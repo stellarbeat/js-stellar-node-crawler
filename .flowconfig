@@ -1,0 +1,12 @@
+[ignore]
+<PROJECT_ROOT>/lib/.*
+
+[include]
+<PROJECT_ROOT>/node_modules/js-stellar-node-connector/*
+
+[libs]
+flow-typed
+
+[options]
+module.system.node.resolve_dirname=node_modules
+#all=true

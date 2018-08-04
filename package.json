@@ -1,0 +1,30 @@
+{
+  "name": "js-stellar-node-crawler",
+  "version": "0.1.0",
+  "description": "Crawl the network for nodes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stellarbeat/js-stellar-node-crawler.git"
+  },
+  "main": "web/index.js",
+  "scripts": {
+    "flow": "flow",
+    "flow:check": "flow check ./src/",
+    "flow:deps": "flow-typed install",
+    "flow:build": "flow-remove-types ./src/ -d ./lib/ --all --pretty; flow-copy-source src lib",
+    "examples:crawl": "npm run flow:build; node lib/examples/crawl"
+  },
+  "author": "pieterjan84@github",
+  "license": "MIT",
+  "dependencies": {
+    "js-stellar-node-connector": "github:stellarbeat/js-stellar-node-connector#master",
+    "stellar-base": "^0.7.8"
+  },
+  "devDependencies": {
+    "flow-copy-source": "^2.0.2",
+    "flow": "^0.2.3",
+    "flow-bin": "^0.73.0",
+    "flow-remove-types": "^1.2.3",
+    "flow-typed": "^2.4.0"
+  }
+}
