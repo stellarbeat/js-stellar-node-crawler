@@ -1,8 +1,8 @@
 // @flow
-const Node = require('js-stellar-node-connector/lib/entities/node');
-const Connection = require("js-stellar-node-connector/lib/entities/connection");
-const QuorumSet = require("js-stellar-node-connector/lib/entities/quorum-set");
-const ConnectionManager = require("js-stellar-node-connector/lib/services/connection-manager");
+const Connection = require("@stellarbeat/js-stellar-node-connector").Connection;
+const Node = require('@stellarbeat/js-stellar-domain').Node;
+const QuorumSet = require('@stellarbeat/js-stellar-domain').QuorumSet;
+const ConnectionManager = require("@stellarbeat/js-stellar-node-connector").ConnectionManager;
 const StellarBase = require('stellar-base');
 
 class Crawler {

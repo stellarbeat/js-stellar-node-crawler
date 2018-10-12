@@ -1,8 +1,8 @@
 [ignore]
-<PROJECT_ROOT>/lib/.*
+.*/node_modules/config-chain/test/broken.json
+lib/*
 
 [include]
-<PROJECT_ROOT>/node_modules/js-stellar-node-connector/*
 
 [libs]
 flow-typed
