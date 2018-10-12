@@ -1,4 +1,4 @@
 "use strict";
 //@flow
 
-exports.crawler = require('./crawler');
+exports.Crawler = require('./crawler');
