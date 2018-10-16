@@ -1,5 +1,5 @@
-const Crawler = require("../lib/crawler");
-const jsonStorage = require("../lib/json-storage");
+const Crawler = require("../lib/index").Crawler;
+const jsonStorage = require("../lib/index").jsonStorage;
 
 // noinspection JSIgnoredPromiseFromCall
 main();
@@ -17,7 +17,7 @@ async function main() {
     let nodes = await jsonStorage.getNodesFromFile(nodesJsonPath);
 
     console.log("[MAIN] Crawl!");
-    let myCrawler = new Crawler();
+    let myCrawler = new Crawler(true, 30000);
     let crawledNodes = await myCrawler.crawl(nodes);
 
     console.log("[MAIN] Writing results to file nodes.json in directory crawl_result");

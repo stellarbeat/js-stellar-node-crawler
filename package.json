@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/stellarbeat/js-stellar-node-crawler.git"
   },
-  "main": "web/index.js",
+  "main": "lib/index.js",
   "scripts": {
     "flow": "flow",
     "flow:check": "flow check ./src/",
@@ -14,13 +14,12 @@
     "flow:build": "flow-remove-types ./src/ -d ./lib/ --all --pretty; flow-copy-source src lib",
     "examples:crawl": "npm run flow:build; node examples/crawl"
   },
-  "main": "lib/index.js",
   "author": "pieterjan84@github",
   "license": "MIT",
   "dependencies": {
     "@stellarbeat/js-stellar-domain": "github:stellarbeat/js-stellar-domain#master",
     "@stellarbeat/js-stellar-node-connector": "github:stellarbeat/js-stellar-node-connector#master",
-    "stellar-base": "^0.8"
+    "stellar-base": "0.8.2"
   },
   "devDependencies": {
     "flow-copy-source": "^2.0.2",
