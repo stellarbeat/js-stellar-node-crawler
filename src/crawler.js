@@ -65,9 +65,15 @@ class Crawler {
         }
 
         this._allNodes.set(node.key, node);
-
-        console.log('[CRAWLER] ' + node.key + ': Start Crawl');
         this._busyCounter++;
+
+        setTimeout(this.crawlNodeDelayed.bind(this), (this._allNodes.size %30)* 1000, node);
+        //time to complete handshake rises with number of simultaneous connections, so we batch crawls over 30 seconds
+        //todo better solution as number of nodes will grow
+    }
+
+    crawlNodeDelayed(node: Node) {
+        console.log('[CRAWLER] ' + node.key + ': Start Crawl');
 
         try {
             console.time(node.key);
@@ -139,6 +145,8 @@ class Crawler {
     }
 
     onHandshakeCompleted(connection: Connection) {
+        console.log(this._busyCounter);
+        console.timeEnd(connection.toNode.key);
         try {
             console.log('[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
             //filter out nodes that switched ip address //@todo: correct location?
