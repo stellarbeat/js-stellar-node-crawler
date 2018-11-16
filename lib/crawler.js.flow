@@ -49,11 +49,10 @@ class Crawler {
                 this._resolve = resolve;
                 this._reject = reject;
 
-                for (let i = 0; i < nodesSeed.length; i++) {
-                    setTimeout(this.crawlNode.bind(this), i%30 * 1000, nodesSeed[i]);
-                    //time to complete handshake rises with number of simultaneous connections, so we batch crawls over 30 seconds
-                    //todo better solution as number of nodes will grow
-                }
+                nodesSeed.forEach(node => {
+                        this.crawlNode(node);
+                    }
+                );
             }
         );
     }
@@ -140,6 +139,8 @@ class Crawler {
     }
 
     onHandshakeCompleted(connection: Connection) {
+        console.log(this._busyCounter);
+        console.timeEnd(connection.toNode.key);
         try {
             console.log('[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
             //filter out nodes that switched ip address //@todo: correct location?
@@ -166,21 +167,18 @@ class Crawler {
         }
     }
 
-    onPeersReceived(peers: Array<Node>, connection: Connection) {
+    onPeersReceived(peers:Array<Node>, connection:Connection) {
         try {
             console.log('[CRAWLER] ' + connection.toNode.key + ': ' + peers.length + ' peers received');
             this._nodesThatSuppliedPeerList.add(connection.toNode);
-            for (let i = 0; i < peers.length; i++) {
-                if (!this._allNodes.has(peers[i].key)) { //newly discovered toNode
-                    console.log('[CRAWLER] ' + connection.toNode.key + ': supplied a newly discovered peer: ' + peers[i].key);
-                    setTimeout(this.crawlNode.bind(this), i%30* 1000, peers[i]);
-                    //time to complete handshake rises with number of simultaneous connections, so we batch crawls over 30 seconds
-                    //todo better solution as number of nodes will grow
-
+            peers.forEach(peer => {
+                if(!this._allNodes.has(peer.key)) { //newly discovered toNode
+                    console.log('[CRAWLER] ' + connection.toNode.key + ': supplied a newly discovered peer: ' + peer.key);
+                    this.crawlNode(peer);
                 } else {
-                    console.log('[CRAWLER] peer ' + peers[i].key + ' already crawled');
+                    console.log('[CRAWLER] peer ' + peer.key + ' already crawled');
                 }
-            }
+            });
         } catch (exception) {
             console.log('[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
