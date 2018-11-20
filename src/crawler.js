@@ -5,6 +5,8 @@ const QuorumSet = require('@stellarbeat/js-stellar-domain').QuorumSet;
 const ConnectionManager = require("@stellarbeat/js-stellar-node-connector").ConnectionManager;
 const CrawlStatisticsProcessor = require("./crawl-statistics-processor");
 const StellarBase = require('stellar-base');
+const winston = require('winston');
+require('dotenv').config();
 
 class Crawler {
 
@@ -19,8 +21,9 @@ class Crawler {
     _resolve: (Array<Node>) => void;
     _reject: () => void;
     _durationInMilliseconds: number;
+    _logger: any;
 
-    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000) { //todo report data with event listeners (e.g. connectionmanager)
+    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, logger) { //todo report data with event listeners (e.g. connectionmanager)
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allNodes = new Map();
@@ -37,7 +40,34 @@ class Crawler {
             this.onQuorumSetHashDetected.bind(this),
             this.onQuorumSetReceived.bind(this),
             this.onNodeDisconnected.bind(this));
+        if(!logger) {
+            this.initializeDefaultLogger();
+        } else {
+            this._logger = logger;
+        }
+
     }
+
+    setLogger(logger: any) {
+        this._logger = logger;
+    }
+
+    initializeDefaultLogger() {
+        this._logger = winston.createLogger({
+            level: process.env.LOG_LEVEL || 'info',
+            format: winston.format.combine(
+                winston.format.colorize(),
+                winston.format.timestamp({
+                    format: 'YYYY-MM-DD HH:mm:ss'
+                }),
+                winston.format.printf(info => `[${info.level}] ${info.timestamp} ${info.message}`)
+            ),
+            transports: [
+                new winston.transports.Console()
+            ]
+        });
+    }
+
 
     /**
      *
@@ -45,6 +75,7 @@ class Crawler {
      * @returns {Promise<any>}
      */
     crawl(nodesSeed: Array<Node>) {
+        this._logger.log('info',"[CRAWLER] Starting crawl with seed of " + nodesSeed.length + "nodes.");
         return new Promise((resolve, reject) => {
                 this._resolve = resolve;
                 this._reject = reject;
@@ -60,7 +91,7 @@ class Crawler {
     crawlNode(node: Node) {
 
         if (this._allNodes.has(node.key)) {
-            console.log('[CRAWLER] ' + node.key + ': Node key already used for crawl');
+            this._logger.log('debug','[CRAWLER] ' + node.key + ': Node key already used for crawl');
             return;
         }
 
@@ -73,22 +104,20 @@ class Crawler {
     }
 
     crawlNodeDelayed(node: Node) {
-        console.log('[CRAWLER] ' + node.key + ': Start Crawl');
+        this._logger.log('debug','[CRAWLER] ' + node.key + ': Start Crawl');
 
         try {
-            console.time(node.key);
             this._connectionManager.connect(
                 this._keyPair,
                 node,
                 this._durationInMilliseconds
             );
         } catch (exception) {
-            console.log('[CRAWLER] ' + node.key + ': Exception: ' + exception.message);
+            this._logger.log('error','[CRAWLER] ' + node.key + ': Exception: ' + exception.message);
         }
     }
 
     wrapUp(node: Node) {
-        console.timeEnd(node.key);
         if (this._activeConnections.has(node.key)) {
             this._activeConnections.delete(node.key);
         }
@@ -96,13 +125,13 @@ class Crawler {
         CrawlStatisticsProcessor.updateNodeStatistics(node);
 
         this._busyCounter--;
-        console.log("[CRAWLER] Connected to " + this._busyCounter + " nodes.");
+        this._logger.log('debug',"[CRAWLER] Connected to " + this._busyCounter + " nodes.");
         if (this._busyCounter === 0) {
 
 
-            console.log("[CRAWLER] Finished with all nodes");
-            console.log('[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.active).length);
-            console.log('[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
+            this._logger.log('info',"[CRAWLER] Finished with all nodes");
+            this._logger.log('info','[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.active).length);
+            this._logger.log('info','[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
 
             this._resolve(
                 Array.from(this._allNodes.values())
@@ -137,25 +166,23 @@ class Crawler {
      */
     onNodeDisconnected(connection: Connection) {
         try {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Node disconnected');
+            this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Node disconnected');
             this.wrapUp(connection.toNode);
         } catch (exception) {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
+            this._logger.log('error','[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
     }
 
     onHandshakeCompleted(connection: Connection) {
-        console.log(this._busyCounter);
-        console.timeEnd(connection.toNode.key);
         try {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
+            this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
             //filter out nodes that switched ip address //@todo: correct location?
             [...this._allNodes.values()].forEach(node => {
                 if (node.publicKey === undefined || node.publicKey === null) {
                     return;
                 }
                 if (node.publicKey === connection.toNode.publicKey && node.key !== connection.toNode.key) {
-                    console.log('[CRAWLER] ' + connection.toNode.key + ': toNode switched ip, discard the old one.');
+                    this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': toNode switched ip, discard the old one.');
                     connection.toNode.statistics = node.statistics; //transfer the statistics. todo: should we log this?
                     this._allNodes.delete(node.key);
                 }
@@ -169,60 +196,60 @@ class Crawler {
                 this._connectionManager.sendGetPeers(connection);
             }
         } catch (exception) {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
+            this._logger.log('error','[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
     }
 
     onPeersReceived(peers:Array<Node>, connection:Connection) {
         try {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': ' + peers.length + ' peers received');
+            this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': ' + peers.length + ' peers received');
             this._nodesThatSuppliedPeerList.add(connection.toNode);
             peers.forEach(peer => {
                 if(!this._allNodes.has(peer.key)) { //newly discovered toNode
-                    console.log('[CRAWLER] ' + connection.toNode.key + ': supplied a newly discovered peer: ' + peer.key);
+                    this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': supplied a newly discovered peer: ' + peer.key);
                     this.crawlNode(peer);
                 } else {
-                    console.log('[CRAWLER] peer ' + peer.key + ' already crawled');
+                    this._logger.log('debug','[CRAWLER] peer ' + peer.key + ' already crawled');
                 }
             });
         } catch (exception) {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
+            this._logger.log('error','[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
 
     }
 
     onLoadTooHighReceived(connection: Connection) {
         try {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Load too high');
+            this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Load too high');
         } catch (exception) {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
+            this._logger.log('error','[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
     }
 
     onQuorumSetHashDetected(connection: Connection, quorumSetHash: string, quorumSetOwnerPublicKey: string) {
         try {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Detected quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
+            this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Detected quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
 
             let node = null;
             let nodes = [...this._allNodes.values()].filter(node => node.publicKey === quorumSetOwnerPublicKey);
             if (nodes.length > 0) {
                 node = nodes[0];
             } else {
-                console.log('[CRAWLER] ' + connection.toNode.key + ': Quorumset owner unknown to us, skipping: ' + quorumSetOwnerPublicKey);
+                this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Quorumset owner unknown to us, skipping: ' + quorumSetOwnerPublicKey);
                 return;
             }
 
             if (node.quorumSet.hashKey === quorumSetHash) {
-                console.log('[CRAWLER] ' + connection.toNode.key + ': Quorumset already known to us for toNode: ' + quorumSetOwnerPublicKey);
+                this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Quorumset already known to us for toNode: ' + quorumSetOwnerPublicKey);
             } else {
-                console.log('[CRAWLER] ' + connection.toNode.key + ': Unknown or modified quorumSetHash for toNode, requesting it: ' + quorumSetOwnerPublicKey);
+                this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Unknown or modified quorumSetHash for toNode, requesting it: ' + quorumSetOwnerPublicKey);
                 let owners = this._quorumSetHashes.get(quorumSetHash);
                 if (owners) {
                     if (owners.has(quorumSetOwnerPublicKey)) {
-                        console.log('[CRAWLER] ' + connection.toNode.key + ': Already logged quorumSetHash for owner: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
+                        this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Already logged quorumSetHash for owner: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
                     } else {
                         owners.add(quorumSetOwnerPublicKey);
-                        console.log('[CRAWLER] ' + connection.toNode.key + ': Logged new owner for quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
+                        this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Logged new owner for quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
                     }
                 } else {
                     this._quorumSetHashes.set(quorumSetHash, new Set([quorumSetOwnerPublicKey]));
@@ -230,13 +257,13 @@ class Crawler {
                 this.requestQuorumSetFromConnectedNodes(quorumSetHash, quorumSetOwnerPublicKey);
             }
         } catch (exception) {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
+            this._logger.log('error','[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
     }
 
     onQuorumSetReceived(connection: Connection, quorumSet: QuorumSet) {
         try {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': QuorumSet received: ' + quorumSet.hashKey);
+            this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': QuorumSet received: ' + quorumSet.hashKey);
             let owners = this._quorumSetHashes.get(quorumSet.hashKey);
             if (!owners) {
                 return;
@@ -244,13 +271,13 @@ class Crawler {
             owners.forEach(nodePublicKey => {
                 let nodes = [...this._allNodes.values()].filter(node => node.publicKey === nodePublicKey).forEach( //node could have switched ip, and thus it is now twice in the list with the same public key.
                     nodeWithNewQuorumSet => {
-                        console.log('[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
+                        this._logger.log('debug','[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
                         nodeWithNewQuorumSet.quorumSet = quorumSet;
                     }
                 );
             });
         } catch (exception) {
-            console.log('[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
+            this._logger.log('error','[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
     }
 }
