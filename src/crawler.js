@@ -106,7 +106,7 @@ class Crawler {
 
     crawlNodeDelayed(node: Node) {
         this._logger.log('debug','[CRAWLER] ' + node.key + ': Start Crawl');
-
+        console.time(node.key);
         try {
             this._connectionManager.connect(
                 this._keyPair,
@@ -175,6 +175,9 @@ class Crawler {
     }
 
     onHandshakeCompleted(connection: Connection) {
+        console.log("timing");
+        console.timeEnd(connection.toNode.key);
+
         try {
             this._logger.log('debug','[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
             //filter out nodes that switched ip address //@todo: correct location?

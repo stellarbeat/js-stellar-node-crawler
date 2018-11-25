@@ -15,7 +15,6 @@ module.exports = {
 
         if(node.statistics.activeRating > 0 ) {
             //to avoid heavy changes after every crawl, we update the nodes active status to their average
-            //todo: find out why we have such differences between crawls on node active status.
             node.active = true;
         } else {
             node.active = false;
