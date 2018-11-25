@@ -32,6 +32,11 @@ class Crawler {
         this._keyPair = StellarBase.Keypair.random();
         this._usePublicNetwork = usePublicNetwork;
         this._quorumSetHashes = new Map();
+        if(!logger) {
+            this.initializeDefaultLogger();
+        } else {
+            this._logger = logger;
+        }
         this._connectionManager = new ConnectionManager(
             this._usePublicNetwork,
             this.onHandshakeCompleted.bind(this),
@@ -39,13 +44,9 @@ class Crawler {
             this.onLoadTooHighReceived.bind(this),
             this.onQuorumSetHashDetected.bind(this),
             this.onQuorumSetReceived.bind(this),
-            this.onNodeDisconnected.bind(this));
-        if(!logger) {
-            this.initializeDefaultLogger();
-        } else {
-            this._logger = logger;
-        }
-
+            this.onNodeDisconnected.bind(this),
+            this._logger
+        );
     }
 
     setLogger(logger: any) {
