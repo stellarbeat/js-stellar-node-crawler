@@ -23,7 +23,7 @@ class Crawler {
     _durationInMilliseconds: number;
     _logger: any;
 
-    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, logger) { //todo report data with event listeners (e.g. connectionmanager)
+    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 3000, logger) { //todo report data with event listeners (e.g. connectionmanager)
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allNodes = new Map();
@@ -99,7 +99,7 @@ class Crawler {
         this._allNodes.set(node.key, node);
         this._busyCounter++;
 
-        setTimeout(this.crawlNodeDelayed.bind(this), (this._allNodes.size %30)* 1000, node);
+        setTimeout(this.crawlNodeDelayed.bind(this), (this._allNodes.size %30)* 2000, node);
         //time to complete handshake rises with number of simultaneous connections, so we batch crawls over 30 seconds
         //todo better solution as number of nodes will grow
     }
@@ -274,9 +274,18 @@ class Crawler {
             }
             owners.forEach(nodePublicKey => {
                 let nodes = [...this._allNodes.values()].filter(node => node.publicKey === nodePublicKey).forEach( //node could have switched ip, and thus it is now twice in the list with the same public key.
-                    nodeWithNewQuorumSet => {
-                        this._logger.log('debug','[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
-                        nodeWithNewQuorumSet.quorumSet = quorumSet;
+                    nodeWithNewQuorumSet =>
+                    {
+                        if(nodeWithNewQuorumSet.quorumSet.hashKey === quorumSet.hashKey) {
+                            this._logger.log('debug','[CRAWLER] QuorumSet already updated for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
+
+                        } else {
+                            this._logger.log('debug','[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
+                            console.log(quorumSet);
+                            console.log(nodeWithNewQuorumSet.key);
+                            nodeWithNewQuorumSet.quorumSet = quorumSet;
+                        }
+
                     }
                 );
             });

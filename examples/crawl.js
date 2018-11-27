@@ -17,7 +17,7 @@ async function main() {
     let nodes = await jsonStorage.getNodesFromFile(nodesJsonPath);
 
     console.log("[MAIN] Crawl!");
-    let myCrawler = new Crawler(true, 30000);
+    let myCrawler = new Crawler(true, 3000);
     let crawledNodes = await myCrawler.crawl(nodes);
 
     console.log("[MAIN] Writing results to file nodes.json in directory crawl_result");
