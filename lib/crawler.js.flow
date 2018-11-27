@@ -281,8 +281,6 @@ class Crawler {
 
                         } else {
                             this._logger.log('debug','[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
-                            console.log(quorumSet);
-                            console.log(nodeWithNewQuorumSet.key);
                             nodeWithNewQuorumSet.quorumSet = quorumSet;
                         }
 
