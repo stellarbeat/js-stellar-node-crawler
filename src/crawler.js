@@ -274,9 +274,12 @@ class Crawler {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Detected quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
 
             let node = null;
-            let nodes = [...this._allNodes.values()].filter(node => node.publicKey === quorumSetOwnerPublicKey);
+            let nodes = [...this._allNodes.values()]
+                .filter(node => node.publicKey === quorumSetOwnerPublicKey);
+
             if (nodes.length > 0) {
                 node = nodes[0];
+                node.active = true; //node is active in scp todo: differentiate between different active status (can connect to it & is active in scp)
             } else {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Quorumset owner unknown to us, skipping: ' + quorumSetOwnerPublicKey);
                 return;
