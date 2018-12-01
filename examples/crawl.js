@@ -18,10 +18,10 @@ async function main() {
 
     console.log("[MAIN] Crawl!");
     let myCrawler = new Crawler(true, 3000);
-    let crawledNodes = await myCrawler.crawl(nodes);
+    let crawledNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey));
 
     console.log("[MAIN] Writing results to file nodes.json in directory crawl_result");
-    await jsonStorage.writeFilePromise("./crawl_result/nodes.json", JSON.stringify(crawledNodes));
+    await jsonStorage.writeFilePromise("./crawl_result/nodes.json", JSON.stringify(crawledNodes.filter(node => node.publicKey)));
 
     console.log("[MAIN] Finished");
 }

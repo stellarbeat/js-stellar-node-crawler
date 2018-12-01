@@ -12,7 +12,8 @@
     "flow:check": "flow check ./src/",
     "flow:deps": "flow-typed install",
     "flow:build": "flow-remove-types ./src/ -d ./lib/ --all --pretty; flow-copy-source src lib",
-    "examples:crawl": "npm run flow:build; node examples/crawl"
+    "examples:crawl": "npm run flow:build; node examples/crawl",
+    "test": "npm run flow:build; jest"
   },
   "author": "pieterjan84@github",
   "license": "MIT",
@@ -28,6 +29,7 @@
     "flow": "^0.2.3",
     "flow-bin": "^0.73.0",
     "flow-remove-types": "^1.2.3",
-    "flow-typed": "^2.4.0"
+    "flow-typed": "^2.4.0",
+    "jest": "^23.6.0"
   }
 }
