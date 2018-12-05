@@ -86,9 +86,9 @@ export class Crawler {
      * @param nodesSeed
      * @returns {Promise<any>}
      */
-    crawl(nodesSeed: Array<Node>) {
+    crawl(nodesSeed: Array<Node>):Promise<Array<Node>> {
         this._logger.log('info', "[CRAWLER] Starting crawl with seed of " + nodesSeed.length + "nodes.");
-        return new Promise((resolve, reject) => {
+        return new Promise<Array<Node>>((resolve, reject) => {
                 this._resolve = resolve;
                 this._reject = reject;
 

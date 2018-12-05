@@ -26,7 +26,7 @@ export declare class Crawler {
      * @param nodesSeed
      * @returns {Promise<any>}
      */
-    crawl(nodesSeed: Array<Node>): Promise<{}>;
+    crawl(nodesSeed: Array<Node>): Promise<Array<Node>>;
     crawlNode(node: Node): void;
     addWeight(node: Node): void;
     removeWeight(node: Node): void;
