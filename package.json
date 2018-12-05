@@ -8,12 +8,9 @@
   },
   "main": "lib/index.js",
   "scripts": {
-    "flow": "flow",
-    "flow:check": "flow check ./src/",
-    "flow:deps": "flow-typed install",
-    "flow:build": "flow-remove-types ./src/ -d ./lib/ --all --pretty; flow-copy-source src lib",
-    "examples:crawl": "npm run flow:build; node examples/crawl",
-    "test": "npm run flow:build; jest"
+    "build": "tsc --declaration",
+    "examples:crawl": "yarn run build; NODE_PATH=node_modules node examples/crawl",
+    "test": "jest"
   },
   "author": "pieterjan84@github",
   "license": "MIT",
@@ -22,14 +19,15 @@
     "@stellarbeat/js-stellar-node-connector": "github:stellarbeat/js-stellar-node-connector#master",
     "dotenv": "^6.1.0",
     "stellar-base": "0.8.2",
+    "tweetnacl": "^1.0.0",
     "winston": "^3.1.0"
   },
   "devDependencies": {
-    "flow-copy-source": "^2.0.2",
-    "flow": "^0.2.3",
-    "flow-bin": "^0.73.0",
-    "flow-remove-types": "^1.2.3",
-    "flow-typed": "^2.4.0",
-    "jest": "^23.6.0"
+    "@types/jest": "^23.3.10",
+    "@types/node": "^10.12.12",
+    "jest": "^23.6.0",
+    "merge": ">=1.2.1",
+    "ts-jest": "^23.10.5",
+    "typescript": "^3.2.1"
   }
 }

@@ -1,8 +1,7 @@
-const fs = require('fs');
-const Node = require("@stellarbeat/js-stellar-domain").Node;
-const QuorumSet = require("@stellarbeat/js-stellar-domain").QuorumSet;
+import * as fs from 'fs';
+import {Node, QuorumSet} from "@stellarbeat/js-stellar-domain";
 
-module.exports = {
+export default {
     readFilePromise: function (path) {
         return new Promise((resolve, reject) =>
             fs.readFile(path, 'utf8', function callback(err, data) {
@@ -35,6 +34,5 @@ module.exports = {
             return Node.fromJSON(node);
         });
     },
-
 };
 

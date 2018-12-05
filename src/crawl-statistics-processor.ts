@@ -1,9 +1,6 @@
-//@flow
+import {Node, Network} from "@stellarbeat/js-stellar-domain";
 
-const Node = require("@stellarbeat/js-stellar-domain").Node;
-const Network = require("@stellarbeat/js-stellar-domain").Network;
-
-module.exports = {
+export default {
     updateNodeStatistics: function (node: Node) {
         if(node.active) {
             node.statistics.incrementActiveCounter();

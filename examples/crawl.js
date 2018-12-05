@@ -1,5 +1,7 @@
-const Crawler = require("../lib/index").Crawler;
-const jsonStorage = require("../lib/index").jsonStorage;
+const Crawler = require("../lib").Crawler;
+const jsonStorage = require('../lib').jsonStorage;
+const Node = require('@stellarbeat/js-stellar-domain').Node;
+const StellarBase = require('stellar-base');
 
 // noinspection JSIgnoredPromiseFromCall
 main();

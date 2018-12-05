@@ -1,25 +1,24 @@
-// @flow
-const Connection = require("@stellarbeat/js-stellar-node-connector").Connection;
-const Node = require('@stellarbeat/js-stellar-domain').Node;
-const QuorumSet = require('@stellarbeat/js-stellar-domain').QuorumSet;
-const ConnectionManager = require("@stellarbeat/js-stellar-node-connector").ConnectionManager;
-const CrawlStatisticsProcessor = require("./crawl-statistics-processor");
+import {Connection, ConnectionManager} from "@stellarbeat/js-stellar-node-connector";
+import {Node, QuorumSet} from '@stellarbeat/js-stellar-domain';
+import CrawlStatisticsProcessor from "./crawl-statistics-processor";
+
 const StellarBase = require('stellar-base');
-const winston = require('winston');
+import * as winston from 'winston';
+
 require('dotenv').config();
 
-class Crawler {
+export class Crawler {
 
     _busyCounter: number;
     _allNodes: Map<string, Node>;
     _activeConnections: Map<string, Connection>;
     _nodesThatSuppliedPeerList: Set<Node>;
-    _keyPair: StellarBase.Keypair;
+    _keyPair: any /*StellarBase.Keypair*/;
     _usePublicNetwork: boolean;
     _quorumSetHashes: Map<string, Set<string>>;
     _connectionManager: ConnectionManager;
-    _resolve: (Array<Node>) => void;
-    _reject: () => void;
+    _resolve: any; //todo typehints
+    _reject: any;
     _durationInMilliseconds: number;
     _logger: any;
 
@@ -29,7 +28,7 @@ class Crawler {
     _activeNodeWeight: number;
     _defaultNodeWeight: number;
 
-    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 3000, logger: any) { //todo report data with event listeners (e.g. connectionmanager)
+    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 3000, logger: any = null) {
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allNodes = new Map();
@@ -335,5 +334,3 @@ class Crawler {
         }
     }
 }
-
-module.exports = Crawler;

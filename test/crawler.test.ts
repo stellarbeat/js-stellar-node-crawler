@@ -1,6 +1,6 @@
-const Node = require('@stellarbeat/js-stellar-domain').Node;
-const ConnectionManager = require("@stellarbeat/js-stellar-node-connector").ConnectionManager;
-const Crawler = require("../lib/crawler");
+import {Node} from '@stellarbeat/js-stellar-domain';
+import {ConnectionManager} from "@stellarbeat/js-stellar-node-connector";
+import {Crawler} from "../src/crawler";
 jest.mock("../node_modules/@stellarbeat/js-stellar-node-connector/lib/connection-manager.js");
 
 //setup
