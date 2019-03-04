@@ -226,6 +226,8 @@ export class Crawler {
                 if (node.publicKey === connection.toNode.publicKey && node.key !== connection.toNode.key) {
                     this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': toNode switched ip, discard the old one.');
                     connection.toNode.statistics = node.statistics; //transfer the statistics. todo: should we log this?
+                    connection.toNode.name = node.name;
+                    connection.toNode.host = node.host;
                     this._allNodes.delete(node.key);
                 }
             });
