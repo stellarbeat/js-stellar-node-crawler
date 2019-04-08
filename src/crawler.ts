@@ -56,8 +56,8 @@ export class Crawler {
         this._nodesToCrawl = [];
         this._weight = 0;
         this._activeNodeWeight = 100;
-        this._defaultNodeWeight = 2;
-        this._maxWeight = 100;
+        this._defaultNodeWeight = 10;
+        this._maxWeight = 500;
     }
 
     setLogger(logger: any) {
