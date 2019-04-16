@@ -224,6 +224,7 @@ export class Crawler {
                     this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': toNode switched ip, discard the old one.');
                     let wasActiveInLastCrawl = connection.toNode.statistics.activeInLastCrawl;
                     connection.toNode.statistics = node.statistics; //transfer the statistics. todo: should we log this?
+                    connection.toNode.geoData = node.geoData; //todo: nodes that use the same public key for multiple ip's are draining the geo lookup license. Need better solution here. Maybe blacklist these nodes. Can detect where date discovered is equal to date updated, but the availability is higher then 1.
                     connection.toNode.statistics.activeInLastCrawl = wasActiveInLastCrawl; //to reduce the right amount of weights
                     connection.toNode.name = node.name;
                     connection.toNode.host = node.host;
