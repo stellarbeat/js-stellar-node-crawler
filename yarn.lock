@@ -18,10 +18,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@stellarbeat/js-stellar-domain@^0.3", "@stellarbeat/js-stellar-domain@^0.3.2":
-  version "0.3.2"
-  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-domain/-/js-stellar-domain-0.3.2.tgz#fa82c49bf5e5b6b131d7a4bb809cbfbe4f00a518"
-  integrity sha512-yCLv81n5D6jFZTkyLbI+/ylmKGTJtTb5aqLfscEmueqzZplxnKXJ2bGzY3emmmUXHDSiVr9R6VhpDJdt5RWYQA==
+"@stellarbeat/js-stellar-domain@^0.3.2":
+  version "0.3.3"
+  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-domain/-/js-stellar-domain-0.3.3.tgz#ae5c915297ccd9487e8aa797f873b1cc950a66fc"
+  integrity sha512-4faBrYxO5sQuftvNb7BqOjO6TG3SLeyL248KTdi0NjzqJ36pfSyVjUrrofCgkZc/IA/WQJPN2LQP5L8VRGhsbQ==
   dependencies:
     lodash "^4.17.11"
 
