@@ -138,7 +138,6 @@ export class Crawler {
                 this.addWeight(nextNodeToCrawl);
 
                 this._logger.log('debug', '[CRAWLER] ' + nextNodeToCrawl.key + ': Start Crawl');
-                console.time(nextNodeToCrawl.key);
 
                 this._connectionManager.connect(
                     this._keyPair,
@@ -213,13 +212,11 @@ export class Crawler {
     }
 
     onHandshakeCompleted(connection: Connection) {
-        console.log("timing");
-        console.timeEnd(connection.toNode.key);
 
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
             //filter out nodes that switched ip address //@todo: correct location?
-            [...this._allNodes.values()].forEach(node => {
+            [...this._allNodes.values()].forEach((node: Node) => {
                 if (node.publicKey === undefined || node.publicKey === null) {
                     return;
                 }
