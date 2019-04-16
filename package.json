@@ -1,6 +1,6 @@
 {
   "name": "@stellarbeat/js-stellar-node-crawler",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Crawl the network for nodes",
   "repository": {
     "type": "git",
@@ -8,6 +8,7 @@
   },
   "main": "lib/index.js",
   "scripts": {
+    "prepublish": "yarn run build",
     "build": "tsc --declaration",
     "examples:crawl": "yarn run build; NODE_PATH=node_modules node examples/crawl",
     "test": "jest"
@@ -15,8 +16,8 @@
   "author": "pieterjan84@github",
   "license": "MIT",
   "dependencies": {
-    "@stellarbeat/js-stellar-domain": "github:stellarbeat/js-stellar-domain#master",
-    "@stellarbeat/js-stellar-node-connector": "github:stellarbeat/js-stellar-node-connector#master",
+    "@stellarbeat/js-stellar-domain": "^0.3",
+    "@stellarbeat/js-stellar-node-connector": "^0.3",
     "dotenv": "^6.1.0",
     "stellar-base": "0.8.2",
     "tweetnacl": "^1.0.0",

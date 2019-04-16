@@ -1,5 +1,6 @@
+import { Node, Network } from "@stellarbeat/js-stellar-domain";
 declare const _default: {
-    updateNodeStatistics: (node: any) => void;
-    updateNetworkStatistics: (network: any) => void;
+    updateNodeStatistics: (node: Node) => void;
+    updateNetworkStatistics: (network: Network) => void;
 };
 export default _default;
