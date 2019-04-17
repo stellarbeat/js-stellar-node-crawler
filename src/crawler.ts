@@ -215,26 +215,7 @@ export class Crawler {
 
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
-            //filter out nodes that switched ip address //@todo: correct location?
-            [...this._allNodes.values()].forEach((node: Node) => {
-                if (node.publicKey === undefined || node.publicKey === null) {
-                    return;
-                }
-                if (node.publicKey === connection.toNode.publicKey && node.key !== connection.toNode.key) {
-                    this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': toNode switched ip, discard the old one.');
-                    let wasActiveInLastCrawl = connection.toNode.statistics.activeInLastCrawl;
-                    connection.toNode.statistics = node.statistics; //transfer the statistics. todo: should we log this?
-                    connection.toNode.geoData = node.geoData; //todo: nodes that use the same public key for multiple ip's are draining the geo lookup license. Need better solution here. Maybe blacklist these nodes. Can detect where date discovered is equal to date updated, but the availability is higher then 1.
-                    connection.toNode.statistics.activeInLastCrawl = wasActiveInLastCrawl; //to reduce the right amount of weights
-                    connection.toNode.name = node.name;
-                    connection.toNode.host = node.host;
-                    this._allNodes.delete(node.key);
-                }
-            });
-            let publicKey = connection.toNode.publicKey;
-            if (!publicKey) {
-                throw new Error('hello message did not supply public key');
-            }
+
             this._activeConnections.set(connection.toNode.key, connection);
             if (!this._nodesThatSuppliedPeerList.has(connection.toNode)) {
                 this._connectionManager.sendGetPeers(connection);
