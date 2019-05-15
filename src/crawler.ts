@@ -88,12 +88,12 @@ export class Crawler {
                 let resolved = false;
 
                 this._ledgerEventSource.addEventListener('message', event => {
-                    this._latestLedgerSequence = JSON.parse(event.data).sequence;
+                    this._latestLedgerSequence = JSON.parse((event as any).data).sequence;
                     console.log("new latest ledger: " + this._latestLedgerSequence);
                     if (!resolved) {
                         resolve();
                     }
-                }, false);
+                });
             }
         );
     }

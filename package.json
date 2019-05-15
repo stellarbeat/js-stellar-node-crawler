@@ -1,6 +1,6 @@
 {
   "name": "@stellarbeat/js-stellar-node-crawler",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Crawl the network for nodes",
   "repository": {
     "type": "git",
@@ -28,6 +28,7 @@
   "devDependencies": {
     "@types/jest": "^23.3.10",
     "@types/node": "^10.12.12",
+    "@types/eventsource": "^1.1.0",
     "jest": "^23.6.0",
     "merge": ">=1.2.1",
     "ts-jest": "^23.10.5",
