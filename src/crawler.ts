@@ -1,11 +1,23 @@
 import {Connection, ConnectionManager} from "@stellarbeat/js-stellar-node-connector";
 import {Node, QuorumSet} from '@stellarbeat/js-stellar-domain';
 import CrawlStatisticsProcessor from "./crawl-statistics-processor";
+import * as EventSource from 'eventsource';
 
 const StellarBase = require('stellar-base');
 import * as winston from 'winston';
 
+type PublicKey = string;
+type LedgerSequence = number;
+
+interface Ledger {
+    node: Node;
+    ledgerId: number;
+    values: Map<publicKey, string>;
+}
+
 require('dotenv').config();
+
+type publicKey = string;
 
 export class Crawler {
 
@@ -21,14 +33,25 @@ export class Crawler {
     _reject: any;
     _durationInMilliseconds: number;
     _logger: any;
-
+    _ledgerEventSource: EventSource;
+    _latestLedgerSequence: number = 20;
+    _ledgerSequenceToCheckForNode: Map<PublicKey, LedgerSequence> = new Map();
+    _ledgers: Map<PublicKey, Ledger> = new Map<PublicKey, Ledger>();
     _nodesToCrawl: Array<Node>;
     _weight: number;
     _maxWeight: number;
     _activeNodeWeight: number;
     _defaultNodeWeight: number;
+    _publicKeyToNodeMap: Map<PublicKey, Node> = new Map<PublicKey, Node>();
 
     constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 3000, logger: any = null) {
+        if (!process.env.HORIZON_URL) {
+            throw new Error('Horizon not configured');
+        }
+        this._ledgerEventSource = new EventSource(process.env.HORIZON_URL + "/ledgers?cursor=now");
+        this._ledgerEventSource.onerror = function() {
+            console.log("EventSource failed.");
+        };
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allNodes = new Map();
@@ -47,7 +70,7 @@ export class Crawler {
             this.onHandshakeCompleted.bind(this),
             this.onPeersReceived.bind(this),
             this.onLoadTooHighReceived.bind(this),
-            this.onQuorumSetHashDetected.bind(this),
+            this.onSCPStatementReceived.bind(this),
             this.onQuorumSetReceived.bind(this),
             this.onNodeDisconnected.bind(this),
             this._logger
@@ -58,6 +81,21 @@ export class Crawler {
         this._activeNodeWeight = 100;
         this._defaultNodeWeight = 10;
         this._maxWeight = 500;
+    }
+
+    async trackLatestLedger() {
+        return new Promise<Array<Node>>((resolve, reject) => {
+                let resolved = false;
+
+                this._ledgerEventSource.addEventListener('message', event => {
+                    this._latestLedgerSequence = JSON.parse(event.data).sequence;
+                    console.log("new latest ledger: " + this._latestLedgerSequence);
+                    if (!resolved) {
+                        resolve();
+                    }
+                }, false);
+            }
+        );
     }
 
     setLogger(logger: any) {
@@ -86,7 +124,9 @@ export class Crawler {
      * @param nodesSeed
      * @returns {Promise<any>}
      */
-    crawl(nodesSeed: Array<Node>):Promise<Array<Node>> {
+    async crawl(nodesSeed: Array<Node>): Promise<Array<Node>> {
+        await this.trackLatestLedger();
+
         this._logger.log('info', "[CRAWLER] Starting crawl with seed of " + nodesSeed.length + "nodes.");
         return new Promise<Array<Node>>((resolve, reject) => {
                 this._resolve = resolve;
@@ -133,9 +173,9 @@ export class Crawler {
     processCrawlQueue() {
         while (this._weight < this._maxWeight && this._nodesToCrawl.length > 0) {
             let nextNodeToCrawl = this._nodesToCrawl.shift();
-
             try {
                 this.addWeight(nextNodeToCrawl);
+                nextNodeToCrawl.isValidating = false;
 
                 this._logger.log('debug', '[CRAWLER] ' + nextNodeToCrawl.key + ': Start Crawl');
 
@@ -167,9 +207,20 @@ export class Crawler {
         if (this._busyCounter === 0) {
 
 
-            this._logger.log('info',"[CRAWLER] Finished with all nodes");
-            this._logger.log('info','[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
-            this._logger.log('info','[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
+            this._logger.log('info', "[CRAWLER] Finished with all nodes");
+            this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
+
+            this._ledgerEventSource.close();
+            this._ledgers.forEach((ledger: Ledger, publicKey: PublicKey,) => {
+                (ledger as Ledger).values.forEach((value: string, publicKey: PublicKey) => {
+                    let validatingNode = this._publicKeyToNodeMap.get(publicKey);
+                    if (validatingNode) {
+                        validatingNode.isValidating = true;
+                        //todo: check values
+                    }
+                })
+            });
 
             this._resolve(
                 Array.from(this._allNodes.values())
@@ -215,11 +266,14 @@ export class Crawler {
 
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
-
+            this._publicKeyToNodeMap.set(connection.toNode.publicKey, connection.toNode);
             this._activeConnections.set(connection.toNode.key, connection);
             if (!this._nodesThatSuppliedPeerList.has(connection.toNode)) {
                 this._connectionManager.sendGetPeers(connection);
             }
+            this._ledgerSequenceToCheckForNode.set(connection.toNode.publicKey, this._latestLedgerSequence);
+            console.log('[CRAWLER] ' + connection.toNode.key + ': checking ledger with sequence: ' + this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey));
+            this._connectionManager.sendGetScpStatus(connection, this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey))
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
@@ -251,7 +305,31 @@ export class Crawler {
         }
     }
 
-    onQuorumSetHashDetected(connection: Connection, quorumSetHash: string, quorumSetOwnerPublicKey: string) {
+    onSCPStatementReceived(connection: Connection, scpStatement: any) {
+        if (scpStatement.type !== 'externalize') {
+            return;
+        }
+
+        if (this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey) !== Number(scpStatement.slotIndex)) {
+            return; // we only check 1 ledger for every node
+        }
+
+        console.log('[CRAWLER] ' + connection.toNode.key + ': Externalize message found for ledger with sequence ' + scpStatement.slotIndex)
+        let ledger = this._ledgers.get(connection.toNode.publicKey);
+        if (ledger === undefined) {
+            ledger = {
+                node: connection.toNode,
+                ledgerId: Number(scpStatement.slotIndex),
+                values: new Map()
+            };
+            this._ledgers.set(connection.toNode.publicKey, ledger);
+        }
+        ledger.values.set(scpStatement.nodeId, scpStatement.commit.value);
+        console.log('[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.slotIndex + ': ' + scpStatement.nodeId + ': ' + scpStatement.commit.value);
+
+        let quorumSetHash = scpStatement.quorumSetHash;
+        let quorumSetOwnerPublicKey = scpStatement.nodeId;
+
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Detected quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
 

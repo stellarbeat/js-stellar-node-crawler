@@ -16,9 +16,12 @@
   "author": "pieterjan84@github",
   "license": "MIT",
   "dependencies": {
-    "@stellarbeat/js-stellar-node-connector": "^0.3",
+    "@stellarbeat/js-stellar-domain": "^0.6.2",
+    "@stellarbeat/js-stellar-node-connector": "^0.4.2",
+    "axios": "^0.18.0",
     "dotenv": "^6.1.0",
-    "stellar-base": "0.8.2",
+    "eventsource": "^1.0.7",
+    "stellar-base": "0.13.2",
     "tweetnacl": "^1.0.0",
     "winston": "^3.1.0"
   },

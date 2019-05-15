@@ -24,7 +24,14 @@ export default {
             node.statistics.decrementOverLoadedCounter();
             node.statistics.overLoadedInLastCrawl = false;
         }
-        //todo how do we represent that a node is overloaded most of the time. overloaded rating?
+
+        if(node.isValidating) {
+            node.statistics.incrementValidatingCounter();
+            node.statistics.validatingInLastCrawl = true;
+        } else {
+            node.statistics.decrementValidatingCounter();
+            node.statistics.validatingInLastCrawl = false;
+        }
     },
 
     updateNetworkStatistics: function (network: Network) {
