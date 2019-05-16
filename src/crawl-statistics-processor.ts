@@ -10,13 +10,6 @@ export default {
             node.statistics.activeInLastCrawl = false;
         }
 
-        if(node.statistics.activeRating > 0 ) {
-            //to avoid heavy changes after every crawl, we update the nodes active status to their average
-            node.active = true;
-        } else {
-            node.active = false;
-        }
-
         if(node.overLoaded) {
             node.statistics.incrementOverLoadedCounter();
             node.statistics.overLoadedInLastCrawl = true;
