@@ -97,7 +97,9 @@ export class Crawler {
     async trackLatestLedger() {
         return await new Promise<Array<Node>>((resolve, reject) => {
                 let resolved = false;
-
+                if(this._latestLedgerSequence !== 0) {
+                    resolve(); //do not wait if there is a start ledger already
+                }
                 this._ledgerEventSource.addEventListener('message', event => {
                     this._latestLedgerSequence = JSON.parse((event as any).data).sequence;
                     this._logger.log('info', "[CRAWLER] new latest ledger: " + this._latestLedgerSequence);
