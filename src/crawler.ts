@@ -50,7 +50,7 @@ export class Crawler {
             throw new Error('Horizon not configured');
         }
 
-        //this._ledgerEventSource = new EventSource(process.env.HORIZON_URL + "/ledgers?cursor=now");
+        this._ledgerEventSource = new EventSource(process.env.HORIZON_URL + "/ledgers?cursor=now");
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allNodes = new Map();
@@ -234,7 +234,9 @@ export class Crawler {
 
         if (this._busyCounter === 0) {
 
-            this._ledgerEventSource.close();
+            if(this._ledgerEventSource) {
+                this._ledgerEventSource.close();
+            }
             this._ledgers.forEach((ledger: Ledger, publicKey: PublicKey,) => {
                 (ledger as Ledger).values.forEach((value: string, publicKey: PublicKey) => {
                     let validatingNode = this._publicKeyToNodeMap.get(publicKey);
