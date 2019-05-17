@@ -2,6 +2,7 @@ import {Connection, ConnectionManager} from "@stellarbeat/js-stellar-node-connec
 import {Node, QuorumSet} from '@stellarbeat/js-stellar-domain';
 import CrawlStatisticsProcessor from "./crawl-statistics-processor";
 import * as EventSource from 'eventsource';
+import axios from 'axios';
 
 const StellarBase = require('stellar-base');
 import * as winston from 'winston';
@@ -49,8 +50,7 @@ export class Crawler {
             throw new Error('Horizon not configured');
         }
 
-        this._ledgerEventSource = new EventSource(process.env.HORIZON_URL + "/ledgers?cursor=now");
-
+        //this._ledgerEventSource = new EventSource(process.env.HORIZON_URL + "/ledgers?cursor=now");
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allNodes = new Map();
@@ -80,6 +80,18 @@ export class Crawler {
         this._activeNodeWeight = 100;
         this._defaultNodeWeight = 10;
         this._maxWeight = 500;
+    }
+
+    async getLatestLedger() {
+        try {
+            let result = await axios.get(process.env.HORIZON_URL);
+            if(result && result.data && result.data.core_latest_ledger) {
+                this._latestLedgerSequence = result.data.core_latest_ledger;
+            }
+        } catch (e) {
+            throw new Error("Error fetching latest ledger. Stopping crawler. " + e.message);
+        }
+
     }
 
     async trackLatestLedger() {
@@ -141,6 +153,7 @@ export class Crawler {
                 this._reject = reject;
 
                 try {
+                    await this.getLatestLedger();
                     await this.trackLatestLedger();
                 } catch (e) {
                     this._reject(e.message);
