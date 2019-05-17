@@ -34,7 +34,7 @@ export class Crawler {
     _durationInMilliseconds: number;
     _logger: any;
     _ledgerEventSource: EventSource;
-    _latestLedgerSequence: number = 20;
+    _latestLedgerSequence: number = 0;
     _ledgerSequenceToCheckForNode: Map<PublicKey, LedgerSequence> = new Map();
     _ledgers: Map<PublicKey, Ledger> = new Map<PublicKey, Ledger>();
     _nodesToCrawl: Array<Node>;
@@ -48,10 +48,9 @@ export class Crawler {
         if (!process.env.HORIZON_URL) {
             throw new Error('Horizon not configured');
         }
+
         this._ledgerEventSource = new EventSource(process.env.HORIZON_URL + "/ledgers?cursor=now");
-        this._ledgerEventSource.onerror = function() {
-            console.log("EventSource failed.");
-        };
+
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allNodes = new Map();
@@ -84,16 +83,27 @@ export class Crawler {
     }
 
     async trackLatestLedger() {
-        return new Promise<Array<Node>>((resolve, reject) => {
+        return await new Promise<Array<Node>>((resolve, reject) => {
                 let resolved = false;
 
                 this._ledgerEventSource.addEventListener('message', event => {
                     this._latestLedgerSequence = JSON.parse((event as any).data).sequence;
-                    console.log("new latest ledger: " + this._latestLedgerSequence);
-                    if (!resolved) {
+                    this._logger.log('info', "[CRAWLER] new latest ledger: " + this._latestLedgerSequence);
+                    if (!resolved) { //after the first retrieval, the calling function stops waiting, but the retrieval continues
                         resolve();
                     }
                 });
+                this._ledgerEventSource.onerror = (event: any) => {
+                    if (this._latestLedgerSequence === 0) {
+                        this._logger.log('error', "[CRAWLER] Error fetching latest ledger: " + event.message + ". Stopping crawler");
+                        reject(new Error("Error fetching latest ledger: " + event.message));
+                    } else {
+                        this._logger.log('error', "[CRAWLER] Error fetching latest ledger: " + event.message + ". Continue with ledger: " + this._latestLedgerSequence);
+                        if (!resolved) {
+                            resolve();
+                        }
+                    }
+                };
             }
         );
     }
@@ -125,17 +135,23 @@ export class Crawler {
      * @returns {Promise<any>}
      */
     async crawl(nodesSeed: Array<Node>): Promise<Array<Node>> {
-        await this.trackLatestLedger();
-
         this._logger.log('info', "[CRAWLER] Starting crawl with seed of " + nodesSeed.length + "nodes.");
-        return new Promise<Array<Node>>((resolve, reject) => {
+        return await new Promise<Array<Node>>(async (resolve, reject) => {
                 this._resolve = resolve;
                 this._reject = reject;
 
-                nodesSeed.forEach(node => {
-                        this.crawlNode(node);
-                    }
-                );
+                try {
+                    await this.trackLatestLedger();
+                } catch (e) {
+                    this._reject(e.message);
+                }
+
+                if (this._latestLedgerSequence !== 0) {
+                    nodesSeed.forEach(node => {
+                            this.crawlNode(node);
+                        }
+                    );
+                }
             }
         );
     }
@@ -202,14 +218,8 @@ export class Crawler {
         this._logger.log('debug', "[CRAWLER] Processing " + this._busyCounter + " nodes.");
 
         this.processCrawlQueue();
-        CrawlStatisticsProcessor.updateNodeStatistics(node);
 
         if (this._busyCounter === 0) {
-
-
-            this._logger.log('info', "[CRAWLER] Finished with all nodes");
-            this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
-            this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
 
             this._ledgerEventSource.close();
             this._ledgers.forEach((ledger: Ledger, publicKey: PublicKey,) => {
@@ -221,6 +231,18 @@ export class Crawler {
                     }
                 })
             });
+
+            this._allNodes.forEach((node) => {
+                    if (node.publicKey) {
+                        this._logger.log('info', "[CRAWLER] updating node statistics for node: " + node.publicKey);
+                        CrawlStatisticsProcessor.updateNodeStatistics(node);
+                    }
+                }
+            );
+
+            this._logger.log('info', "[CRAWLER] Finished with all nodes");
+            this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
 
             this._resolve(
                 Array.from(this._allNodes.values())
@@ -272,7 +294,7 @@ export class Crawler {
                 this._connectionManager.sendGetPeers(connection);
             }
             this._ledgerSequenceToCheckForNode.set(connection.toNode.publicKey, this._latestLedgerSequence);
-            console.log('[CRAWLER] ' + connection.toNode.key + ': checking ledger with sequence: ' + this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey));
+            this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': checking ledger with sequence: ' + this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey));
             this._connectionManager.sendGetScpStatus(connection, this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey))
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
@@ -314,7 +336,7 @@ export class Crawler {
             return; // we only check 1 ledger for every node
         }
 
-        console.log('[CRAWLER] ' + connection.toNode.key + ': Externalize message found for ledger with sequence ' + scpStatement.slotIndex)
+        this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Externalize message found for ledger with sequence ' + scpStatement.slotIndex);
         let ledger = this._ledgers.get(connection.toNode.publicKey);
         if (ledger === undefined) {
             ledger = {
@@ -325,7 +347,7 @@ export class Crawler {
             this._ledgers.set(connection.toNode.publicKey, ledger);
         }
         ledger.values.set(scpStatement.nodeId, scpStatement.commit.value);
-        console.log('[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.slotIndex + ': ' + scpStatement.nodeId + ': ' + scpStatement.commit.value);
+        this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.slotIndex + ': ' + scpStatement.nodeId + ': ' + scpStatement.commit.value);
 
         let quorumSetHash = scpStatement.quorumSetHash;
         let quorumSetOwnerPublicKey = scpStatement.nodeId;
