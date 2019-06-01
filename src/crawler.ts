@@ -82,6 +82,12 @@ export class Crawler {
         this._maxWeight = 500;
     }
 
+    getProcessedLedgers() {
+        return [...new Set( //unique values
+            Array.from(this._ledgers.values()).map(ledger => ledger.ledgerId)
+        )];
+    }
+
     async getLatestLedger() {
         try {
             let result = await axios.get(process.env.HORIZON_URL);
@@ -91,7 +97,6 @@ export class Crawler {
         } catch (e) {
             throw new Error("Error fetching latest ledger. Stopping crawler. " + e.message);
         }
-
     }
 
     async trackLatestLedger() {
