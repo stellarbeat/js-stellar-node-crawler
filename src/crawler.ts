@@ -1,6 +1,5 @@
 import {Connection, ConnectionManager} from "@stellarbeat/js-stellar-node-connector";
 import {Node, QuorumSet} from '@stellarbeat/js-stellar-domain';
-import CrawlStatisticsProcessor from "./crawl-statistics-processor";
 import * as EventSource from 'eventsource';
 import axios from 'axios';
 
@@ -254,14 +253,6 @@ export class Crawler {
                 })
             });
 
-            this._allNodes.forEach((node) => {
-                    if (node.publicKey) {
-                        this._logger.log('info', "[CRAWLER] updating node statistics for node: " + node.publicKey);
-                        CrawlStatisticsProcessor.updateNodeStatistics(node);
-                    }
-                }
-            );
-
             this._logger.log('info', "[CRAWLER] Finished with all nodes");
             this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
             this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
@@ -316,7 +307,7 @@ export class Crawler {
                 this._connectionManager.sendGetPeers(connection);
             }
             this._ledgerSequenceToCheckForNode.set(connection.toNode.publicKey, this._latestLedgerSequence);
-            this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': checking ledger with sequence: ' + this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey));
+            this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': checking ledger with sequence: ' + this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey));
             this._connectionManager.sendGetScpStatus(connection, this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey))
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
@@ -358,7 +349,7 @@ export class Crawler {
             return; // we only check 1 ledger for every node
         }
 
-        this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Externalize message found for ledger with sequence ' + scpStatement.slotIndex);
+        this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Externalize message found for ledger with sequence ' + scpStatement.slotIndex);
         let ledger = this._ledgers.get(connection.toNode.publicKey);
         if (ledger === undefined) {
             ledger = {
@@ -369,7 +360,7 @@ export class Crawler {
             this._ledgers.set(connection.toNode.publicKey, ledger);
         }
         ledger.values.set(scpStatement.nodeId, scpStatement.commit.value);
-        this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.slotIndex + ': ' + scpStatement.nodeId + ': ' + scpStatement.commit.value);
+        this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.slotIndex + ': ' + scpStatement.nodeId + ': ' + scpStatement.commit.value);
 
         let quorumSetHash = scpStatement.quorumSetHash;
         let quorumSetOwnerPublicKey = scpStatement.nodeId;
