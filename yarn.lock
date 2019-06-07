@@ -18,10 +18,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@stellarbeat/js-stellar-domain@^0.8.0":
-  version "0.8.0"
-  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-domain/-/js-stellar-domain-0.8.0.tgz#f0356d3ef2e90706dd294f615fd8c5886690072e"
-  integrity sha512-fTwmlcyibNV17cHA2BWa06FrA41aotOUulcdrKKqnU7mBBfxbObVdHSAWff2JxTEpzRTaeAYTSvVhUGXkmDKog==
+"@stellarbeat/js-stellar-domain@^0.8.1":
+  version "0.8.1"
+  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-domain/-/js-stellar-domain-0.8.1.tgz#2e6e6d14fa9461daa309cebcf108f0af048f1a42"
+  integrity sha512-D1TRUFoKwwBU4AL/nu+T1S9ZmN7u1VXHcgvkpZvs2d+apxUEjqOrbB/9/VO2UWO6JBtNgjki5SGJCaUYMiB3Iw==
   dependencies:
     find-versions "^3.1.0"
     latest-semver "^2.0.0"
@@ -31,12 +31,12 @@
     semver-diff "^3.0.0"
     to-semver "^2.0.0"
 
-"@stellarbeat/js-stellar-node-connector@^0.5.2":
-  version "0.5.2"
-  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-0.5.2.tgz#d019316f04ceebf033a2656e1b7e87c6d9ec5547"
-  integrity sha512-bRm72DzFFlmOJt2hOEYM/7WcywgJXS5Bn96O3XUZkBDGKypeS/9alDjHpoPDH103GGZ9OlH0AGUCvlDpf3sZtw==
+"@stellarbeat/js-stellar-node-connector@^0.5.3":
+  version "0.5.3"
+  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-0.5.3.tgz#ac000e066b461b8df1e481b866d428a3e6fd3d93"
+  integrity sha512-VHvArYc30h4rbMVHAVeD+TXr0dYVSshHiPjU7Ol3Pwnj9fMKDZUqT+t0NLaFevpSddFeZGrpEgF2hq8HjqgnXQ==
   dependencies:
-    "@stellarbeat/js-stellar-domain" "^0.8.0"
+    "@stellarbeat/js-stellar-domain" "^0.8.1"
     bignumber.js "^4.0.0"
     curve25519-n "^1.4.0"
     dotenv "^6.1.0"
