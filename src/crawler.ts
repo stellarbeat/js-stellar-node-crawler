@@ -1,5 +1,6 @@
 import {Connection, ConnectionManager} from "@stellarbeat/js-stellar-node-connector";
 import {Node, QuorumSet} from '@stellarbeat/js-stellar-domain';
+import CrawlStatisticsProcessor from "./crawl-statistics-processor";
 import * as EventSource from 'eventsource';
 import axios from 'axios';
 
@@ -252,6 +253,14 @@ export class Crawler {
                     }
                 })
             });
+
+            this._allNodes.forEach((node) => {
+                    if (node.publicKey) {
+                        this._logger.log('info', "[CRAWLER] updating node statistics for node: " + node.publicKey);
+                        CrawlStatisticsProcessor.updateNodeStatistics(node);
+                    }
+                }
+            );
 
             this._logger.log('info', "[CRAWLER] Finished with all nodes");
             this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
