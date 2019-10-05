@@ -383,7 +383,7 @@ export class Crawler {
 
             if (nodes.length > 0) {
                 node = nodes[0];
-                node.active = true; //node is active in scp todo: differentiate between different active status (can connect to it & is active in scp)
+                node.active = true;
             } else {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Quorumset owner unknown to us, skipping: ' + quorumSetOwnerPublicKey);
                 return;

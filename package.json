@@ -1,6 +1,6 @@
 {
   "name": "@stellarbeat/js-stellar-node-crawler",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Crawl the network for nodes",
   "repository": {
     "type": "git",
@@ -16,7 +16,7 @@
   "author": "pieterjan84@github",
   "license": "MIT",
   "dependencies": {
-    "@stellarbeat/js-stellar-node-connector": "^0.6.1",
+    "@stellarbeat/js-stellar-node-connector": "^0.7.2",
     "axios": "^0.18.0",
     "dotenv": "^6.1.0",
     "eventsource": "^1.0.7",
@@ -25,12 +25,12 @@
     "winston": "^3.1.0"
   },
   "devDependencies": {
-    "@types/jest": "^23.3.10",
-    "@types/node": "^10.12.12",
+    "@types/jest": "^24.0.18",
+    "jest": "^24.9.0",
+    "ts-jest": "^24.0.2",
+    "@types/node": "^11.10.1",
     "@types/eventsource": "^1.1.0",
-    "jest": "^23.6.0",
     "merge": ">=1.2.1",
-    "ts-jest": "^23.10.5",
-    "typescript": "^3.2.1"
+    "typescript": "^3.6.2"
   }
 }
