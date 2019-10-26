@@ -286,7 +286,7 @@
     "@types/istanbul-reports" "^1.1.1"
     "@types/yargs" "^13.0.0"
 
-"@stellarbeat/js-stellar-domain@^0.13.2":
+"@stellarbeat/js-stellar-domain@^0.13", "@stellarbeat/js-stellar-domain@^0.13.2":
   version "0.13.2"
   resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-domain/-/js-stellar-domain-0.13.2.tgz#59507e8d3000b28459005132814255e95f6f91eb"
   integrity sha512-gS7g//2Ar7mvCqNVdExCtM+G2bml3rV9JuxzwIhrMQe51N+TiThv9pppZcgrJbSE4AZXnnvM6+HJ+Y71irIdMw==
@@ -298,7 +298,7 @@
     semver-compare "^1.0.0"
     to-semver "^2.0.0"
 
-"@stellarbeat/js-stellar-node-connector@^0.8.0":
+"@stellarbeat/js-stellar-node-connector@^0.8":
   version "0.8.0"
   resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-0.8.0.tgz#807b7a82aae38f13706b96b9519beee14b6a69b8"
   integrity sha512-Ejoauihs7nN07pELizNzgVH7SsUbrUcmnFRA0nA7Tiq89/sCvTYK6uv8IpbZWdgr+DMveRjr0EXlKZGLNSeI0w==
