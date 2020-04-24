@@ -1,6 +1,6 @@
 {
   "name": "@stellarbeat/js-stellar-node-crawler",
-  "version": "0.8.1",
+  "version": "1.0.0",
   "description": "Crawl the network for nodes",
   "repository": {
     "type": "git",
@@ -22,8 +22,8 @@
     "winston": "^3.1.0"
   },
   "peerDependencies": {
-    "@stellarbeat/js-stellar-domain": "^0.13",
-    "@stellarbeat/js-stellar-node-connector": "^0.8"
+    "@stellarbeat/js-stellar-domain": "^1.1.0",
+    "@stellarbeat/js-stellar-node-connector": "^1.0"
   },
   "devDependencies": {
     "@stellarbeat/js-stellar-domain": "^0.13",
