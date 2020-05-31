@@ -311,7 +311,7 @@ export class Crawler {
             this._ledgerSequenceToCheckForNode.set(connection.toNode.publicKey, this._latestLedgerSequence);
             this.setSCPTimeout(connection.toNode);
             /*this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': checking ledger with sequence: ' + this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey));*/
-            //this._connectionManager.sendGetScpStatus(connection, this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey))
+            this._connectionManager.sendGetScpStatus(connection, this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey))
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
