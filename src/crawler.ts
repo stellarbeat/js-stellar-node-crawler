@@ -155,6 +155,19 @@ export class Crawler {
      */
     async crawl(nodesSeed: Array<Node>): Promise<Array<Node>> {
         this._logger.log('info', "[CRAWLER] Starting crawl with seed of " + nodesSeed.length + "nodes.");
+        function compare(a:Node, b: Node) {
+            if (a.isValidating && !b.isValidating) {
+                return -1;
+            }
+            if (!a.isValidating && b.isValidating) {
+                return 1;
+            }
+            
+            return 0;
+        }
+
+        nodesSeed.sort(compare);
+
         return await new Promise<Array<Node>>(async (resolve, reject) => {
                 this._resolve = resolve;
                 this._reject = reject;
@@ -192,17 +205,17 @@ export class Crawler {
 
     addWeight(node: Node) {
         if (node.statistics.activeInLastCrawl) {  //high chance that we can connect so we dedicate most resources to it
-            this._weight += 100;
+            this._weight += this._activeNodeWeight;
         } else {
-            this._weight += 2; //connect to 50 unknown nodes at a time
+            this._weight += this._defaultNodeWeight;
         }
     }
 
     removeWeight(node: Node) {
         if (node.statistics.activeInLastCrawl) {
-            this._weight -= 100;
+            this._weight -= this._activeNodeWeight;
         } else {
-            this._weight -= 2;
+            this._weight -= this._defaultNodeWeight;
         }
     }
 
