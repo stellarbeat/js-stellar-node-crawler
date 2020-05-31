@@ -1,1 +1,59 @@
-[{"ip":"core-testnet1.stellar.org","port":11625,"host":"core-testnet1.stellar.org","publicKey":"GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK","name":"SDF validator 2","ledgerVersion":10,"overlayVersion":8,"overlayMinVersion":7,"networkId":"esM5l1ROMXXSZr0CJDmyLNsWUIwBFj8m5csqPhBFqXk=","versionStr":"v10.3.0rc2","active":true,"overLoaded":true,"quorumSet":{"hashKey":"7mhz+5gjKbzsEppyQ/VCgZ95mMPPKqmMb7OsvRMWctw=","threshold":3,"validators":["GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ","GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH","GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK","GAOO3LWBC4XF6VWRP5ESJ6IBHAISVJMSBTALHOQM2EZG7Q477UWA6L7U"],"innerQuorumSets":[{"hashKey":"5OoVvX0yJ4+VlKnXZgr1rzFUgS6QWgRzKunyt9l7bJw=","threshold":2,"validators":["GC5SXLNAM3C4NMGK2PXK4R34B5GNZ47FYQ24ZIBFDFOCU6D4KBN4POAE","GBJQUIXUO4XSNPAUT6ODLZUJRV2NPXYASKUBY4G5MYP3M47PCVI55MNT","GAK6Z5UVGUVSEK6PEOCAYJISTT5EJBB34PN3NOLEQG2SUKXRVV2F6HZY"],"innerQuorumSets":[]}]},"geoData":{"countryCode":"US","countryName":"United States","regionCode":"VA","regionName":"Virginia","city":"Ashburn","zipCode":"20149","timeZone":"America/New_York","latitude":39.0853,"longitude":-77.6452,"metroCode":511},"statistics":{"activeCounter":300,"overLoadedCounter":259,"activeRating":5,"activeInLastCrawl":true,"overLoadedInLastCrawl":true},"dateDiscovered":"2018-04-28T14:39:01.772Z","dateUpdated":"2019-03-28T18:41:22.970Z"}]
+[
+  {
+    "ip": "core-testnet1.stellar.org",
+    "port": 11625,
+    "host": "core-testnet1.stellar.org",
+    "publicKey": "GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK",
+    "name": "SDF validator 2",
+    "ledgerVersion": 10,
+    "overlayVersion": 8,
+    "overlayMinVersion": 7,
+    "networkId": "esM5l1ROMXXSZr0CJDmyLNsWUIwBFj8m5csqPhBFqXk=",
+    "versionStr": "v10.3.0rc2",
+    "active": true,
+    "overLoaded": true,
+    "quorumSet": {
+      "hashKey": "7mhz+5gjKbzsEppyQ/VCgZ95mMPPKqmMb7OsvRMWctw=",
+      "threshold": 3,
+      "validators": [
+        "GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ",
+        "GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH",
+        "GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK",
+        "GAOO3LWBC4XF6VWRP5ESJ6IBHAISVJMSBTALHOQM2EZG7Q477UWA6L7U"
+      ],
+      "innerQuorumSets": [
+        {
+          "hashKey": "5OoVvX0yJ4+VlKnXZgr1rzFUgS6QWgRzKunyt9l7bJw=",
+          "threshold": 2,
+          "validators": [
+            "GC5SXLNAM3C4NMGK2PXK4R34B5GNZ47FYQ24ZIBFDFOCU6D4KBN4POAE",
+            "GBJQUIXUO4XSNPAUT6ODLZUJRV2NPXYASKUBY4G5MYP3M47PCVI55MNT",
+            "GAK6Z5UVGUVSEK6PEOCAYJISTT5EJBB34PN3NOLEQG2SUKXRVV2F6HZY"
+          ],
+          "innerQuorumSets": []
+        }
+      ]
+    },
+    "geoData": {
+      "countryCode": "US",
+      "countryName": "United States",
+      "regionCode": "VA",
+      "regionName": "Virginia",
+      "city": "Ashburn",
+      "zipCode": "20149",
+      "timeZone": "America/New_York",
+      "latitude": 39.0853,
+      "longitude": -77.6452,
+      "metroCode": 511
+    },
+    "statistics": {
+      "activeCounter": 300,
+      "overLoadedCounter": 259,
+      "activeRating": 5,
+      "activeInLastCrawl": true,
+      "overLoadedInLastCrawl": true
+    },
+    "dateDiscovered": "2018-04-28T14:39:01.772Z",
+    "dateUpdated": "2019-03-28T18:41:22.970Z"
+  }
+]

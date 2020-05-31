@@ -1,0 +1,84 @@
+[
+  {
+    "ip": "159.69.64.220",
+    "port": 11625,
+    "publicKey": "GCQKI36SWZ2XJDCVKLXYOEGC3MNIJV3U6IEDWHK5IIMJ6OIKDJHYSID2",
+    "ledgerVersion": 11,
+    "overlayVersion": 9,
+    "overlayMinVersion": 8,
+    "networkId": "esM5l1ROMXXSZr0CJDmyLNsWUIwBFj8m5csqPhBFqXk=",
+    "versionStr": "v11.1.0",
+    "active": true,
+    "overLoaded": false,
+    "quorumSet": {
+      "hashKey": "0BDHWtDl8hjo/6RD/HE1WBJCLyUNxG6kXC15CI5m+lE=",
+      "threshold": 4,
+      "validators": [
+        "GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH",
+        "GARBCBH4YSHUJLYEPKEPMVYZIJ3ZSQR3QCJ245CWGY64X72JLN4A6RSG",
+        "GCWJKM4EGTGJUVSWUJDPCQEOEP5LHSOFKSA4HALBTOO4T4H3HCHOM6UX"
+      ],
+      "innerQuorumSets": [
+        {
+          "hashKey": "kpHONpSQ9HS3Q5hslIisYVlRfvae8bhspHMe4Xu+hl0=",
+          "threshold": 3,
+          "validators": [
+            "GASN57EFNZWME73BJXYZUTCD34EPX4KIIZQTQDTMBWWVH6JIZJUCBGQX",
+            "GCJCSMSPIWKKPR7WEPIQG63PDF7JGGEENRC33OKVBSPUDIRL6ZZ5M7OO"
+          ],
+          "innerQuorumSets": [
+            {
+              "hashKey": "5AJfImd+otckWM1BGte6YzZ2uVRYWXOugGDraMOs5qk=",
+              "threshold": 3,
+              "validators": [
+                "GB7H5CNUNVCM6KGG6P2LAQE4YZP4D6CHFJRSSS34VNEPDDVIFAWRJ7ZA",
+                "GDEP5ASQQT4LKZLK6POEQKPTL7SXWQ66QW3WIRXFN4WXFL5JBG3K5GKQ",
+                "GC5SXLNAM3C4NMGK2PXK4R34B5GNZ47FYQ24ZIBFDFOCU6D4KBN4POAE",
+                "GAENPO2XRTTMAJXDWM3E3GAALNLG4HVMKJ4QF525TR25RI42YPEDULOW"
+              ],
+              "innerQuorumSets": []
+            }
+          ]
+        },
+        {
+          "hashKey": "uU74xwPfcP+jq+u5TpkkMP8jXXyWHFwlTzD5At3ooko=",
+          "threshold": 3,
+          "validators": [
+            "GCQKI36SWZ2XJDCVKLXYOEGC3MNIJV3U6IEDWHK5IIMJ6OIKDJHYSID2",
+            "GCFONE23AB7Y6C5YZOMKUKGETPIAJA4QOYLS5VNS4JHBGKRZCPYHDLW7",
+            "GAK6Z5UVGUVSEK6PEOCAYJISTT5EJBB34PN3NOLEQG2SUKXRVV2F6HZY"
+          ],
+          "innerQuorumSets": []
+        }
+      ]
+    },
+    "geoData": {
+      "countryCode": "DE",
+      "countryName": "Germany",
+      "regionCode": null,
+      "regionName": null,
+      "city": null,
+      "latitude": 51.2993,
+      "longitude": 9.491,
+      "dateUpdated": "2020-05-31T08:20:13.947Z"
+    },
+    "statistics": {
+      "activeInLastCrawl": true,
+      "overLoadedInLastCrawl": false,
+      "validatingInLastCrawl": false,
+      "active30DaysPercentage": 0,
+      "overLoaded30DaysPercentage": 0,
+      "validating30DaysPercentage": 0,
+      "active24HoursPercentage": 0,
+      "overLoaded24HoursPercentage": 0,
+      "validating24HoursPercentage": 0,
+      "has30DayStats": true
+    },
+    "dateDiscovered": "2019-03-28T12:51:26.575Z",
+    "dateUpdated": "2020-05-31T08:58:29.533Z",
+    "isValidator": true,
+    "isFullValidator": false,
+    "isValidating": false,
+    "index": 0
+  }
+]

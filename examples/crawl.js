@@ -20,7 +20,7 @@ async function main() {
 
     console.log("[MAIN] Crawl!");
     let crawledNodes = [];
-    let myCrawler = new Crawler(true, 3000);
+    let myCrawler = new Crawler(true, 30000);
 
     try {
         crawledNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey));
