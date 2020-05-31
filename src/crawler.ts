@@ -37,7 +37,7 @@ export class Crawler {
     _ledgerEventSource: EventSource;
     _latestLedgerSequence: number = 0;
     _ledgerSequenceToCheckForNode: Map<PublicKey, LedgerSequence> = new Map();
-    _processedLedgers: Set<Number> = new Set();
+    _processedLedgers: Set<number> = new Set();
     _nodesToCrawl: Array<Node>;
     _weight: number;
     _maxWeight: number;
