@@ -1,3 +1,40 @@
 [
-  {"ip":"3.120.145.172","port":11625,"publicKey":"GDMAU3NHV4H7NZF5PY6O6SULIUKIIHPRYOKM7HMREK4BW65VHMDKNM6M","ledgerVersion":13,"overlayVersion":13,"overlayMinVersion":11,"networkId":"esM5l1ROMXXSZr0CJDmyLNsWUIwBFj8m5csqPhBFqXk=","versionStr":"stellar-core 13.0.0 (9ed3da29be1c2c932b946025ca2907646a9072f4)","active":true,"overLoaded":false,"quorumSet":{"threshold":9007199254740991,"validators":[],"innerQuorumSets":[]},"geoData":{"dateUpdated":"2020-05-31T12:40:27.290Z"},"statistics":{"activeInLastCrawl":false,"overLoadedInLastCrawl":false,"validatingInLastCrawl":false,"active30DaysPercentage":0,"overLoaded30DaysPercentage":0,"validating30DaysPercentage":0,"active24HoursPercentage":0,"overLoaded24HoursPercentage":0,"validating24HoursPercentage":0,"has30DayStats":true},"dateDiscovered":"2020-05-31T12:40:27.290Z","dateUpdated":"2020-05-31T12:40:27.922Z","isValidator":false,"isFullValidator":false,"isValidating":false,"index":0}
+  {
+    "ip": "35.229.188.114",
+    "port": 11625,
+    "publicKey": "GDMAU3NHV4H7NZF5PY6O6SULIUKIIHPRYOKM7HMREK4BW65VHMDKNM6M",
+    "ledgerVersion": 13,
+    "overlayVersion": 13,
+    "overlayMinVersion": 11,
+    "networkId": "esM5l1ROMXXSZr0CJDmyLNsWUIwBFj8m5csqPhBFqXk=",
+    "versionStr": "stellar-core 13.0.0 (9ed3da29be1c2c932b946025ca2907646a9072f4)",
+    "active": true,
+    "overLoaded": false,
+    "quorumSet": {
+      "threshold": 9007199254740991,
+      "validators": [],
+      "innerQuorumSets": []
+    },
+    "geoData": {
+      "dateUpdated": "2020-05-31T12:40:27.290Z"
+    },
+    "statistics": {
+      "activeInLastCrawl": false,
+      "overLoadedInLastCrawl": false,
+      "validatingInLastCrawl": false,
+      "active30DaysPercentage": 0,
+      "overLoaded30DaysPercentage": 0,
+      "validating30DaysPercentage": 0,
+      "active24HoursPercentage": 0,
+      "overLoaded24HoursPercentage": 0,
+      "validating24HoursPercentage": 0,
+      "has30DayStats": true
+    },
+    "dateDiscovered": "2020-05-31T12:40:27.290Z",
+    "dateUpdated": "2020-05-31T12:40:27.922Z",
+    "isValidator": false,
+    "isFullValidator": false,
+    "isValidating": false,
+    "index": 0
+  }
 ]

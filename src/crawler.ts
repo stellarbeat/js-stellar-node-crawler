@@ -8,7 +8,6 @@ const StellarBase = require('stellar-base');
 import * as winston from 'winston';
 
 type PublicKey = string;
-type NodeKey = string;
 type LedgerSequence = number;
 
 interface Ledger {
@@ -26,7 +25,7 @@ export class Crawler {
     _busyCounter: number;
     _allNodes: Map<string, Node>;
     _activeConnections: Map<string, Connection>;
-    _confirmedValidatingNodes: Set<PublicKey> = new Set();
+    _processedValidatingNodes: Set<PublicKey> = new Set();
     _nodesThatSuppliedPeerList: Set<Node>;
     _keyPair: any /*StellarBase.Keypair*/;
     _usePublicNetwork: boolean;
@@ -243,12 +242,12 @@ export class Crawler {
             );
 
             this._logger.log('info', "[CRAWLER] Finished with all nodes");
-            this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.statistics.activeInLastCrawl).length);
-            this._logger.log('info', '[CRAWLER] of which are active: ' + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.statistics.validatingInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] of which are validating:'  + Array.from(this._allNodes.values()).filter(node => node.statistics.validatingInLastCrawl).length);
             this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
 
             this._resolve(
-                Array.from(this._publicKeyToNodeMap.values())
+                Array.from(this._allNodes.values())
             );
         }
     }
@@ -300,8 +299,7 @@ export class Crawler {
             /*if (!this._nodesThatSuppliedPeerList.has(connection.toNode)) { //Most nodes send their peers automatically on successful handshake
                 this._connectionManager.sendGetPeers(connection);
             }*/
-            if(this._confirmedValidatingNodes.has(connection.toNode.publicKey)) {
-                connection.toNode.isValidating = true; //needed if it's a newly discovered node.
+            if(this._processedValidatingNodes.has(connection.toNode.publicKey)) {
                 this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': ' + connection.toNode.publicKey + ' already confirmed validating, disconnecting');
                 this._connectionManager.disconnect(connection);
             } else {
@@ -361,11 +359,6 @@ export class Crawler {
         this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.slotIndex + ': ' + scpStatement.nodeId + ': ' + scpStatement.commit.value);
         this._processedLedgers.add(Number(scpStatement.slotIndex)); // todo track values
 
-        //mark node as validating
-        this._confirmedValidatingNodes.add(scpStatement.nodeId);
-        if(node) //not sure we already know the node
-            node.isValidating = true;
-
         this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.nodeId + ' is validating on ledger:  ' + scpStatement.slotIndex);
 
         let quorumSetHash = scpStatement.quorumSetHash;
@@ -379,7 +372,6 @@ export class Crawler {
                     this._logger.log('info', '[CRAWLER] ' + node.key + ': Node is validating on ledger:  ' + scpStatement.slotIndex);
                     node.isValidating = true;
                 }
-
             } else {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Quorumset owner unknown to us, skipping: ' + quorumSetOwnerPublicKey);
                 return;
@@ -387,8 +379,10 @@ export class Crawler {
 
             if (node.quorumSet.hashKey === quorumSetHash) {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Quorumset already known to us for toNode: ' + quorumSetOwnerPublicKey);
+                //we don't need any more info for this node, fully processed
+                this._processedValidatingNodes.add(node.publicKey);
             } else {
-                this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Unknown or modified quorumSetHash for toNode, requesting it: ' + quorumSetOwnerPublicKey);
+                this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Unknown or modified quorumSetHash for toNode, requesting it: ' + quorumSetOwnerPublicKey);
                 let owners = this._quorumSetHashes.get(quorumSetHash);
                 if (owners) {
                     if (owners.has(quorumSetOwnerPublicKey)) {
@@ -424,6 +418,8 @@ export class Crawler {
 
                     } else {
                         this._logger.log('debug', '[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
+                        this._processedValidatingNodes.add(owner);
+
                         nodeWithNewQuorumSet.quorumSet = quorumSet;
                     }
             });
