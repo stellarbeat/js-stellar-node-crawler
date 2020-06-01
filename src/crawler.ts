@@ -243,11 +243,12 @@ export class Crawler {
             );
 
             this._logger.log('info', "[CRAWLER] Finished with all nodes");
-            this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.statistics.activeInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] of which are active: ' + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.statistics.validatingInLastCrawl).length);
             this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
 
             this._resolve(
-                Array.from(this._allNodes.values())
+                Array.from(this._publicKeyToNodeMap.values())
             );
         }
     }
@@ -290,6 +291,10 @@ export class Crawler {
 
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking ' + connection.toNode.publicKey + ' as active');
+            let node = this._allNodes.get(connection.toNode.key);
+            if(node && node.publicKey !== connection.toNode.publicKey ) //node switched publicKey
+                this._publicKeyToNodeMap.delete(node.publicKey);
+
             this._publicKeyToNodeMap.set(connection.toNode.publicKey, connection.toNode);
             this._activeConnections.set(connection.toNode.key, connection);
             /*if (!this._nodesThatSuppliedPeerList.has(connection.toNode)) { //Most nodes send their peers automatically on successful handshake
@@ -411,19 +416,16 @@ export class Crawler {
             if (!owners) {
                 return;
             }
-            owners.forEach(nodePublicKey => {
-                //todo: optimize. Could use publicKeyToNodeMap? How to handle nodes that switched ip's?
-                [...this._allNodes.values()].filter(node => node.publicKey === nodePublicKey).forEach( //node could have switched ip, and thus it is now twice in the list with the same public key.
-                    nodeWithNewQuorumSet => {
-                        if (nodeWithNewQuorumSet.quorumSet.hashKey === quorumSet.hashKey) {
-                            this._logger.log('debug', '[CRAWLER] QuorumSet already updated for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
+            owners.forEach(owner => {
+                    let nodeWithNewQuorumSet = this._publicKeyToNodeMap.get(owner);
 
-                        } else {
-                            this._logger.log('debug', '[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
-                            nodeWithNewQuorumSet.quorumSet = quorumSet;
-                        }
+                    if (nodeWithNewQuorumSet.quorumSet.hashKey === quorumSet.hashKey) {
+                        this._logger.log('debug', '[CRAWLER] QuorumSet already updated for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
+
+                    } else {
+                        this._logger.log('debug', '[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
+                        nodeWithNewQuorumSet.quorumSet = quorumSet;
                     }
-                );
             });
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
