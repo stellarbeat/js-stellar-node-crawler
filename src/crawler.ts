@@ -8,6 +8,7 @@ const StellarBase = require('stellar-base');
 import * as winston from 'winston';
 
 type PublicKey = string;
+type NodeKey = string;
 type LedgerSequence = number;
 
 interface Ledger {
@@ -25,6 +26,7 @@ export class Crawler {
     _busyCounter: number;
     _allNodes: Map<string, Node>;
     _activeConnections: Map<string, Connection>;
+    _confirmedValidatingNodes: Set<PublicKey> = new Set();
     _nodesThatSuppliedPeerList: Set<Node>;
     _keyPair: any /*StellarBase.Keypair*/;
     _usePublicNetwork: boolean;
@@ -35,8 +37,7 @@ export class Crawler {
     _durationInMilliseconds: number;
     _logger: any;
     _ledgerEventSource: EventSource;
-    _latestLedgerSequence: number = 0;
-    _ledgerSequenceToCheckForNode: Map<PublicKey, LedgerSequence> = new Map();
+    _ledgerSequence: LedgerSequence = 0;
     _processedLedgers: Set<number> = new Set();
     _nodesToCrawl: Array<Node>;
     _weight: number;
@@ -92,39 +93,12 @@ export class Crawler {
         try {
             let result = await axios.get(process.env.HORIZON_URL);
             if(result && result.data && result.data.core_latest_ledger) {
-                this._latestLedgerSequence = result.data.core_latest_ledger;
+                this._ledgerSequence = result.data.core_latest_ledger;
+                this._logger.log('info', "[CRAWLER] Starting ledger: " + this._ledgerSequence);
             }
         } catch (e) {
             throw new Error("Error fetching latest ledger. Stopping crawler. " + e.message);
         }
-    }
-
-    async trackLatestLedger() {
-        return await new Promise<Array<Node>>((resolve, reject) => {
-                let resolved = false;
-                if(this._latestLedgerSequence !== 0) {
-                    resolve(); //do not wait if there is a start ledger already
-                }
-                this._ledgerEventSource.addEventListener('message', event => {
-                    this._latestLedgerSequence = JSON.parse((event as any).data).sequence;
-                    this._logger.log('info', "[CRAWLER] new latest ledger: " + this._latestLedgerSequence);
-                    if (!resolved) { //after the first retrieval, the calling function stops waiting, but the retrieval continues
-                        resolve();
-                    }
-                });
-                this._ledgerEventSource.onerror = (event: any) => {
-                    if (this._latestLedgerSequence === 0) {
-                        this._logger.log('error', "[CRAWLER] Error fetching latest ledger: " + event.message + ". Stopping crawler");
-                        reject(new Error("Error fetching latest ledger: " + event.message));
-                    } else {
-                        this._logger.log('error', "[CRAWLER] Error fetching latest ledger: " + event.message + ". Continue with ledger: " + this._latestLedgerSequence);
-                        if (!resolved) {
-                            resolve();
-                        }
-                    }
-                };
-            }
-        );
     }
 
     setLogger(logger: any) {
@@ -147,7 +121,6 @@ export class Crawler {
         });
     }
 
-
     /**
      *
      * @param nodesSeed
@@ -168,18 +141,19 @@ export class Crawler {
 
         nodesSeed.sort(compare);
 
+        nodesSeed.forEach(node => this._publicKeyToNodeMap.set(node.publicKey, node));
+
         return await new Promise<Array<Node>>(async (resolve, reject) => {
                 this._resolve = resolve;
                 this._reject = reject;
 
                 try {
                     await this.getLatestLedger();
-                    await this.trackLatestLedger();
                 } catch (e) {
                     this._reject(e.message);
                 }
 
-                if (this._latestLedgerSequence !== 0) {
+                if (this._ledgerSequence !== 0) {
                     nodesSeed.forEach(node => {
                             this.crawlNode(node);
                         }
@@ -315,16 +289,21 @@ export class Crawler {
     onHandshakeCompleted(connection: Connection) {
 
         try {
-            this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking toNode as active');
+            this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking ' + connection.toNode.publicKey + ' as active');
             this._publicKeyToNodeMap.set(connection.toNode.publicKey, connection.toNode);
             this._activeConnections.set(connection.toNode.key, connection);
-            if (!this._nodesThatSuppliedPeerList.has(connection.toNode)) {
+            /*if (!this._nodesThatSuppliedPeerList.has(connection.toNode)) { //Most nodes send their peers automatically on successful handshake
                 this._connectionManager.sendGetPeers(connection);
+            }*/
+            if(this._confirmedValidatingNodes.has(connection.toNode.publicKey)) {
+                connection.toNode.isValidating = true; //needed if it's a newly discovered node.
+                this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': ' + connection.toNode.publicKey + ' already confirmed validating, disconnecting');
+                this._connectionManager.disconnect(connection);
+            } else {
+                this.setSCPTimeout(connection.toNode);
+                this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': send get scp status message');
+                this._connectionManager.sendGetScpStatus(connection, this._ledgerSequence)
             }
-            this._ledgerSequenceToCheckForNode.set(connection.toNode.publicKey, this._latestLedgerSequence);
-            this.setSCPTimeout(connection.toNode);
-            /*this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': checking ledger with sequence: ' + this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey));*/
-            this._connectionManager.sendGetScpStatus(connection, this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey))
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
@@ -359,14 +338,13 @@ export class Crawler {
     onSCPStatementReceived(connection: Connection, scpStatement: any) {
         this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.type + " message found for node " + scpStatement.nodeId + " for ledger " + scpStatement.slotIndex);
 
-        if (this._ledgerSequenceToCheckForNode.get(connection.toNode.publicKey) > Number(scpStatement.slotIndex)) {
+        if (Number(scpStatement.slotIndex) < this._ledgerSequence) {
             return; //older scp messages are ignored.
         }
 
         let node = this._publicKeyToNodeMap.get(scpStatement.nodeId);
         if(node){
             node.active = true; //node is active
-            node.isValidator = true; //participates in consensus
             this._nodesParticipatingInSCP.add(node.key);
         }
 
@@ -378,6 +356,13 @@ export class Crawler {
         this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.slotIndex + ': ' + scpStatement.nodeId + ': ' + scpStatement.commit.value);
         this._processedLedgers.add(Number(scpStatement.slotIndex)); // todo track values
 
+        //mark node as validating
+        this._confirmedValidatingNodes.add(scpStatement.nodeId);
+        if(node) //not sure we already know the node
+            node.isValidating = true;
+
+        this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': ' + scpStatement.nodeId + ' is validating on ledger:  ' + scpStatement.slotIndex);
+
         let quorumSetHash = scpStatement.quorumSetHash;
         let quorumSetOwnerPublicKey = scpStatement.nodeId;
 
@@ -385,8 +370,11 @@ export class Crawler {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Detected quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
 
             if(node){
-                node.active = true;
-                node.isValidating = true;
+                if(!node.isValidating) { //first time validating is detected
+                    this._logger.log('info', '[CRAWLER] ' + node.key + ': Node is validating on ledger:  ' + scpStatement.slotIndex);
+                    node.isValidating = true;
+                }
+
             } else {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Quorumset owner unknown to us, skipping: ' + quorumSetOwnerPublicKey);
                 return;
@@ -394,12 +382,6 @@ export class Crawler {
 
             if (node.quorumSet.hashKey === quorumSetHash) {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Quorumset already known to us for toNode: ' + quorumSetOwnerPublicKey);
-                let ownerConnection = this._activeConnections.get(node.key);
-                if(ownerConnection) {
-                    this._logger.log('debug', '[CRAWLER] ' + quorumSetOwnerPublicKey + ': Node is validating and we have quorumset representation: disconnecting');
-                    this._connectionManager.disconnect(ownerConnection);//we have all the info we need from this node
-                }
-
             } else {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Unknown or modified quorumSetHash for toNode, requesting it: ' + quorumSetOwnerPublicKey);
                 let owners = this._quorumSetHashes.get(quorumSetHash);
@@ -430,7 +412,8 @@ export class Crawler {
                 return;
             }
             owners.forEach(nodePublicKey => {
-                let nodes = [...this._allNodes.values()].filter(node => node.publicKey === nodePublicKey).forEach( //node could have switched ip, and thus it is now twice in the list with the same public key.
+                //todo: optimize. Could use publicKeyToNodeMap? How to handle nodes that switched ip's?
+                [...this._allNodes.values()].filter(node => node.publicKey === nodePublicKey).forEach( //node could have switched ip, and thus it is now twice in the list with the same public key.
                     nodeWithNewQuorumSet => {
                         if (nodeWithNewQuorumSet.quorumSet.hashKey === quorumSet.hashKey) {
                             this._logger.log('debug', '[CRAWLER] QuorumSet already updated for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
@@ -439,14 +422,6 @@ export class Crawler {
                             this._logger.log('debug', '[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
                             nodeWithNewQuorumSet.quorumSet = quorumSet;
                         }
-                        if(nodeWithNewQuorumSet.isValidating){
-                            let ownerConnection = this._activeConnections.get(nodeWithNewQuorumSet.key);
-                            if(ownerConnection) {
-                                this._logger.log('debug', '[CRAWLER] ' + nodeWithNewQuorumSet.publicKey + ': Node is validating and we have quorumset representation: disconnecting');
-                                this._connectionManager.disconnect(ownerConnection);//we have all the info we need from this node
-                            }
-                        }
-
                     }
                 );
             });
@@ -457,16 +432,16 @@ export class Crawler {
 
     setSCPTimeout(node:Node) {
         this._timeouts.set(node.key, setTimeout(() => {
-            this._logger.log('info','[CRAWLER] ' + node.publicKey + ': SCP Listen timeout reached, disconnecting');
-            if(this._nodesParticipatingInSCP.has(node.key)){
+            this._logger.log('info','[CRAWLER] ' + node.key + ': SCP Listen timeout reached, disconnecting');
+            if(this._nodesParticipatingInSCP.has(node.key) && !node.isValidating){
                 this._nodesParticipatingInSCP.delete(node.key);
-                this._logger.log('info','[CRAWLER] ' + node.publicKey + ': Node was active in SCP, adding more time to listen for externalize messages');
+                this._logger.log('info','[CRAWLER] ' + node.key + ': Node was active in SCP, adding more time to listen for externalize messages');
                 this.setSCPTimeout(node);
             } else {
                 let connection = this._activeConnections.get(node.key);
                 if(connection)
                     this._connectionManager.disconnect(connection);
             }
-        }, 5000)); //5 seconds to provide first scp message
+        }, 3000)); //3 seconds to provide first scp message
     }
 }
