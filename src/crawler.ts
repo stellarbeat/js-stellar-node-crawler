@@ -280,6 +280,10 @@ export class Crawler {
     onNodeDisconnected(connection: Connection) {
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Node disconnected');
+            if(this._processedValidatingNodes.has(connection.toNode.publicKey)){ //if a node cant complete the handshake, but it is confirmed through other nodes that it is active and validating, we mark it as such.
+                connection.toNode.active = true;
+                connection.toNode.isValidating = true;
+            }
             this.wrapUp(connection.toNode);
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
