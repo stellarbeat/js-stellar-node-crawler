@@ -301,6 +301,7 @@ export class Crawler {
             }*/
             if(this._processedValidatingNodes.has(connection.toNode.publicKey)) {
                 this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': ' + connection.toNode.publicKey + ' already confirmed validating, disconnecting');
+                connection.toNode.isValidating = true; //a newly connected node always has validating = false
                 this._connectionManager.disconnect(connection);
             } else {
                 this.setSCPTimeout(connection.toNode);
