@@ -285,10 +285,9 @@ export class Crawler {
                 if(!connection.toNode.active) {
                     this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Node did not complete handshake, but is confirmed validating. Marking node as overloaded and validating.');
                     connection.toNode.overLoaded = true;
+                    connection.toNode.active = true;
+                    connection.toNode.isValidating = true;
                 } //node didn't complete handshake, but it is confirmed validating and thus active. This happens when the node has a high load and can't process messages quickly enough.
-
-                connection.toNode.active = true;
-                connection.toNode.isValidating = true;
             }
             this.wrapUp(connection.toNode);
         } catch (exception) {
@@ -309,9 +308,9 @@ export class Crawler {
             /*if (!this._nodesThatSuppliedPeerList.has(connection.toNode)) { //Most nodes send their peers automatically on successful handshake
                 this._connectionManager.sendGetPeers(connection);
             }*/
-            if(this._processedValidatingNodes.has(connection.toNode.publicKey)) {
+            if(this._processedValidatingNodes.has(connection.toNode.publicKey)) { //we already confirmed that the node is validating by listening to externalize messages propagated by other nodes.
                 this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': ' + connection.toNode.publicKey + ' already confirmed validating, disconnecting');
-                connection.toNode.isValidating = true; //a newly connected node always has validating = false
+                connection.toNode.isValidating = true;
                 this._connectionManager.disconnect(connection);
             } else {
                 this.setSCPTimeout(connection.toNode);
@@ -343,7 +342,7 @@ export class Crawler {
 
     onLoadTooHighReceived(connection: Connection) {
         try {
-            this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Load too high');
+            this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Load too high message received, disconnected');
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
@@ -358,7 +357,6 @@ export class Crawler {
 
         let node = this._publicKeyToNodeMap.get(scpStatement.nodeId);
         if(node){
-            node.active = true; //node is active
             this._nodesParticipatingInSCP.add(node.key);
         }
 
@@ -379,9 +377,12 @@ export class Crawler {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Detected quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
 
             if(node){
-                if(!node.isValidating) { //first time validating is detected
-                    this._logger.log('info', '[CRAWLER] ' + node.key + ': Node is validating on ledger:  ' + scpStatement.slotIndex);
-                    node.isValidating = true;
+                if(node.active)//we have successfully connected to node already, so we mark it as validating
+                {
+                    if(!node.isValidating) { //first time validating is detected
+                        this._logger.log('info', '[CRAWLER] ' + node.key + ': Node is validating on ledger:  ' + scpStatement.slotIndex);
+                        node.isValidating = true;
+                    }
                 }
             } else {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Quorumset owner unknown to us, skipping: ' + quorumSetOwnerPublicKey);
@@ -391,7 +392,7 @@ export class Crawler {
             if (node.quorumSet.hashKey === quorumSetHash) {
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Quorumset already known to us for toNode: ' + quorumSetOwnerPublicKey);
                 //we don't need any more info for this node, fully processed
-                this._processedValidatingNodes.add(node.publicKey);
+                this._processedValidatingNodes.add(node.publicKey); //node is confirmed validating and we have the quorumset. If we connect to it in the future, we can disconnect immediately and mark it as validating.
             } else {
                 this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Unknown or modified quorumSetHash for toNode, requesting it: ' + quorumSetOwnerPublicKey);
                 let owners = this._quorumSetHashes.get(quorumSetHash);
@@ -429,7 +430,7 @@ export class Crawler {
 
                     } else {
                         this._logger.log('debug', '[CRAWLER] Updating QuorumSet for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
-                        this._processedValidatingNodes.add(owner);
+                        this._processedValidatingNodes.add(owner); //the node is validating because we only request quorumSets from externalize messages.
 
                         nodeWithNewQuorumSet.quorumSet = quorumSet;
                     }
