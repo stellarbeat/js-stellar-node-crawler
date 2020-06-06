@@ -243,7 +243,8 @@ export class Crawler {
 
             this._logger.log('info', "[CRAWLER] Finished with all nodes");
             this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
-            this._logger.log('info', '[CRAWLER] of which are validating:'  + Array.from(this._allNodes.values()).filter(node => node.statistics.validatingInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] of which are validating: '  + Array.from(this._allNodes.values()).filter(node => node.statistics.validatingInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] of which are overloaded: '  + Array.from(this._allNodes.values()).filter(node => node.statistics.overLoadedInLastCrawl).length);
             this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
 
             this._resolve(
@@ -281,6 +282,11 @@ export class Crawler {
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Node disconnected');
             if(this._processedValidatingNodes.has(connection.toNode.publicKey)){ //if a node cant complete the handshake, but it is confirmed through other nodes that it is active and validating, we mark it as such.
+                if(!connection.toNode.active) {
+                    this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Node did not complete handshake, but is confirmed validating. Marking node as overloaded and validating.');
+                    connection.toNode.overLoaded = true;
+                } //node didn't complete handshake, but it is confirmed validating and thus active. This happens when the node has a high load and can't process messages quickly enough.
+
                 connection.toNode.active = true;
                 connection.toNode.isValidating = true;
             }
