@@ -80,7 +80,7 @@ export class Crawler {
         this._weight = 0;
         this._activeNodeWeight = 100;
         this._defaultNodeWeight = 20;
-        this._maxWeight = 4000;
+        this._maxWeight = 400;
     }
 
     getProcessedLedgers() {
