@@ -1,11 +1,11 @@
 import {Connection, ConnectionManager} from "@stellarbeat/js-stellar-node-connector";
 import {Node, QuorumSet} from '@stellarbeat/js-stellar-domain';
-import CrawlStatisticsProcessor from "./crawl-statistics-processor";
 import * as EventSource from 'eventsource';
 import axios from 'axios';
 
 const StellarBase = require('stellar-base');
 import * as winston from 'winston';
+import {PeerNode} from "@stellarbeat/js-stellar-node-connector/lib";
 
 type PublicKey = string;
 type LedgerSequence = number;
@@ -23,10 +23,10 @@ type publicKey = string;
 export class Crawler {
 
     _busyCounter: number;
-    _allNodes: Map<string, Node>;
+    _allPeerNodes: Map<string, PeerNode>;
     _activeConnections: Map<string, Connection>;
     _processedValidatingNodes: Set<PublicKey> = new Set();
-    _nodesThatSuppliedPeerList: Set<Node>;
+    _nodesThatSuppliedPeerList: Set<PeerNode>;
     _keyPair: any /*StellarBase.Keypair*/;
     _usePublicNetwork: boolean;
     _quorumSetHashes: Map<string, Set<string>>;
@@ -35,27 +35,26 @@ export class Crawler {
     _reject: any;
     _durationInMilliseconds: number;
     _logger: any;
-    _ledgerEventSource: EventSource;
     _ledgerSequence: LedgerSequence = 0;
     _processedLedgers: Set<number> = new Set();
-    _nodesToCrawl: Array<Node>;
+    _nodesToCrawl: Array<PeerNode>;
     _weight: number;
     _maxWeight: number;
     _activeNodeWeight: number;
     _defaultNodeWeight: number;
     _publicKeyToNodeMap: Map<PublicKey, Node> = new Map<PublicKey, Node>();
     _timeouts: Map<string, any> = new Map();
-    _nodesParticipatingInSCP: Set<string> = new Set();
+    _peerNodesParticipatingInSCP: Set<string> = new Set();
+    _prioritizedPeerNodes: Set<string> = new Set();
 
     constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, logger: any = null) {
         if (!process.env.HORIZON_URL) {
             throw new Error('Horizon not configured');
         }
 
-        this._ledgerEventSource = new EventSource(process.env.HORIZON_URL + "/ledgers?cursor=now");
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
-        this._allNodes = new Map();
+        this._allPeerNodes = new Map();
         this._activeConnections = new Map(); //nodes that completed a handshake and we are currently listening to
         this._nodesThatSuppliedPeerList = new Set();
         this._keyPair = StellarBase.Keypair.random();
@@ -81,14 +80,16 @@ export class Crawler {
         this._weight = 0;
         this._activeNodeWeight = 100;
         this._defaultNodeWeight = 20;
-        this._maxWeight = 400;
+        this._maxWeight = 4000;
     }
 
     getProcessedLedgers() {
         return Array.from(this._processedLedgers);
     }
 
-    async getLatestLedger() {
+    protected async getLatestLedger() {
+        if(!process.env.HORIZON_URL)
+            throw new Error('HORIZON URL env not configured');
         try {
             let result = await axios.get(process.env.HORIZON_URL);
             if(result && result.data && result.data.core_latest_ledger) {
@@ -104,7 +105,7 @@ export class Crawler {
         this._logger = logger;
     }
 
-    initializeDefaultLogger() {
+    protected initializeDefaultLogger() {
         this._logger = winston.createLogger({
             level: process.env.LOG_LEVEL || 'info',
             format: winston.format.combine(
@@ -153,51 +154,61 @@ export class Crawler {
                 }
 
                 if (this._ledgerSequence !== 0) {
-                    nodesSeed.forEach(node => {
-                            this.crawlNode(node);
-                        }
-                    );
+                    nodesSeed.forEach(node => this.crawlNode(node));
                 }
             }
         );
     }
 
     crawlNode(node: Node) {
+        node.active = false;
+        node.isValidating = false;
+        node.overLoaded = false;
 
-        if (this._allNodes.has(node.key)) {
+        let peerNode = new PeerNode(node.ip, node.port);
+        peerNode.publicKey = node.publicKey;
+        this.crawlPeerNode(peerNode);
+    }
+
+    protected crawlPeerNode(node: PeerNode) {
+        if (this._allPeerNodes.has(node.key)) {
             this._logger.log('debug', '[CRAWLER] ' + node.key + ': Node key already used for crawl');
             return;
         }
 
-        this._allNodes.set(node.key, node);
+        this._allPeerNodes.set(node.key, node);
         this._nodesToCrawl.push(node);
         this._busyCounter++;
 
         this.processCrawlQueue();
     }
 
-    addWeight(node: Node) {
-        if (node.statistics.activeInLastCrawl) {  //high chance that we can connect so we dedicate most resources to it
+    protected addWeight(node: PeerNode) {
+        if(node.publicKey
+            &&  this._publicKeyToNodeMap.get(node.publicKey)
+            && this._publicKeyToNodeMap.get(node.publicKey)!.statistics.activeInLastCrawl){
+            this._prioritizedPeerNodes.add(node.key);
             this._weight += this._activeNodeWeight;
-        } else {
+        } //high chance that we can connect so we dedicate most resources to it
+        else {
             this._weight += this._defaultNodeWeight;
         }
     }
 
-    removeWeight(node: Node) {
-        if (node.statistics.activeInLastCrawl) {
+    removeWeight(node: PeerNode) {
+        if(this._prioritizedPeerNodes.has(node.key)){
             this._weight -= this._activeNodeWeight;
-        } else {
+        }
+        else {
             this._weight -= this._defaultNodeWeight;
         }
     }
 
     processCrawlQueue() {
         while (this._weight < this._maxWeight && this._nodesToCrawl.length > 0) {
-            let nextNodeToCrawl = this._nodesToCrawl.shift();
+            let nextNodeToCrawl = this._nodesToCrawl.shift()!;
             try {
                 this.addWeight(nextNodeToCrawl);
-                nextNodeToCrawl.isValidating = false;
 
                 this._logger.log('debug', '[CRAWLER] ' + nextNodeToCrawl.key + ': Start Crawl');
 
@@ -212,7 +223,7 @@ export class Crawler {
         }
     }
 
-    wrapUp(node: Node) {
+    wrapUp(node: PeerNode) {
         if(this._timeouts.get(node.key))
             clearTimeout(this._timeouts.get(node.key));
 
@@ -229,26 +240,30 @@ export class Crawler {
 
         if (this._busyCounter === 0) {
 
-            if(this._ledgerEventSource) {
-                this._ledgerEventSource.close();
-            }
+            Array.from(this._publicKeyToNodeMap).forEach(
+                ([publicKey, node]) => {
+                    this._logger.log('debug', "[CRAWLER] updating node statistics for node: " + node.publicKey);
+                    node.statistics.activeInLastCrawl = node.active;
+                    node.statistics.overLoadedInLastCrawl = node.overLoaded;
+                    node.statistics.validatingInLastCrawl = node.isValidating;
+                }
+            )
 
-            this._allNodes.forEach((node) => {
-                    if (node.publicKey) {
-                        this._logger.log('debug', "[CRAWLER] updating node statistics for node: " + node.publicKey);
-                        CrawlStatisticsProcessor.updateNodeStatistics(node);
+            this._allPeerNodes.forEach((peerNode) => {
+                    if (peerNode.publicKey) {
+                        let node = this._publicKeyToNodeMap.get(peerNode.publicKey);
                     }
                 }
             );
 
             this._logger.log('info', "[CRAWLER] Finished with all nodes");
-            this._logger.log('info', '[CRAWLER] ' + this._allNodes.size + " nodes crawled of which are active: " + Array.from(this._allNodes.values()).filter(node => node.statistics.activeInLastCrawl).length);
-            this._logger.log('info', '[CRAWLER] of which are validating: '  + Array.from(this._allNodes.values()).filter(node => node.statistics.validatingInLastCrawl).length);
-            this._logger.log('info', '[CRAWLER] of which are overloaded: '  + Array.from(this._allNodes.values()).filter(node => node.statistics.overLoadedInLastCrawl).length);
+            this._logger.log('info', '[CRAWLER] ' + this._allPeerNodes.size + " nodes crawled of which are active: " + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.active).length);
+            this._logger.log('info', '[CRAWLER] of which are validating: '  + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.isValidating).length);
+            this._logger.log('info', '[CRAWLER] of which are overloaded: '  + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.overLoaded).length);
             this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
 
             this._resolve(
-                Array.from(this._allNodes.values())
+                Array.from(this._publicKeyToNodeMap.values())
             );
         }
     }
@@ -281,12 +296,13 @@ export class Crawler {
     onNodeDisconnected(connection: Connection) {
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Node disconnected');
-            if(this._processedValidatingNodes.has(connection.toNode.publicKey)){ //if a node cant complete the handshake, but it is confirmed through other nodes that it is active and validating, we mark it as such.
-                if(!connection.toNode.active) {
+            if(connection.toNode.publicKey && this._processedValidatingNodes.has(connection.toNode.publicKey)){ //if a node cant complete the handshake, but it is confirmed through other nodes that it is active and validating, we mark it as such.
+                let node = this._publicKeyToNodeMap.get(connection.toNode.publicKey);
+                if(node && !node.active) {
                     this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Node did not complete handshake, but is confirmed validating. Marking node as overloaded and validating.');
-                    connection.toNode.overLoaded = true;
-                    connection.toNode.active = true;
-                    connection.toNode.isValidating = true;
+                    node.overLoaded = true;
+                    node.active = true;
+                    node.isValidating = true;
                 } //node didn't complete handshake, but it is confirmed validating and thus active. This happens when the node has a high load and can't process messages quickly enough.
             }
             this.wrapUp(connection.toNode);
@@ -296,24 +312,38 @@ export class Crawler {
     }
 
     onHandshakeCompleted(connection: Connection) {
-
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': Handshake succeeded, marking ' + connection.toNode.publicKey + ' as active');
-            let node = this._allNodes.get(connection.toNode.key);
-            if(node && node.publicKey !== connection.toNode.publicKey ) //node switched publicKey
-                this._publicKeyToNodeMap.delete(node.publicKey);
+            if(!connection.toNode.publicKey)
+                throw new Error('peernode missing publickey: ' + connection.toNode.key);
 
-            this._publicKeyToNodeMap.set(connection.toNode.publicKey, connection.toNode);
+            let node = this._publicKeyToNodeMap.get(connection.toNode.publicKey);
+            if(!node) {
+                node = new Node(connection.toNode.ip, connection.toNode.port, connection.toNode.publicKey);
+                this._publicKeyToNodeMap.set(node.publicKey, node);
+            }
+            node.active = true;
+            if(node.ip !== connection.toNode.ip) {
+                this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': ' + connection.toNode.publicKey + ' switched IP');
+            }
+            node.ip = connection.toNode.ip;
+            node.port = connection.toNode.port;
+            node.ledgerVersion = connection.toNode.ledgerVersion;
+            node.overlayVersion = connection.toNode.overlayVersion;
+            node.overlayMinVersion = connection.toNode.overlayMinVersion;
+            node.networkId = connection.toNode.networkId;
+            node.versionStr = connection.toNode.versionStr;
+
             this._activeConnections.set(connection.toNode.key, connection);
             /*if (!this._nodesThatSuppliedPeerList.has(connection.toNode)) { //Most nodes send their peers automatically on successful handshake
                 this._connectionManager.sendGetPeers(connection);
             }*/
-            if(this._processedValidatingNodes.has(connection.toNode.publicKey)) { //we already confirmed that the node is validating by listening to externalize messages propagated by other nodes.
+            if(this._processedValidatingNodes.has(node.publicKey)) { //we already confirmed that the node is validating by listening to externalize messages propagated by other nodes.
                 this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': ' + connection.toNode.publicKey + ' already confirmed validating, disconnecting');
-                connection.toNode.isValidating = true;
+                node.isValidating = true;
                 this._connectionManager.disconnect(connection);
             } else {
-                this.setSCPTimeout(connection.toNode);
+                this.setSCPTimeout(node);
                 this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': send get scp status message');
                 this._connectionManager.sendGetScpStatus(connection, this._ledgerSequence)
             }
@@ -322,14 +352,14 @@ export class Crawler {
         }
     }
 
-    onPeersReceived(peers: Array<Node>, connection: Connection) {
+    onPeersReceived(peers: Array<PeerNode>, connection: Connection) {
         try {
             this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': ' + peers.length + ' peers received');
             this._nodesThatSuppliedPeerList.add(connection.toNode);
             peers.forEach(peer => {
-                if (!this._allNodes.has(peer.key)) { //newly discovered toNode
+                if (!this._allPeerNodes.has(peer.key)) { //newly discovered toNode
                     this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': supplied a newly discovered peer: ' + peer.key);
-                    this.crawlNode(peer);
+                    this.crawlPeerNode(peer);
                 } else {
                     this._logger.log('debug', '[CRAWLER] peer ' + peer.key + ' already crawled');
                 }
@@ -343,6 +373,13 @@ export class Crawler {
     onLoadTooHighReceived(connection: Connection) {
         try {
             this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Load too high message received, disconnected');
+            if(connection.toNode.publicKey){
+                let node = this._publicKeyToNodeMap.get(connection.toNode.publicKey);
+                if(node) {
+                    node.active = true;
+                    node.overLoaded = true;
+                }
+            }
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
         }
@@ -357,7 +394,7 @@ export class Crawler {
 
         let node = this._publicKeyToNodeMap.get(scpStatement.nodeId);
         if(node){
-            this._nodesParticipatingInSCP.add(node.key);
+            this._peerNodesParticipatingInSCP.add(node.key);
         }
 
         if (scpStatement.type !== 'externalize') { //only if node is externalizing, we mark the node as validating
@@ -394,7 +431,7 @@ export class Crawler {
                 //we don't need any more info for this node, fully processed
                 this._processedValidatingNodes.add(node.publicKey); //node is confirmed validating and we have the quorumset. If we connect to it in the future, we can disconnect immediately and mark it as validating.
             } else {
-                this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Unknown or modified quorumSetHash for toNode, requesting it: ' + quorumSetOwnerPublicKey);
+                this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': Unknown or modified quorumSetHash for toNode, requesting it: ' + quorumSetOwnerPublicKey + ' => ' + quorumSetHash);
                 let owners = this._quorumSetHashes.get(quorumSetHash);
                 if (owners) {
                     if (owners.has(quorumSetOwnerPublicKey)) {
@@ -417,13 +454,17 @@ export class Crawler {
 
     onQuorumSetReceived(connection: Connection, quorumSet: QuorumSet) {
         try {
-            this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': QuorumSet received: ' + quorumSet.hashKey);
+            this._logger.log('info', '[CRAWLER] ' + connection.toNode.key + ': QuorumSet received: ' + quorumSet.hashKey);
+            if(!quorumSet.hashKey)
+                throw new Error('Missing hashkey for quorumset');
             let owners = this._quorumSetHashes.get(quorumSet.hashKey);
             if (!owners) {
                 return;
             }
             owners.forEach(owner => {
                     let nodeWithNewQuorumSet = this._publicKeyToNodeMap.get(owner);
+                    if(!nodeWithNewQuorumSet)
+                        return;
 
                     if (nodeWithNewQuorumSet.quorumSet.hashKey === quorumSet.hashKey) {
                         this._logger.log('debug', '[CRAWLER] QuorumSet already updated for toNode: ' + nodeWithNewQuorumSet.publicKey + ' => ' + quorumSet.hashKey);
@@ -440,15 +481,19 @@ export class Crawler {
         }
     }
 
-    setSCPTimeout(node:Node) {
-        this._timeouts.set(node.key, setTimeout(() => {
-            this._logger.log('info','[CRAWLER] ' + node.key + ': SCP Listen timeout reached, disconnecting');
-            if(this._nodesParticipatingInSCP.has(node.key) && !node.isValidating){
-                this._nodesParticipatingInSCP.delete(node.key);
+    setSCPTimeout(peerNode:PeerNode) {
+        this._timeouts.set(peerNode.key, setTimeout(() => {
+            this._logger.log('info','[CRAWLER] ' + peerNode.key + ': SCP Listen timeout reached, disconnecting');
+            if(!peerNode.publicKey)
+                throw new Error('peernode is missing publickey: ' + peerNode.key);
+
+            let node = this._publicKeyToNodeMap.get(peerNode.publicKey);
+            if(this._peerNodesParticipatingInSCP.has(peerNode.key) && node && !node.isValidating){ //if two peernodes are reusing the same publicKey, we can't tell which one is (not) validating, because scp messages are based on publickey, not ip.
+                this._peerNodesParticipatingInSCP.delete(node.key);
                 this._logger.log('info','[CRAWLER] ' + node.key + ': Node was active in SCP, adding more time to listen for externalize messages');
                 this.setSCPTimeout(node);
             } else {
-                let connection = this._activeConnections.get(node.key);
+                let connection = this._activeConnections.get(peerNode.key);
                 if(connection)
                     this._connectionManager.disconnect(connection);
             }
