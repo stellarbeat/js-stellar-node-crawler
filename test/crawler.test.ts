@@ -4,12 +4,9 @@ import {Crawler} from "../src/crawler";
 jest.mock("../node_modules/@stellarbeat/js-stellar-node-connector/lib/connection-manager.js");
 
 //setup
-let crawler;
+let crawler:Crawler;
 beforeEach(() => {
     crawler = new Crawler(true, 1000);
-});
-afterEach(() => {
-    crawler = undefined;
 });
 
 test('constructor', () => {
@@ -26,9 +23,10 @@ test('crawlSingleNode', () => {
 
     expect(crawler._nodesToCrawl.length).toEqual(2);
     expect(crawler._nodesToCrawl[0]).toEqual(node1);
+    //@ts-ignore
     expect(crawler.processCrawlQueue.mock.calls.length).toBe(2);
-    expect(crawler._allNodes.size).toEqual(2);
-    expect(crawler._allNodes.get('123:11625')).toEqual(node1);
+    expect(Array.from(crawler._publicKeyToNodeMap.values()).length).toEqual(2);
+    expect(crawler._publicKeyToNodeMap.get('123')).toEqual(node1);
     expect(crawler._busyCounter).toEqual(2);
 });
 

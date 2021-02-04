@@ -587,23 +587,22 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@stellarbeat/js-stellar-domain@^2.0.0":
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-domain/-/js-stellar-domain-2.0.0.tgz#10029babba915b5d7573e00e1b830095d9dd91e6"
-  integrity sha512-iGVdwTl8UWD+KD5LUewYMG4tXsozSE35In1JAD81JNwiDwuINywv4YGXxM0sU7dRNiPNFWacHBeIEDY8v/ykFA==
+"@stellarbeat/js-stellar-domain@^2.13.0":
+  version "2.13.0"
+  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-domain/-/js-stellar-domain-2.13.0.tgz#6c344c4aaff0f18b0051134af8061e25c2ec0c49"
+  integrity sha512-bHe59650FdLum24hY1vtJVqD+gkidXMjPQ8ZTNKuAkjiSsbuwiBcz7rulWicljUMeEdycu/Xundc2lxJAF4WsA==
   dependencies:
     "@iarna/toml" "^2.2.3"
     find-versions "^3.1.0"
     latest-semver "^2.0.0"
-    lodash "^4.17.13"
     semver "^6.3.0"
     semver-compare "^1.0.0"
     to-semver "^2.0.0"
 
-"@stellarbeat/js-stellar-node-connector@^2.1.0":
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-2.1.0.tgz#826a0122bd1b347f0c162874597ea4d6045f72a6"
-  integrity sha512-eCY+3axg2+QL0sdcIAT6aQNwK5EQOB1nCFZ+XTa6HbuepKwbT5jh3hUxeeBDQkHGZDrAd5u+AhoGO+IRGLgrMg==
+"@stellarbeat/js-stellar-node-connector@^2.3.0":
+  version "2.3.0"
+  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-2.3.0.tgz#ad2f4e880f6a6548f212ab056f7e24e27edfbc8a"
+  integrity sha512-dUQrYgoLG7MVbZFhjNxU5Z+V0QkRLXjn5oEFwEKycjuT/7Fsw4bgMkxdosxSZsZ/pZtBlcBINdIRnxisAvlMag==
   dependencies:
     "@types/sodium-native" "^2.3.2"
     bignumber.js "^4.0.0"

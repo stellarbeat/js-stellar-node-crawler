@@ -46,6 +46,14 @@ export class Crawler {
     _timeouts: Map<string, any> = new Map();
     _peerNodesParticipatingInSCP: Set<string> = new Set();
     _prioritizedPeerNodes: Set<string> = new Set();
+    _nodesActiveInLastCrawl: Set<PublicKey> = new Set();
+    /**
+     * TODO:
+     * - refactor out the Node dependency. Crawler should receive and return Peernodes.
+     * - Add validating, active, overloaded properties to peernode and default to false.
+     * - to prioritize previously active nodes in the crawl process, we need a 'priority' flag, currently this is 'activeInLastCrawl', do we switch this?
+     **/
+
 
     constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, logger: any = null) {
         if (!process.env.HORIZON_URL) {
@@ -161,6 +169,8 @@ export class Crawler {
     }
 
     crawlNode(node: Node) {
+        if(node.active)
+            this._nodesActiveInLastCrawl.add(node.publicKey);
         node.active = false;
         node.isValidating = false;
         node.overLoaded = false;
@@ -186,7 +196,7 @@ export class Crawler {
     protected addWeight(node: PeerNode) {
         if(node.publicKey
             &&  this._publicKeyToNodeMap.get(node.publicKey)
-            && this._publicKeyToNodeMap.get(node.publicKey)!.statistics.activeInLastCrawl){
+            && this._nodesActiveInLastCrawl.has(node.publicKey)){
             this._prioritizedPeerNodes.add(node.key);
             this._weight += this._activeNodeWeight;
         } //high chance that we can connect so we dedicate most resources to it
@@ -239,16 +249,6 @@ export class Crawler {
         this.processCrawlQueue();
 
         if (this._busyCounter === 0) {
-
-            Array.from(this._publicKeyToNodeMap).forEach(
-                ([publicKey, node]) => {
-                    this._logger.log('debug', "[CRAWLER] updating node statistics for node: " + node.publicKey);
-                    node.statistics.activeInLastCrawl = node.active;
-                    node.statistics.overLoadedInLastCrawl = node.overLoaded;
-                    node.statistics.validatingInLastCrawl = node.isValidating;
-                }
-            )
-
             this._allPeerNodes.forEach((peerNode) => {
                     if (peerNode.publicKey) {
                         let node = this._publicKeyToNodeMap.get(peerNode.publicKey);
@@ -319,7 +319,7 @@ export class Crawler {
 
             let node = this._publicKeyToNodeMap.get(connection.toNode.publicKey);
             if(!node) {
-                node = new Node(connection.toNode.ip, connection.toNode.port, connection.toNode.publicKey);
+                node = new Node(connection.toNode.publicKey, connection.toNode.ip, connection.toNode.port);
                 this._publicKeyToNodeMap.set(node.publicKey, node);
             }
             node.active = true;
