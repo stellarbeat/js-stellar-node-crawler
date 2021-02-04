@@ -52,6 +52,7 @@ export class Crawler {
      * - refactor out the Node dependency. Crawler should receive and return Peernodes.
      * - Add validating, active, overloaded properties to peernode and default to false.
      * - to prioritize previously active nodes in the crawl process, we need a 'priority' flag, currently this is 'activeInLastCrawl', do we switch this?
+     * Todo: watch out for nodes that switch publickeys on the same IP. These are multiple Nodes, but in the current implementation of the crawler, they are only one peer node
      **/
 
 
@@ -249,12 +250,6 @@ export class Crawler {
         this.processCrawlQueue();
 
         if (this._busyCounter === 0) {
-            this._allPeerNodes.forEach((peerNode) => {
-                    if (peerNode.publicKey) {
-                        let node = this._publicKeyToNodeMap.get(peerNode.publicKey);
-                    }
-                }
-            );
 
             this._logger.log('info', "[CRAWLER] Finished with all nodes");
             this._logger.log('info', '[CRAWLER] ' + this._allPeerNodes.size + " nodes crawled of which are active: " + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.active).length);
