@@ -96,21 +96,18 @@ export class Crawler {
     }
 
     protected async getLatestLedger() {
-        if(process.env.BYPASS_HORIZON === 'TRUE'){
-            this._logger.log('info', "[CRAWLER] Starting ledger: " + this._ledgerSequence);
-
-            return;
-        }
         if(!process.env.HORIZON_URL)
             throw new Error('HORIZON URL env not configured');
         try {
             let result = await axios.get(process.env.HORIZON_URL);
             if(result && result.data && result.data.core_latest_ledger) {
-                this._ledgerSequence = result.data.core_latest_ledger;
+                //if horizon is stuck the latest ledger could be too outdated. If this happens we use the provided ledger id from the previous crawl. TODO: what about forks in the network with different ledger sequences.
+                if(result.data.core_latest_ledger > this._ledgerSequence)
+                    this._ledgerSequence = result.data.core_latest_ledger;
                 this._logger.log('info', "[CRAWLER] Starting ledger: " + this._ledgerSequence);
             }
         } catch (e) {
-            throw new Error("Error fetching latest ledger. Stopping crawler. " + e.message);
+            this._logger.log('info', "Error fetching latest ledger from horizon, using latest detected ledger. " + e.message);
         }
     }
 
