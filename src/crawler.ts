@@ -55,12 +55,11 @@ export class Crawler {
      * Todo: watch out for nodes that switch publickeys on the same IP. These are multiple Nodes, but in the current implementation of the crawler, they are only one peer node
      **/
 
-
-    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, logger: any = null) {
+    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, latestLedger:number = 0, logger: any = null) {
         if (!process.env.HORIZON_URL) {
             throw new Error('Horizon not configured');
         }
-
+        this._ledgerSequence = latestLedger;
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allPeerNodes = new Map();
@@ -97,6 +96,11 @@ export class Crawler {
     }
 
     protected async getLatestLedger() {
+        if(process.env.BYPASS_HORIZON === 'TRUE'){
+            this._logger.log('info', "[CRAWLER] Starting ledger: " + this._ledgerSequence);
+
+            return;
+        }
         if(!process.env.HORIZON_URL)
             throw new Error('HORIZON URL env not configured');
         try {
@@ -339,8 +343,8 @@ export class Crawler {
                 this._connectionManager.disconnect(connection);
             } else {
                 this.setSCPTimeout(node);
-                //this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': send get scp status message');
-                //this._connectionManager.sendGetScpStatus(connection, this._ledgerSequence)
+                this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': send get scp status message');
+                this._connectionManager.sendGetScpStatus(connection, this._ledgerSequence)
             }
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
