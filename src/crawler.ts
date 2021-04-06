@@ -339,8 +339,8 @@ export class Crawler {
                 this._connectionManager.disconnect(connection);
             } else {
                 this.setSCPTimeout(node);
-                this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': send get scp status message');
-                this._connectionManager.sendGetScpStatus(connection, this._ledgerSequence)
+                //this._logger.log('debug', '[CRAWLER] ' + connection.toNode.key + ': send get scp status message');
+                //this._connectionManager.sendGetScpStatus(connection, this._ledgerSequence)
             }
         } catch (exception) {
             this._logger.log('error', '[CRAWLER] ' + connection.toNode.key + ': Exception: ' + exception.message);
