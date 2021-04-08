@@ -47,7 +47,8 @@ export class Crawler {
     _peerNodesParticipatingInSCP: Set<string> = new Set();
     _prioritizedPeerNodes: Set<string> = new Set();
     _nodesActiveInLastCrawl: Set<PublicKey> = new Set();
-    _horizonLatestLedger:number = 0;
+
+    public horizonLatestLedger:number = 0;
     /**
      * TODO:
      * - refactor out the Node dependency. Crawler should receive and return Peernodes.
@@ -103,8 +104,8 @@ export class Crawler {
             let result = await axios.get(process.env.HORIZON_URL);
             if(result && result.data && result.data.core_latest_ledger) {
                 //if horizon is stuck the latest ledger could be too outdated. If this happens we use the provided ledger id from the previous crawl. TODO: what about forks in the network with different ledger sequences.
-                if(this._horizonLatestLedger !== result.data.core_latest_ledger){//horizon has a new ledger
-                    this._horizonLatestLedger = result.data.core_latest_ledger;
+                if(this.horizonLatestLedger !== result.data.core_latest_ledger){//horizon has a new ledger
+                    this.horizonLatestLedger = result.data.core_latest_ledger;
                     this._ledgerSequence = result.data.core_latest_ledger;
                 } else {
                     this._logger.log('info', "[CRAWLER] horizon latest ledger not updated: " + result.data.core_latest_ledger);
