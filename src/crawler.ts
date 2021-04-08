@@ -47,6 +47,7 @@ export class Crawler {
     _peerNodesParticipatingInSCP: Set<string> = new Set();
     _prioritizedPeerNodes: Set<string> = new Set();
     _nodesActiveInLastCrawl: Set<PublicKey> = new Set();
+    _horizonLatestLedger:number = 0;
     /**
      * TODO:
      * - refactor out the Node dependency. Crawler should receive and return Peernodes.
@@ -59,7 +60,7 @@ export class Crawler {
         if (!process.env.HORIZON_URL) {
             throw new Error('Horizon not configured');
         }
-        this._ledgerSequence = latestLedger;
+        this._ledgerSequence = latestLedger++;
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allPeerNodes = new Map();
@@ -102,13 +103,20 @@ export class Crawler {
             let result = await axios.get(process.env.HORIZON_URL);
             if(result && result.data && result.data.core_latest_ledger) {
                 //if horizon is stuck the latest ledger could be too outdated. If this happens we use the provided ledger id from the previous crawl. TODO: what about forks in the network with different ledger sequences.
-                if(result.data.core_latest_ledger > this._ledgerSequence)
+                if(this._horizonLatestLedger !== result.data.core_latest_ledger){//horizon has a new ledger
+                    this._horizonLatestLedger = result.data.core_latest_ledger;
                     this._ledgerSequence = result.data.core_latest_ledger;
-                this._logger.log('info', "[CRAWLER] Starting ledger: " + this._ledgerSequence);
+                } else {
+                    this._logger.log('info', "[CRAWLER] horizon latest ledger not updated: " + result.data.core_latest_ledger);
+                    this._logger.log('info', "[CRAWLER] Using max ledger number from latest crawl " + result.data.core_latest_ledger);
+                }
+            } else {
+                this._logger.log('info', "[CRAWLER] Could not fetch latest ledger from horizon, using max ledger number from latest crawl " + result.data.core_latest_ledger);
             }
         } catch (e) {
-            this._logger.log('info', "Error fetching latest ledger from horizon, using latest detected ledger. " + e.message);
+            this._logger.log('info', "Error fetching latest ledger from horizon, using latest detected ledger from previous crawl. " + e.message);
         }
+        this._logger.log('info', "[CRAWLER] Starting ledger: " + this._ledgerSequence);
     }
 
     setLogger(logger: any) {

@@ -599,10 +599,10 @@
     semver-compare "^1.0.0"
     to-semver "^2.0.0"
 
-"@stellarbeat/js-stellar-node-connector@^2.3.0":
-  version "2.3.0"
-  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-2.3.0.tgz#ad2f4e880f6a6548f212ab056f7e24e27edfbc8a"
-  integrity sha512-dUQrYgoLG7MVbZFhjNxU5Z+V0QkRLXjn5oEFwEKycjuT/7Fsw4bgMkxdosxSZsZ/pZtBlcBINdIRnxisAvlMag==
+"@stellarbeat/js-stellar-node-connector@^2.4.1":
+  version "2.4.1"
+  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-2.4.1.tgz#523e96c1602b296d3da1c047640c20669f6560f4"
+  integrity sha512-/jamiT7lcd2UALatz3PybXVWyxDECJ5WsMS///gSW6eMBYvRhSs0ERdeOyugHJpdYmqrGdLwGsm/d2ce20x5gw==
   dependencies:
     "@types/sodium-native" "^2.3.2"
     bignumber.js "^4.0.0"
