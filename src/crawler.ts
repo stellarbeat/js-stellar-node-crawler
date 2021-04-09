@@ -58,11 +58,11 @@ export class Crawler {
      * Todo: watch out for nodes that switch publickeys on the same IP. These are multiple Nodes, but in the current implementation of the crawler, they are only one peer node
      **/
 
-    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, latestLedger:number = 0, logger: any = null) {
+    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, horizonLatestLedger:number = 0, logger: any = null) {
         if (!process.env.HORIZON_URL) {
             throw new Error('Horizon not configured');
         }
-        this._ledgerSequence = latestLedger++;
+        this._ledgerSequence = horizonLatestLedger++; //if we cannot fetch the latest ledger from horizon, or horizon has not advanced, we check the next ledger.
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allPeerNodes = new Map();
@@ -98,27 +98,26 @@ export class Crawler {
         return Array.from(this._processedLedgers);
     }
 
-    protected async getLatestLedger() {
+    protected async getLatestLedger() {//todo: refactor out horizon to higher layer
         if(!process.env.HORIZON_URL)
             throw new Error('HORIZON URL env not configured');
         try {
             let result = await axios.get(process.env.HORIZON_URL);
             if(result && result.data && result.data.core_latest_ledger) {
-                //if horizon is stuck the latest ledger could be too outdated. If this happens we use the provided ledger id from the previous crawl. TODO: what about forks in the network with different ledger sequences.
+                //if horizon is stuck we try the next ledger. This way we can see if the network is still advancing (horizon is stuck due to a problem), or if not, the network is halted.
                 if(this.horizonLatestLedger !== result.data.core_latest_ledger){//horizon has a new ledger
                     this.horizonLatestLedger = result.data.core_latest_ledger;
                     this._ledgerSequence = result.data.core_latest_ledger;
                 } else {
-                    this._logger.log('info', "[CRAWLER] horizon latest ledger not updated: " + result.data.core_latest_ledger);
-                    this._logger.log('info', "[CRAWLER] Using max ledger number from latest crawl " + result.data.core_latest_ledger);
+                    this._logger.log('warn', "[CRAWLER] horizon latest ledger not updated: " + result.data.core_latest_ledger + "Network halted? Trying out next ledger");
                 }
             } else {
-                this._logger.log('info', "[CRAWLER] Could not fetch latest ledger from horizon, using max ledger number from latest crawl " + result.data.core_latest_ledger);
+                this._logger.log('error', "[CRAWLER] Could not fetch latest ledger from horizon, using next ledger as fallback " + result.data.core_latest_ledger);
             }
         } catch (e) {
-            this._logger.log('info', "Error fetching latest ledger from horizon, using latest detected ledger from previous crawl. " + e.message);
+            this._logger.log('error', "Error fetching latest ledger from horizon, using next ledger as fallback " + e.message);
         }
-        this._logger.log('info', "[CRAWLER] Starting ledger: " + this._ledgerSequence);
+        this._logger.log('info', "[CRAWLER] Checking validating states based on latest ledger: " + this._ledgerSequence);
     }
 
     setLogger(logger: any) {
