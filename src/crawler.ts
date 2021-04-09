@@ -47,6 +47,7 @@ export class Crawler {
     _peerNodesParticipatingInSCP: Set<string> = new Set();
     _prioritizedPeerNodes: Set<string> = new Set();
     _nodesActiveInLastCrawl: Set<PublicKey> = new Set();
+    _pass:number = 1;
 
     public horizonLatestLedger:number = 0;
     /**
@@ -90,7 +91,7 @@ export class Crawler {
         this._weight = 0;
         this._activeNodeWeight = 100;
         this._defaultNodeWeight = 20;
-        this._maxWeight = 400;
+        this._maxWeight = 40000;
     }
 
     getProcessedLedgers() {
@@ -146,6 +147,7 @@ export class Crawler {
      * @returns {Promise<any>}
      */
     async crawl(nodesSeed: Array<Node>): Promise<Array<Node>> {
+        this._pass = 1;
         this._logger.log('info', "[CRAWLER] Starting crawl with seed of " + nodesSeed.length + "nodes.");
         function compare(a:Node, b: Node) {
             if (a.isValidating && !b.isValidating) {
@@ -259,7 +261,20 @@ export class Crawler {
 
         this.processCrawlQueue();
 
-        if (this._busyCounter === 0) {
+        if (this._busyCounter === 0 && this._pass === 1){//retry active but non validating validators
+            this._pass++;
+            Array.from(this._publicKeyToNodeMap.values())
+                .filter(node => node.active && node.isValidator && !node.isValidating)
+                .forEach(validator => {
+                    this._logger.log('info', "[CRAWLER] retrying: " + node.publicKey);
+                    let peerNode = this._allPeerNodes.get(validator.key);
+                    if(!peerNode)
+                        return;
+                    this._allPeerNodes.delete(validator.key);
+                    this.crawlPeerNode(peerNode);
+                })
+        }
+        else if (this._busyCounter === 0) {
 
             this._logger.log('info', "[CRAWLER] Finished with all nodes");
             this._logger.log('info', '[CRAWLER] ' + this._allPeerNodes.size + " nodes crawled of which are active: " + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.active).length);
