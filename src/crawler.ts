@@ -58,11 +58,10 @@ export class Crawler {
      * Todo: watch out for nodes that switch publickeys on the same IP. These are multiple Nodes, but in the current implementation of the crawler, they are only one peer node
      **/
 
-    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, horizonLatestLedger:number = 0, logger: any = null) {
+    constructor(usePublicNetwork: boolean = true, durationInMilliseconds: number = 30000, logger: any = null) {
         if (!process.env.HORIZON_URL) {
             throw new Error('Horizon not configured');
         }
-        this._ledgerSequence = horizonLatestLedger++; //if we cannot fetch the latest ledger from horizon, or horizon has not advanced, we check the next ledger.
         this._durationInMilliseconds = durationInMilliseconds;
         this._busyCounter = 0;
         this._allPeerNodes = new Map();
@@ -91,7 +90,7 @@ export class Crawler {
         this._weight = 0;
         this._activeNodeWeight = 100;
         this._defaultNodeWeight = 20;
-        this._maxWeight = 40000;
+        this._maxWeight = 400;
     }
 
     getProcessedLedgers() {
@@ -141,11 +140,11 @@ export class Crawler {
     }
 
     /**
-     *
      * @param nodesSeed
-     * @returns {Promise<any>}
+     * @param horizonLatestLedger too check if the ledger is advancing.
      */
-    async crawl(nodesSeed: Array<Node>): Promise<Array<Node>> {
+    async crawl(nodesSeed: Array<Node>, horizonLatestLedger:number = 0): Promise<Array<Node>> {
+        this._ledgerSequence = horizonLatestLedger++; //if we cannot fetch the latest ledger from horizon, or horizon has not advanced, we check the next ledger.
         this._pass = 1;
         this._logger.log('info', "[CRAWLER] Starting crawl with seed of " + nodesSeed.length + "nodes.");
         function compare(a:Node, b: Node) {

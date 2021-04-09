@@ -20,10 +20,10 @@ async function main() {
 
     console.log("[MAIN] Crawl!");
     let crawledNodes = [];
-    let myCrawler = new Crawler(true, 30000, 34796840);
+    let myCrawler = new Crawler(true, 30000);
 
     try {
-        crawledNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey));
+        crawledNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey), 34844700);
     } catch (e) {
         console.log(e);
     }
