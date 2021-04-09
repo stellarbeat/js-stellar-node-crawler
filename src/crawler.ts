@@ -264,7 +264,7 @@ export class Crawler {
             Array.from(this._publicKeyToNodeMap.values())
                 .filter(node => node.active && node.isValidator && !node.isValidating)
                 .forEach(validator => {
-                    this._logger.log('info', "[CRAWLER] retrying: " + node.publicKey);
+                    this._logger.log('info', "[CRAWLER] retrying: " + validator.publicKey);
                     let peerNode = this._allPeerNodes.get(validator.key);
                     if(!peerNode)
                         return;
