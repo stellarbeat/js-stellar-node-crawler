@@ -196,7 +196,7 @@ export class Crawler {
             this._logger.log('debug', '[CRAWLER] ' + node.key + ': Node key already used for crawl');
             return;
         }
-
+        this._logger.log('debug', '[CRAWLER] ' + node.key + ': Adding node to crawl queue');
         this._allPeerNodes.set(node.key, node);
         this._nodesToCrawl.push(node);
         this._busyCounter++;
@@ -259,7 +259,19 @@ export class Crawler {
 
         this.processCrawlQueue();
 
-        if (this._busyCounter === 0 && this._pass === 1){//retry active but non validating validators
+        if (this._busyCounter === 0 && this._pass > 1) {//stop the crawler
+
+            this._logger.log('info', "[CRAWLER] Finished with all nodes");
+            this._logger.log('info', '[CRAWLER] ' + this._allPeerNodes.size + " nodes crawled of which are active: " + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.active).length);
+            this._logger.log('info', '[CRAWLER] of which are validating: '  + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.isValidating).length);
+            this._logger.log('info', '[CRAWLER] of which are overloaded: '  + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.overLoaded).length);
+            this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
+
+            this._resolve(
+                Array.from(this._publicKeyToNodeMap.values())
+            );
+        }
+        else if (this._busyCounter === 0 && this._pass === 1){//retry active but non validating validators
             this._pass++;
             Array.from(this._publicKeyToNodeMap.values())
                 .filter(node => node.active && node.isValidator && !node.isValidating)
@@ -272,18 +284,7 @@ export class Crawler {
                     this.crawlPeerNode(peerNode);
                 })
         }
-        else if (this._busyCounter === 0) {
 
-            this._logger.log('info', "[CRAWLER] Finished with all nodes");
-            this._logger.log('info', '[CRAWLER] ' + this._allPeerNodes.size + " nodes crawled of which are active: " + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.active).length);
-            this._logger.log('info', '[CRAWLER] of which are validating: '  + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.isValidating).length);
-            this._logger.log('info', '[CRAWLER] of which are overloaded: '  + Array.from(this._publicKeyToNodeMap.values()).filter(node => node.overLoaded).length);
-            this._logger.log('info', '[CRAWLER] ' + this._nodesThatSuppliedPeerList.size + " supplied us with a peers list.");
-
-            this._resolve(
-                Array.from(this._publicKeyToNodeMap.values())
-            );
-        }
     }
 
     requestQuorumSetFromConnectedNodes(quorumSetHash: string, quorumSetOwnerPublicKey: string) {
