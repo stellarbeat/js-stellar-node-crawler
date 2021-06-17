@@ -103,17 +103,19 @@ export class Crawler {
         try {
             let result = await axios.get(process.env.HORIZON_URL);
             if(result && result.data && result.data.core_latest_ledger) {
-                //if horizon is stuck we try the next ledger. This way we can see if the network is still advancing (horizon is stuck due to a problem), or if not, the network is halted.
                 if(this.horizonLatestLedger !== result.data.core_latest_ledger){//horizon has a new ledger
                     this.horizonLatestLedger = result.data.core_latest_ledger;
                     this._ledgerSequence = result.data.core_latest_ledger;
                 } else {
                     this._logger.log('warn', "[CRAWLER] horizon latest ledger not updated: " + result.data.core_latest_ledger + "Network halted? Trying out next ledger");
+                    this._ledgerSequence ++;
                 }
             } else {
-                this._logger.log('error', "[CRAWLER] Could not fetch latest ledger from horizon, using next ledger as fallback " + result.data.core_latest_ledger);
+                this._ledgerSequence ++;
+                this._logger.log('error', "[CRAWLER] Could not fetch latest ledger from horizon, using next ledger as fallback " + this._ledgerSequence);
             }
         } catch (e) {
+            this._ledgerSequence ++;
             this._logger.log('error', "Error fetching latest ledger from horizon, using next ledger as fallback " + e.message);
         }
         this._logger.log('info', "[CRAWLER] Checking validating states based on latest ledger: " + this._ledgerSequence);
@@ -144,7 +146,7 @@ export class Crawler {
      * @param horizonLatestLedger too check if the ledger is advancing.
      */
     async crawl(nodesSeed: Array<Node>, horizonLatestLedger:number = 0): Promise<Array<Node>> {
-        this._ledgerSequence = horizonLatestLedger++; //if we cannot fetch the latest ledger from horizon, or horizon has not advanced, we check the next ledger.
+        this._ledgerSequence = horizonLatestLedger;
         this._pass = 1;
         this._logger.log('info', "[CRAWLER] Starting crawl with seed of " + nodesSeed.length + "nodes.");
         function compare(a:Node, b: Node) {

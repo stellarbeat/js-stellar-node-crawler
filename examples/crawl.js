@@ -23,7 +23,7 @@ async function main() {
     let myCrawler = new Crawler(true, 30000);
 
     try {
-        crawledNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey), 34844700);
+        crawledNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey), 0);
     } catch (e) {
         console.log(e);
     }
