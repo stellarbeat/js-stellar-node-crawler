@@ -20,7 +20,7 @@ export default {
                 if (err) {
                     reject(err);
                 } else {
-                    resolve();
+                    resolve({});
                 }
             })
         );
