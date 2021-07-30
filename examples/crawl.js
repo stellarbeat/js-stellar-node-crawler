@@ -1,12 +1,14 @@
-const Crawler = require("../lib").Crawler;
-const jsonStorage = require('../lib').jsonStorage;
-const Node = require('@stellarbeat/js-stellar-domain').Node;
-const StellarBase = require('stellar-base');
+const Crawler = require("../lib/node-crawler/src").Crawler;
+const jsonStorage = require('../lib/node-crawler/src').jsonStorage;
+const blocked = require('blocked-at')
 
 // noinspection JSIgnoredPromiseFromCall
 main();
 
 async function main() {
+    blocked((time, stack) => {
+        console.log(`Blocked for ${time}ms, operation started here:`, stack)
+    }, {trimFalsePositives: true})
 
     if (process.argv.length <= 2) {
         console.log("Usage: " + __filename + " NODES.JSON_PATH ");

@@ -16,18 +16,24 @@
   "author": "pieterjan84@github",
   "license": "MIT",
   "dependencies": {
+    "@types/lru-cache": "^5.1.1",
+    "@types/pino": "^6.3.11",
     "axios": "^0.21.1",
+    "blocked-at": "^1.2.0",
     "dotenv": "^10.0.0",
     "eventsource": "^1.1.0",
+    "lru-cache": "^6.0.0",
+    "neverthrow": "^4.2.2",
+    "pino": "^6.13.0",
     "winston": "^3.3.3"
   },
   "peerDependencies": {
     "@stellarbeat/js-stellar-domain": "^2.23.1",
-    "@stellarbeat/js-stellar-node-connector": "^2.5.1"
+    "@stellarbeat/js-stellar-node-connector": "git://github.com/stellarbeat/js-stellar-node-connector#master"
   },
   "devDependencies": {
     "@stellarbeat/js-stellar-domain": "^2.23.1",
-    "@stellarbeat/js-stellar-node-connector": "^2.5.1",
+    "@stellarbeat/js-stellar-node-connector": "git://github.com/stellarbeat/js-stellar-node-connector#master",
     "@types/eventsource": "^1.1.5",
     "@types/jest": "^26.0.23",
     "jest": "^27.0.4",

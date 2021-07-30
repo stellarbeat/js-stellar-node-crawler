@@ -4,3 +4,5 @@ dist/
 flow-typed/
 .env
 lib/
+.clinic/
+.crawl_result/
