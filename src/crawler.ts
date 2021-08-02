@@ -392,7 +392,7 @@ export class Crawler {
             if (this.processedValidatingNodes.has(node.publicKey)) { //we already confirmed that the node is validating by listening to externalize messages propagated by other nodes.
                 this.logger.info('[CRAWLER] ' + connection.toNode.key + ': ' + connection.toNode.publicKey + ' already confirmed validating, disconnecting');
                 node.isValidating = true;
-                connection.end();
+                connection.destroy();
             } else {
                 this.setSCPTimeout(connection.toNode); //todo rename to peernode
                 this.logger.debug('[CRAWLER] ' + connection.toNode.key + ': send get scp status message');
@@ -550,7 +550,7 @@ export class Crawler {
             } else {
                 let connection = this.activeConnections.get(peerNode.key);
                 if (connection)
-                    connection.end();
+                    connection.destroy();
             }
         }, 5000)); //5 seconds for first scp message, correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
     }
