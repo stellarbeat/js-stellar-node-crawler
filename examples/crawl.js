@@ -1,5 +1,5 @@
-const Crawler = require("../lib").Crawler;
-const jsonStorage = require('../lib').jsonStorage;
+const Crawler = require("../lib/crawler/src").Crawler;
+const jsonStorage = require('../lib/crawler/src').jsonStorage;
 const blocked = require('blocked-at')
 
 // noinspection JSIgnoredPromiseFromCall
@@ -22,7 +22,7 @@ async function main() {
 
     console.log("[MAIN] Crawl!");
     let crawledNodes = [];
-    let myCrawler = new Crawler(true);
+    let myCrawler = new Crawler(true, 40);
 
     try {
         crawledNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey), 0);
