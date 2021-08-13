@@ -1,34 +1,32 @@
-import {Node} from '@stellarbeat/js-stellar-domain';
-import {ConnectionManager} from "@stellarbeat/js-stellar-node-connector";
-import {Crawler} from "../src/crawler";
-jest.mock("../node_modules/@stellarbeat/js-stellar-node-connector/lib/connection-manager.js");
+import {Node as NetworkNode, getConfigFromEnv} from "@stellarbeat/js-stellar-node-connector";
+import {Crawler} from "../src";
+import {xdr} from "stellar-base";
+import {Node} from "@stellarbeat/js-stellar-domain";
 
-//setup
-let crawler:Crawler;
-beforeEach(() => {
-    crawler = new Crawler(true, 1000);
-});
+let peerNodeData: Node;
+let peerNode: NetworkNode;
 
-test('constructor', () => {
+beforeAll(() => {
+    peerNodeData = new Node('PEER', '127.0.0.1', 11623)
+    peerNode = new NetworkNode(true, getConfigFromEnv());
+    peerNode.acceptIncomingConnections(peerNodeData.port, peerNodeData.ip);
+})
+afterAll(() => {
+    peerNode.stopAcceptingIncomingConnections();
+})
 
-    expect(ConnectionManager).toHaveBeenCalledTimes(1); //constructor
-});
+test('crawl', (done) => {
+    peerNode.on("connection", (connection) => {
+        connection.on("connect", () => {
+            console.log("Crawler contacted me!");
+            done();
+        });
+        connection.on("data", (stellarMessage: xdr.StellarMessage) => {
 
-test('crawlSingleNode', () => {
-    let node1 = new Node('123');
-    let node2 = new Node('234');
-    crawler.processCrawlQueue = jest.fn();
-    crawler.crawlNode(node1);
-    crawler.crawlNode(node2);
+        })
+        connection.on("error", (error: Error) => console.log(error));
+    });
 
-    expect(crawler._nodesToCrawl.length).toEqual(2);
-    expect(crawler._nodesToCrawl[0]).toEqual(node1);
-    //@ts-ignore
-    expect(crawler.processCrawlQueue.mock.calls.length).toBe(2);
-    expect(Array.from(crawler._publicKeyToNodeMap.values()).length).toEqual(2);
-    expect(crawler._publicKeyToNodeMap.get('123')).toEqual(node1);
-    expect(crawler._busyCounter).toEqual(2);
-});
-
-test('processQueue', () => {
+    let crawler = new Crawler(true, 20);
+    crawler.crawl([peerNodeData]);
 });

@@ -8,7 +8,7 @@
   },
   "main": "lib/index.js",
   "scripts": {
-    "prepublish": "yarn run build",
+    "prepare": "yarn run build",
     "build": "tsc --declaration",
     "examples:crawl": "yarn run build; NODE_PATH=node_modules node examples/crawl",
     "test": "jest"
@@ -29,11 +29,11 @@
   },
   "peerDependencies": {
     "@stellarbeat/js-stellar-domain": "^2.23.1",
-    "@stellarbeat/js-stellar-node-connector": "git://github.com/stellarbeat/js-stellar-node-connector#master"
+    "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.4"
   },
   "devDependencies": {
     "@stellarbeat/js-stellar-domain": "^2.23.1",
-    "@stellarbeat/js-stellar-node-connector": "git://github.com/stellarbeat/js-stellar-node-connector#master",
+    "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.7",
     "@types/async": "^3.2.7",
     "@types/eventsource": "^1.1.5",
     "@types/jest": "^26.0.23",
