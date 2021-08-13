@@ -1,25 +1,23 @@
 import {Node as NetworkNode, getConfigFromEnv} from "@stellarbeat/js-stellar-node-connector";
-import {Crawler} from "../src";
+import {Crawler, PeerNode} from "../src";
 import {xdr} from "stellar-base";
-import {Node} from "@stellarbeat/js-stellar-domain";
 
-let peerNodeData: Node;
-let peerNode: NetworkNode;
-
+let peerNetworkNode: NetworkNode;
+let peerNodeData: PeerNode;
+jest.setTimeout(10000);
 beforeAll(() => {
-    peerNodeData = new Node('PEER', '127.0.0.1', 11623)
-    peerNode = new NetworkNode(true, getConfigFromEnv());
-    peerNode.acceptIncomingConnections(peerNodeData.port, peerNodeData.ip);
+    peerNodeData = new PeerNode('127.0.0.1', 11623)
+    peerNetworkNode = new NetworkNode(true, getConfigFromEnv());
+    peerNetworkNode.acceptIncomingConnections(peerNodeData.port, peerNodeData.ip);
 })
 afterAll(() => {
-    peerNode.stopAcceptingIncomingConnections();
+    peerNetworkNode.stopAcceptingIncomingConnections();
 })
 
-test('crawl', (done) => {
-    peerNode.on("connection", (connection) => {
+test('crawl', async () => {
+    peerNetworkNode.on("connection", (connection) => {
         connection.on("connect", () => {
             console.log("Crawler contacted me!");
-            done();
         });
         connection.on("data", (stellarMessage: xdr.StellarMessage) => {
 
@@ -28,5 +26,10 @@ test('crawl', (done) => {
     });
 
     let crawler = new Crawler(true, 20);
-    crawler.crawl([peerNodeData]);
+    let result = await crawler.crawl([peerNodeData]);
+    let peerNode = result.pop()!;
+    expect(peerNode.active).toBeTruthy();
+    expect(peerNode.isValidating).toBeFalsy();
+    expect(peerNode.overLoaded).toBeFalsy();
+
 });
