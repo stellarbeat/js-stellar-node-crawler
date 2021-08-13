@@ -26,13 +26,16 @@ type LedgerSequence = number;
 
 require('dotenv').config();
 
+type QuorumSetHash = string;
+
 export class Crawler {
     protected allPeerNodes: Map<string, PeerNode>;
     protected activeConnections: Map<string, Connection>;
     protected processedValidatingNodes: Set<PublicKey> = new Set();
     protected nodesThatSuppliedPeerList: Set<string>;
     protected usePublicNetwork: boolean;
-    protected quorumSetHashes: Map<string, Set<string>>;
+    protected quorumSetOwners: Map<string, Set<string>>;
+    protected quorumSetMap: Map<QuorumSetHash, QuorumSet> = new Map<QuorumSetHash, QuorumSet>();
     protected crawlerNode: NetworkNode;
     protected resolve: any; //todo typehints
     protected reject: any;
@@ -57,7 +60,7 @@ export class Crawler {
         this.activeConnections = new Map(); //nodes that completed a handshake and we are currently listening to
         this.nodesThatSuppliedPeerList = new Set();
         this.usePublicNetwork = usePublicNetwork;
-        this.quorumSetHashes = new Map();
+        this.quorumSetOwners = new Map();
         if (!logger) {
             logger = this.initializeDefaultLogger();
         }
@@ -110,16 +113,11 @@ export class Crawler {
         });
     }
 
-    /**
-     * @param peerNodes
-     * @param horizonLatestLedger too check if the ledger is advancing.
-     *
-     * todo: add quorumset cache to improve speed and reduce dependency here. crawl array of tuples (ip - port)
-     */
-    async crawl(peerNodes: Array<PeerNode>, horizonLatestLedger: number = 0): Promise<Array<PeerNode>> {
+    async crawl(nodeAddresses: Array<[ip:string, port:number]>, quorumSetMap:Map<string, QuorumSet> = new Map<string, QuorumSet>(), horizonLatestLedger: number = 0): Promise<Array<PeerNode>> {
         console.time("crawl");
         this.ledgerSequence = horizonLatestLedger;
-        this.logger.info("Starting crawl with seed of " + peerNodes.length + "nodes.");
+        this.quorumSetMap = quorumSetMap;
+        this.logger.info("Starting crawl with seed of " + nodeAddresses.length + "addresses.");
 
         return await new Promise<Array<PeerNode>>(async (resolve, reject) => {
                 this.resolve = resolve;
@@ -132,7 +130,7 @@ export class Crawler {
                 }
 
                 if (this.ledgerSequence !== 0) {
-                    peerNodes.forEach(node => this.crawlNode(node));
+                    nodeAddresses.forEach(address => this.crawlNode(new PeerNode(address[0], address[1])));
                 }
             }
         );
@@ -392,7 +390,7 @@ export class Crawler {
                 this.processedValidatingNodes.add(publicKey); //node is confirmed validating and we have the quorumset. If we connect to it in the future, we can disconnect immediately and mark it as validating.//todo: disconnect if currently connected?
             } else {
                 this.logger.info({'peer': connection.remoteAddress}, 'Unknown or modified quorumSetHash for peer, requesting it: ' + quorumSetOwnerPublicKey + ' => ' + quorumSetHash);
-                let owners = this.quorumSetHashes.get(quorumSetHash);
+                let owners = this.quorumSetOwners.get(quorumSetHash);
                 if (owners) {
                     if (owners.has(quorumSetOwnerPublicKey)) {
                         this.logger.debug({'peer': connection.remoteAddress}, 'Already logged quorumSetHash for owner: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
@@ -401,7 +399,7 @@ export class Crawler {
                         this.logger.debug({'peer': connection.remoteAddress}, 'Logged new owner for quorumSetHash: ' + quorumSetHash + ' owned by: ' + quorumSetOwnerPublicKey);
                     }
                 } else {
-                    this.quorumSetHashes.set(quorumSetHash, new Set([quorumSetOwnerPublicKey]));
+                    this.quorumSetOwners.set(quorumSetHash, new Set([quorumSetOwnerPublicKey]));
                 }
                 this.logger.debug({'peer': connection.remoteAddress}, ': Requesting quorumset: ' + quorumSetHash);
 
@@ -417,7 +415,7 @@ export class Crawler {
             this.logger.info({'peer': connection.remoteAddress}, 'QuorumSet received: ' + quorumSet.hashKey);
             if (!quorumSet.hashKey)
                 throw new Error('Missing hashkey for quorumset');
-            let owners = this.quorumSetHashes.get(quorumSet.hashKey);
+            let owners = this.quorumSetOwners.get(quorumSet.hashKey);
             if (!owners) {
                 return;
             }

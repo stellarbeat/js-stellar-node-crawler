@@ -3,12 +3,12 @@ import {Crawler, PeerNode} from "../src";
 import {xdr} from "stellar-base";
 
 let peerNetworkNode: NetworkNode;
-let peerNodeData: PeerNode;
+let peerNodeAddress: [ip:string, port:number];
 jest.setTimeout(10000);
 beforeAll(() => {
-    peerNodeData = new PeerNode('127.0.0.1', 11623)
+    peerNodeAddress = ['127.0.0.1', 11623];
     peerNetworkNode = new NetworkNode(true, getConfigFromEnv());
-    peerNetworkNode.acceptIncomingConnections(peerNodeData.port, peerNodeData.ip);
+    peerNetworkNode.acceptIncomingConnections(peerNodeAddress[1], peerNodeAddress[0]);
 })
 afterAll(() => {
     peerNetworkNode.stopAcceptingIncomingConnections();
@@ -26,7 +26,7 @@ test('crawl', async () => {
     });
 
     let crawler = new Crawler(true, 20);
-    let result = await crawler.crawl([peerNodeData]);
+    let result = await crawler.crawl([peerNodeAddress]);
     let peerNode = result.pop()!;
     expect(peerNode.active).toBeTruthy();
     expect(peerNode.isValidating).toBeFalsy();
