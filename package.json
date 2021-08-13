@@ -8,7 +8,7 @@
   },
   "main": "lib/index.js",
   "scripts": {
-    "prepare": "yarn run build",
+    "prepare": "yarn test; yarn run build",
     "build": "tsc --declaration",
     "examples:crawl": "yarn run build; NODE_PATH=node_modules node examples/crawl",
     "test": "jest"
