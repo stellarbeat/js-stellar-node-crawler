@@ -28,12 +28,12 @@
     "pino": "^6.13.0"
   },
   "peerDependencies": {
-    "@stellarbeat/js-stellar-domain": "^2.23.1",
+    "@stellarbeat/js-stellar-domain": "^2.23.2",
     "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.4"
   },
   "devDependencies": {
-    "@stellarbeat/js-stellar-domain": "^2.23.1",
-    "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.7",
+    "@stellarbeat/js-stellar-domain": "^2.23.2",
+    "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.8",
     "@types/async": "^3.2.7",
     "@types/eventsource": "^1.1.5",
     "@types/jest": "^26.0.23",

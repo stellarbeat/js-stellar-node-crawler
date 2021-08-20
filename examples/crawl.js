@@ -21,17 +21,17 @@ async function main() {
     let nodes = await jsonStorage.getNodesFromFile(nodesJsonPath);
 
     console.log("[MAIN] Crawl!");
-    let crawledNodes = [];
+    let activePeerNodes = [];
     let myCrawler = new Crawler(true, 40);
 
     try {
-        crawledNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey).map(node => [node.ip, node.port]));
+        activePeerNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey).map(node => [node.ip, node.port]));
     } catch (e) {
         console.log(e);
     }
 
     console.log("[MAIN] Writing results to file nodes.json in directory crawl_result");
-    await jsonStorage.writeFilePromise("./crawl_result/nodes.json", JSON.stringify(crawledNodes.filter(node => node.publicKey)));
+    await jsonStorage.writeFilePromise("./crawl_result/nodes.json", JSON.stringify(activePeerNodes));
 
     console.log("[MAIN] Finished");
 }

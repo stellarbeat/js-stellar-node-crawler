@@ -31,5 +31,4 @@ test('crawl', async () => {
     expect(peerNode.active).toBeTruthy();
     expect(peerNode.isValidating).toBeFalsy();
     expect(peerNode.overLoaded).toBeFalsy();
-
 });
