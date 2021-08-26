@@ -1,6 +1,7 @@
 const Crawler = require("../lib").Crawler;
 const jsonStorage = require('../lib').jsonStorage;
 const blocked = require('blocked-at')
+const {QuorumSet} = require("@stellarbeat/js-stellar-domain");
 
 // noinspection JSIgnoredPromiseFromCall
 main();
@@ -22,7 +23,11 @@ async function main() {
 
     console.log("[MAIN] Crawl!");
     let activePeerNodes = [];
-    let myCrawler = new Crawler(true, 40);
+    let qSet = new QuorumSet('hash', 2, [
+        'GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH', 'GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ', 'GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK'
+    ]);
+    let myCrawler = new Crawler(qSet, true, 40);
+
 
     try {
         activePeerNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey).map(node => [node.ip, node.port]));

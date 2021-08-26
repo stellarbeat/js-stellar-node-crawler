@@ -16,7 +16,7 @@ import StellarMessage = xdr.StellarMessage;
 import MessageType = xdr.MessageType;
 import ScpStatement = xdr.ScpStatement;
 import ScpStatementType = xdr.ScpStatementType;
-import {PeerNode} from "./peer-node";
+import {Peer, PeerNode, UnknownPeerNode} from "./peer-node";
 import {NodeInfo} from "@stellarbeat/js-stellar-node-connector/lib/node";
 import * as P from "pino";
 import {Slots} from "./slots";
@@ -37,14 +37,16 @@ type QuorumSetHash = string;
 
 export class Crawler {
     protected crawledNodeAddresses: Set<PeerKey>;
-    protected activeConnections: Map<string, Connection>;
+    protected activeConnections: Map<PublicKey, Connection>;
     protected quorumSetOwners: Map<string, Set<string>>;
     protected quorumSetMap: Map<QuorumSetHash, QuorumSet> = new Map<QuorumSetHash, QuorumSet>();
     protected crawlerNode: NetworkNode;
     protected logger: P.Logger;
     protected latestLedgerSequence: LedgerSequence = 0;
     protected crawlQueue: QueueObject<NodeAddress>;
+    protected quorumSetDiscoveryQueues: Map<QuorumSetHash, QueueObject<any>> = new Map();
     protected peerNodesByPublicKey: Map<PublicKey, PeerNode> = new Map();
+    protected unknownPeerNodesByPublicKey: Map<PublicKey, UnknownPeerNode> = new Map();
     protected timeouts: Map<string, any> = new Map();
     protected envelopeCache = new LRUCache(5000);
     protected slots: Slots;
@@ -53,10 +55,19 @@ export class Crawler {
     protected scpTimeoutCounters: Map<PublicKey, number> = new Map();
 
     //todo: network string instead of boolean
-    constructor(usePublicNetwork: boolean = true, concurrency: number = 400, logger: any = null) {//todo networkId
+    /**
+     *
+     * @param quorumSet Trusted nodes to determine closed ledgers
+     * @param usePublicNetwork
+     * @param concurrency Amount of nodes crawled concurrently
+     * @param quorumSetMap Known quorumSets to speed up crawling
+     * @param logger
+     */
+    constructor(quorumSet: QuorumSet, usePublicNetwork: boolean = true, concurrency: number = 400, quorumSetMap: Map<string, QuorumSet> = new Map<string, QuorumSet>(), logger: any = null) {//todo networkId
         if (!process.env.HORIZON_URL) {
             throw new Error('Horizon not configured');
         }
+        this.quorumSetMap = quorumSetMap;
         this.crawledNodeAddresses = new Set();
         this.activeConnections = new Map(); //nodes that completed a handshake and we are currently listening to
         this.quorumSetOwners = new Map();
@@ -65,10 +76,7 @@ export class Crawler {
         }
 
         this.logger = logger.child({mod: 'Crawler'});
-        let trustedQuorumSet = new QuorumSet('hash', 2, [
-            'GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH', 'GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ', 'GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK'
-        ]);//todo: add as param
-        this.slots = new Slots(trustedQuorumSet);
+        this.slots = new Slots(quorumSet);
 
         this.crawlerNode = new NetworkNode(
             usePublicNetwork,
@@ -77,7 +85,6 @@ export class Crawler {
         );
 
         this.crawlQueue = queue(this.processCrawlPeerNodeInCrawlQueue.bind(this), concurrency);
-
     }
 
     public getProcessedLedgers() {
@@ -92,10 +99,9 @@ export class Crawler {
     }
 
     //todo add 'crawl' object, that holds necessary data structures for the 'current' crawl. this object is passed to every connection event handler.
-    async crawl(nodeAddresses: NodeAddress[], quorumSetMap: Map<string, QuorumSet> = new Map<string, QuorumSet>(), latestLedgerSequence: number = 0): Promise<Array<PeerNode>> {
+    async crawl(nodeAddresses: NodeAddress[], latestLedgerSequence: number = 0): Promise<Array<PeerNode>> {
         console.time("crawl");
         this.latestLedgerSequence = latestLedgerSequence;
-        this.quorumSetMap = quorumSetMap;
         this.logger.info("Starting crawl with seed of " + nodeAddresses.length + "addresses.");
 
         return await new Promise<Array<PeerNode>>(async (resolve, reject) => {
@@ -204,8 +210,8 @@ export class Crawler {
             if (this.timeouts.get(connection.remoteAddress))
                 clearTimeout(this.timeouts.get(connection.remoteAddress));
 
-            if (this.activeConnections.has(connection.remoteAddress)) {
-                this.activeConnections.delete(connection.remoteAddress);
+            if (this.activeConnections.has(connection.remotePublicKey!)) {
+                this.activeConnections.delete(connection.remotePublicKey!);
             }
             this.logger.debug("nodes left in queue: " + this.crawlQueue.length());
             done();//done processing
@@ -232,6 +238,15 @@ export class Crawler {
 
             peerNode.active = true;
 
+            let unknownPeerNodeMatch = this.unknownPeerNodesByPublicKey.get(publicKey);
+            if(unknownPeerNodeMatch){
+                peerNode.participatingInSCP = unknownPeerNodeMatch.participatingInSCP;
+                peerNode.isValidating = unknownPeerNodeMatch.isValidating;
+                peerNode.quorumSet = unknownPeerNodeMatch.quorumSet;
+                peerNode.quorumSetHash = unknownPeerNodeMatch.quorumSetHash;
+                this.unknownPeerNodesByPublicKey.delete(publicKey);//peerNode no longer unknown
+            }
+
             if (this.peerNodesByPublicKey.has(publicKey)) {//this public key is already used in this crawl! A node is not allowed to reuse public keys. Disconnecting.
                 this.logger.error({
                     'peer': connection.remoteAddress,
@@ -242,7 +257,7 @@ export class Crawler {
             }
 
             this.peerNodesByPublicKey.set(publicKey, peerNode);
-            this.activeConnections.set(connection.remoteAddress, connection);
+            this.activeConnections.set(publicKey, connection);
             /*if (!this._nodesThatSuppliedPeerList.has(connection.peer)) { //Most nodes send their peers automatically on successful handshake
                 this._connectionManager.sendGetPeers(connection);
             }*/
@@ -322,17 +337,19 @@ export class Crawler {
             'slotIndex': scpStatement.slotIndex().toString()
         }, 'processing new scp statement: ' + scpStatement.pledges().switch().name);
 
-        let peer = this.peerNodesByPublicKey.get(publicKey);
-        if (peer)
-            peer.participatingInSCP = true;
+        let peer = this.getPeer(publicKey);
+        if (!peer){
+            peer = new UnknownPeerNode(publicKey);
+            this.unknownPeerNodesByPublicKey.set(publicKey, peer);
+        }
 
-        //TODO: process quorumset hashes. Update peers only when slot is higher then previous registered quorumset hash
+        peer.participatingInSCP = true;
 
         if (scpStatement.pledges().switch().value !== ScpStatementType.scpStExternalize().value) { //only if node is externalizing, we mark the node as validating
             return;
         }
 
-        this.processExternalizeStatement(publicKey, scpStatement.slotIndex().toString(), scpStatement.pledges().externalize())
+        this.processExternalizeStatement(peer, scpStatement.slotIndex().toString(), scpStatement.pledges().externalize())
 
 
         /*let quorumSetHash = scpStatement.pledges().externalize().commitQuorumSetHash().toString('base64');
@@ -367,40 +384,49 @@ export class Crawler {
         }*/
     }
 
-    protected processExternalizeStatement(publicKey: PublicKey, slotIndex: string, statementExternalize: xdr.ScpStatementExternalize) {
+    protected processExternalizeStatement(peer: Peer, slotIndex: string, statementExternalize: xdr.ScpStatementExternalize) {
         let value = statementExternalize.commit().value().toString('base64');
         this.logger.debug({
-            'publicKey': publicKey,
+            'publicKey': peer.publicKey,
             'slotIndex': slotIndex
         }, 'externalize msg with value: ' + value);
 
-        let markNodeAsValidating = (publicKey: PublicKey) => {
-            if (!this.validatingPublicKeys.has(publicKey)) {
+        let markNodeAsValidating = (peer: Peer) => {
+            if (!this.validatingPublicKeys.has(peer.publicKey)) {
                 this.logger.info({
-                    'pk': publicKey,
+                    'pk': peer.publicKey,
                 }, 'Validating');
             }
-            this.validatingPublicKeys.add(publicKey);
-            let peerNode = this.peerNodesByPublicKey.get(publicKey);
-            if (peerNode)
-                peerNode.isValidating = true;
+            this.validatingPublicKeys.add(peer.publicKey);
+            peer.isValidating = true;
         }
 
         let slot = this.slots.getSlot(slotIndex);
         let slotWasClosedBefore = slot.closed();
-        slot.addExternalizeValue(publicKey, value);
+        slot.addExternalizeValue(peer.publicKey, value);
 
         if (slot.closed()) {
             if (!slotWasClosedBefore) {//we just closed the slot, lets mark all nodes as validating!
                 this.logger.info({ledger: slotIndex}, 'Ledger closed!');
-                slot.getNodesAgreeingOnExternalizedValue().forEach(validatingPublicKey => markNodeAsValidating(validatingPublicKey));
+                slot.getNodesAgreeingOnExternalizedValue().forEach(validatingPublicKey => {
+                    let validatingPeer = this.getPeer(validatingPublicKey);
+                    if(validatingPeer)
+                        markNodeAsValidating(validatingPeer);
+                });
             } else { //if the slot was already closed, we check if this new (?) node should be marked as validating
                 if (value === slot.externalizedValue)
-                    markNodeAsValidating(publicKey);
+                    markNodeAsValidating(peer);
             }
         }
     }
 
+    getPeer(publicKey: PublicKey){
+        let peer = this.peerNodesByPublicKey.get(publicKey);
+        if(peer)
+            return peer;
+
+        return this.unknownPeerNodesByPublicKey.get(publicKey);
+    }
 
     protected onQuorumSetReceived(connection: Connection, quorumSet: QuorumSet) {
         try {
@@ -430,24 +456,24 @@ export class Crawler {
         }
     }
 
-    protected setSCPTimeout(peer: PeerNode) {
+    protected setSCPTimeout(peer: Peer) {
         this.scpTimeoutCounters.set(peer.publicKey, 0);
 
-        this.timeouts.set(peer.key, setTimeout(() => {
-            this.logger.debug({'peer': peer.key, 'pk': peer.publicKey}, 'SCP Listen timeout reached');
+        this.timeouts.set(peer.publicKey, setTimeout(() => {
+            this.logger.debug({'pk': peer.publicKey}, 'SCP Listen timeout reached');
             let timeoutCounter = this.scpTimeoutCounters.get(peer.publicKey)!;
             timeoutCounter++;
             if (peer.participatingInSCP && !peer.isValidating && timeoutCounter <= 20) {//we wait for 100 seconds max if node is trying to reach consensus.
-                this.logger.info({'peer': peer.key}, 'Node was active in SCP, but not yet confirmed validating. Adding more time to listen for externalize messages'); //todo: if externalizing wrong values, we should disconnect.
+                this.logger.info({'pk': peer.publicKey}, 'Node was active in SCP, but not yet confirmed validating. Adding more time to listen for externalize messages'); //todo: if externalizing wrong values, we should disconnect.
                 this.setSCPTimeout(peer);
             } else { //if not participating in SCP or the node is confirmed validating, we disconnect: TODO: are we requesting quorumSet?
                 this.logger.debug({
-                    'peer': peer.key,
+                    'pk': peer.publicKey,
                     'counter': timeoutCounter,
                     'validating': peer.isValidating,
                     'scp': peer.participatingInSCP
                 }, 'Disconnect'); //todo: if externalizing wrong values, we should disconnect, but not here, in receivedSCPMSG
-                let connection = this.activeConnections.get(peer.key);
+                let connection = this.activeConnections.get(peer.publicKey);
                 if (connection)
                     connection.destroy();
             }
