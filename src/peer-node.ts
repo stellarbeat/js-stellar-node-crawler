@@ -6,6 +6,7 @@ export interface Peer {
     quorumSetHash: string | undefined;
     quorumSet: QuorumSet | undefined;
     isValidating: boolean;
+    behind: number;
 }
 
 export class PeerNode implements Peer{
@@ -24,6 +25,7 @@ export class PeerNode implements Peer{
     public quorumSetHash: string | undefined;
     public quorumSet: QuorumSet | undefined;
     public suppliedPeerList: boolean = false;
+    public behind:number = 0;
 
     constructor(ip: string, port: number, publicKey: string, ledgerVersion: number, overlayVersion: number, overlayMinVersion: number, networkId: string, versionStr: string) {
         this.ip = ip;
@@ -50,6 +52,7 @@ export class UnknownPeerNode implements Peer {
     public quorumSetHash: string | undefined;
     public quorumSet: QuorumSet | undefined;
     public isValidating = false;
+    public behind = 0;
 
     constructor(publicKey: string) {
         this.publicKey = publicKey;

@@ -2,7 +2,7 @@ import {xdr} from "stellar-base";
 import containsSlice from "@stellarbeat/js-stellar-domain/lib/quorum/containsSlice";
 import {QuorumSet} from "@stellarbeat/js-stellar-domain";
 
-type SlotIndex = string;
+type SlotIndex = bigint;
 type NodeId = string;
 type SlotValue = string;
 
@@ -18,7 +18,7 @@ export class Slot {
     }
 
     getNodesAgreeingOnExternalizedValue(): Set<NodeId> {
-        if(this.externalizedValue === undefined)
+        if (this.externalizedValue === undefined)
             return new Set();
 
         return this.valuesMap.get(this.externalizedValue)!;
@@ -66,7 +66,11 @@ export class Slots {
         return slot;
     }
 
-    getClosedSlotIndexes(){
+    public getLatestSlotIndex() {
+        return Array.from(this.slots.keys()).reduce((l, r) => r > l ? r : l);
+    }
+
+    getClosedSlotIndexes() {
         Array.from(this.slots.values())
             .filter(slot => slot.closed())
             .map(slot => slot.index);

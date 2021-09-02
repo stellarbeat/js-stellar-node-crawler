@@ -26,7 +26,7 @@ async function main() {
     let qSet = new QuorumSet('hash', 2, [
         'GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH', 'GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ', 'GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK'
     ]);
-    let myCrawler = new Crawler(qSet, true, 40);
+    let myCrawler = new Crawler(qSet, true, 80);
 
 
     try {
