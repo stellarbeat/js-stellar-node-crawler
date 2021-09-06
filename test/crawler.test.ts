@@ -33,7 +33,8 @@ test('crawl', async () => {
     let result = await crawler.crawl([peerNodeAddress]);
     let peerNode = result.pop()!;
 
-    expect(peerNode.active).toBeTruthy();
+    expect(peerNode.successfullyConnected).toBeTruthy();
     expect(peerNode.isValidating).toBeFalsy();
     expect(peerNode.overLoaded).toBeFalsy();
+    expect(crawler.getProcessedLedgers()).toEqual([]);
 });

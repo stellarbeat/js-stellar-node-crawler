@@ -1,4 +1,3 @@
-import {xdr} from "stellar-base";
 import containsSlice from "@stellarbeat/js-stellar-domain/lib/quorum/containsSlice";
 import {QuorumSet} from "@stellarbeat/js-stellar-domain";
 
@@ -66,13 +65,18 @@ export class Slots {
         return slot;
     }
 
+    hasClosedSlot() {
+        return this.getClosedSlotIndexes().length !== 0;
+    }
+
     public getLatestSlotIndex() {
-        return Array.from(this.slots.keys()).reduce((l, r) => r > l ? r : l);
+        return Array.from(this.slots.keys()).reduce((l, r) => r > l ? r : l, BigInt(0));
     }
 
     getClosedSlotIndexes() {
-        Array.from(this.slots.values())
+        return Array.from(this.slots.values())
             .filter(slot => slot.closed())
             .map(slot => slot.index);
     }
+
 }
