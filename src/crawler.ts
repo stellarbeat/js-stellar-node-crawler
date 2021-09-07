@@ -29,11 +29,15 @@ function nodeAddressToPeerKey(nodeAddress: NodeAddress) {
 }
 
 type PeerKey = string;//ip:port
-type LedgerSequence = number;
 
 require('dotenv').config();
 
 type QuorumSetHash = string;
+
+export interface Ledger {
+    sequence: bigint;
+    closeTime: Date;
+}
 
 export class Crawler {
     protected crawledNodeAddresses: Set<PeerKey>;
@@ -48,12 +52,19 @@ export class Crawler {
     protected quorumSetRequestHashesInProgress: Set<QuorumSetHash> = new Set();
     protected crawlerNode: NetworkNode;
     protected logger: P.Logger;
-    protected latestLedgerSequence: LedgerSequence = 0;
+    protected latestClosedLedger: Ledger = {
+        sequence: BigInt(0),
+        closeTime: new Date(0)
+    };
     protected crawlQueue: QueueObject<NodeAddress>;
     protected peerNodes: Map<PublicKey, PeerNode> = new Map();
     protected listenTimeouts: Map<string, any> = new Map();
     protected envelopeCache = new LRUCache(5000);
     protected slots: Slots;
+
+    protected static readonly MAX_LEDGER_DRIFT = 5; //how many ledgers can a node fall behind
+    protected static readonly SCP_LISTEN_TIMEOUT = 5; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
+    protected static readonly MAX_CLOSED_LEDGER_PROCESSING_TIME = 90000; //how long in ms we still process messages of closed ledgers.
 
     //todo: network string instead of boolean
     /**
@@ -99,9 +110,12 @@ export class Crawler {
     }
 
     //todo add 'crawl' object, that holds necessary data structures for the 'current' crawl. this object is passed to every connection event handler.
-    async crawl(nodeAddresses: NodeAddress[], latestLedgerSequence: number = 0): Promise<Array<PeerNode>> {
+    async crawl(nodeAddresses: NodeAddress[], latestClosedLedger: Ledger = {
+        sequence: BigInt(0),
+        closeTime: new Date(0)
+    }): Promise<Array<PeerNode>> {
         console.time("crawl");
-        this.latestLedgerSequence = latestLedgerSequence;
+        this.latestClosedLedger = latestClosedLedger;
         this.logger.info("Starting crawl with seed of " + nodeAddresses.length + "addresses.");
 
         return await new Promise<Array<PeerNode>>(async (resolve) => {
@@ -182,13 +196,17 @@ export class Crawler {
         }
     }
 
-    protected onStellarMessageErrorReceived(connection:Connection, errorMessage: xdr.Error){
-        switch (errorMessage.code()){
+    protected onStellarMessageErrorReceived(connection: Connection, errorMessage: xdr.Error) {
+        switch (errorMessage.code()) {
             case xdr.ErrorCode.errLoad():
                 this.onLoadTooHighReceived(connection);
                 break;
             default:
-                this.logger.info({'pk': connection.remotePublicKey, 'peer': connection.remoteIp + ":" + connection.remotePort, 'error': errorMessage.code().name}, errorMessage.msg().toString());
+                this.logger.info({
+                    'pk': connection.remotePublicKey,
+                    'peer': connection.remoteIp + ":" + connection.remotePort,
+                    'error': errorMessage.code().name
+                }, errorMessage.msg().toString());
                 break;
         }
 
@@ -218,7 +236,7 @@ export class Crawler {
         this.logger.info(Array.from(this.peerNodes.values()).filter(node => node.suppliedPeerList).length + " supplied us with a peers list.");
 
         console.timeEnd("crawl")
-        let peers:PeerNode[] = Array.from(this.peerNodes.values());
+        let peers: PeerNode[] = Array.from(this.peerNodes.values());
         resolve(
             peers
         );
@@ -328,7 +346,7 @@ export class Crawler {
                 return; //we don't return this peernode to consumer of this library
             }
 
-            if(!peerNode){
+            if (!peerNode) {
                 peerNode = new PeerNode(
                     publicKey
                 );
@@ -394,6 +412,17 @@ export class Crawler {
             return;
         }
         this.envelopeCache.set(scpEnvelope.signature().toString(), 1);
+
+        let slotIndex = BigInt(scpEnvelope.statement().slotIndex().toString());
+        let latestSequenceDifference = Number(this.latestClosedLedger.sequence - slotIndex);
+
+        if (latestSequenceDifference > Crawler.MAX_LEDGER_DRIFT)
+            return; //ledger message older than allowed by pure ledger sequence numbers
+
+        if (slotIndex <= this.latestClosedLedger.sequence && new Date().getTime() - this.latestClosedLedger.closeTime.getTime() > Crawler.MAX_CLOSED_LEDGER_PROCESSING_TIME){
+            return; //we only allow for x seconds of processing of closed ledger messages
+        }
+
         let verifiedResult = verifySCPEnvelopeSignature(scpEnvelope, hash(Buffer.from(Networks.PUBLIC)));
         if (verifiedResult.isOk() && verifiedResult.value)//todo: worker?
             this.onSCPStatementReceived(connection, scpEnvelope.statement())
@@ -439,10 +468,6 @@ export class Crawler {
         }
 
         let publicKey = publicKeyResult.value;
-
-        if (Number(scpStatement.slotIndex) < this.latestLedgerSequence) {
-            return; //older scp messages are ignored.
-        }
 
         this.logger.debug({
             'peer': connection.remoteAddress,
@@ -503,6 +528,10 @@ export class Crawler {
         if (slot.closed()) {
             if (!slotWasClosedBefore) {//we just closed the slot, lets mark all nodes as validating!
                 this.logger.info({ledger: slotIndex.toString()}, 'Ledger closed!');
+                this.latestClosedLedger = {
+                    sequence: slotIndex,
+                    closeTime: new Date()
+                }
                 slot.getNodesAgreeingOnExternalizedValue().forEach(validatingPublicKey => {
                     let validatingPeer = this.peerNodes.get(validatingPublicKey);
                     if (validatingPeer)
@@ -558,13 +587,16 @@ export class Crawler {
             this.disconnect(connection);
             return;
         }
-        this.logger.info({'pk': peer.publicKey, 'latestActiveSlotIndex': peer.latestActiveSlotIndex}, 'Listening for externalize msg'); //todo: if externalizing wrong values, we should disconnect.
+        this.logger.debug({
+            'pk': peer.publicKey,
+            'latestActiveSlotIndex': peer.latestActiveSlotIndex
+        }, 'Listening for externalize msg'); //todo: if externalizing wrong values, we should disconnect.
         this.openConnections.set(peer.publicKey, connection);
 
         this.listenTimeouts.set(peer.publicKey, setTimeout(() => {
             this.logger.debug({'pk': peer.publicKey}, 'SCP Listen timeout reached');
             timeoutCounter++;
             this.listen(peer, connection, timeoutCounter);
-        }, 5000)); //5 seconds for first scp message, correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
+        }, 5000)); //5 seconds for first scp message,
     }
 }

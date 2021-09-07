@@ -30,7 +30,10 @@ async function main() {
 
 
     try {
-        activePeerNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey).map(node => [node.ip, node.port]));
+        activePeerNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey).map(node => [node.ip, node.port]), {
+            sequence: BigInt(37229980),
+            closeTime: new Date(new Date().getTime()-100000)
+        });
     } catch (e) {
         console.log(e);
     }
