@@ -1,9 +1,9 @@
 import {PublicKey, QuorumSet} from "@stellarbeat/js-stellar-domain";
-import {Connection} from "@stellarbeat/js-stellar-node-connector";
 import * as P from "pino";
 import {Logger} from "pino";
 import {xdr} from "stellar-base";
 import {PeerNode} from "./peer-node";
+import {CrawlState}  from "./crawl-state";
 
 type QuorumSetHash = string;
 
@@ -13,9 +13,6 @@ type QuorumSetHash = string;
  */
 export class QuorumSetManager {
 
-    protected quorumSets: Map<QuorumSetHash, QuorumSet>;
-    protected openConnections: Map<PublicKey, Connection>;
-    protected peerNodes: Map<PublicKey, PeerNode>;
     protected quorumSetOwners: Map<QuorumSetHash, Set<PublicKey>> = new Map();
     protected quorumSetRequestedTo: Map<QuorumSetHash, Set<PublicKey>> = new Map();
     protected quorumSetRequests: Map<PublicKey, {
@@ -25,14 +22,11 @@ export class QuorumSetManager {
     protected quorumSetRequestHashesInProgress: Set<QuorumSetHash> = new Set();
     protected logger:Logger;
 
-    constructor(peerNodes: Map<PublicKey, PeerNode>, openConnections: Map<PublicKey, Connection>, quorumSets: Map<QuorumSetHash, QuorumSet>, logger:P.Logger) {
-        this.peerNodes = peerNodes;
-        this.openConnections = openConnections;
-        this.quorumSets = quorumSets;
+    constructor(logger:P.Logger) {
         this.logger = logger;
     }
 
-    public processQuorumSetHashFromStatement(peer: PeerNode, scpStatement: xdr.ScpStatement) {
+    public processQuorumSetHashFromStatement(peer: PeerNode, scpStatement: xdr.ScpStatement, crawlState: CrawlState) {
         peer.quorumSetHash = this.getQuorumSetHash(scpStatement);
         if (!this.getQuorumSetHashOwners(peer.quorumSetHash).has(peer.publicKey)) {
             this.logger.debug({'pk': peer.publicKey, hash: peer.quorumSetHash}, 'Detected new quorumSetHash');
@@ -40,27 +34,27 @@ export class QuorumSetManager {
 
         this.getQuorumSetHashOwners(peer.quorumSetHash).add(peer.publicKey);
 
-        if (this.quorumSets.has(peer.quorumSetHash))
-            peer.quorumSet = this.quorumSets.get(peer.quorumSetHash);
+        if (crawlState.quorumSets.has(peer.quorumSetHash))
+            peer.quorumSet = crawlState.quorumSets.get(peer.quorumSetHash);
         else {
             this.logger.debug({'pk': peer.publicKey}, 'Unknown quorumSet for hash: ' + peer.quorumSetHash);
-            this.requestQuorumSet(peer.quorumSetHash);
+            this.requestQuorumSet(peer.quorumSetHash, crawlState);
         }
     }
 
-    public processQuorumSet(quorumSet: QuorumSet, sender: PublicKey){
-        this.quorumSets.set(quorumSet.hashKey!, quorumSet);
+    public processQuorumSet(quorumSet: QuorumSet, sender: PublicKey, crawlState: CrawlState){
+        crawlState.quorumSets.set(quorumSet.hashKey!, quorumSet);
         let owners = this.getQuorumSetHashOwners(quorumSet.hashKey!);
 
         owners.forEach(owner => {
-            let peer = this.peerNodes.get(owner);
+            let peer = crawlState.peerNodes.get(owner);
             if (peer)
                 peer.quorumSet = quorumSet;
         });
         this.clearRequestQuorumSet(sender);
     }
 
-    public connectedToPeerNode(peerNode: PeerNode){
+    public connectedToPeerNode(peerNode: PeerNode, crawlState: CrawlState){
         if (peerNode.quorumSetHash && !peerNode.quorumSet) {
             this.logger.info({'hash': peerNode.quorumSetHash, 'pk': peerNode.publicKey}, 'Priority request');
             this.quorumSetRequestHashesInProgress.delete(peerNode.quorumSetHash);
@@ -69,24 +63,24 @@ export class QuorumSetManager {
                 clearTimeout(runningQuorumSetRequest.timeout);
                 this.quorumSetRequests.delete(peerNode.publicKey);
             }
-            this.requestQuorumSet(peerNode.quorumSetHash);
+            this.requestQuorumSet(peerNode.quorumSetHash, crawlState);
         }
     }
 
-    public peerNodeDisconnected(publicKey: PublicKey){
+    public peerNodeDisconnected(publicKey: PublicKey, crawlState: CrawlState){
         let hash = this.clearRequestQuorumSet(publicKey);
         if (hash)
-            this.requestQuorumSet(hash);
+            this.requestQuorumSet(hash, crawlState);
     }
 
-    public peerNodeDoesNotHaveQuorumSet(publicKey: PublicKey){
+    public peerNodeDoesNotHaveQuorumSet(publicKey: PublicKey, crawlState: CrawlState){
         let hash = this.clearRequestQuorumSet(publicKey);
         if (hash)
-            this.requestQuorumSet(hash);
+            this.requestQuorumSet(hash, crawlState);
     }
 
-    protected requestQuorumSet(quorumSetHash: string) {
-        if (this.quorumSets.has(quorumSetHash))
+    protected requestQuorumSet(quorumSetHash: string, crawlState: CrawlState) {
+        if (crawlState.quorumSets.has(quorumSetHash))
             return;
 
         if (this.quorumSetRequestHashesInProgress.has(quorumSetHash)) {
@@ -105,7 +99,7 @@ export class QuorumSetManager {
         let quorumSetMessage = xdr.StellarMessage.getScpQuorumset(Buffer.from(quorumSetHash, 'base64'));
 
         let sendRequest = (to: PublicKey) => {
-            let connection = this.openConnections.get(to);
+            let connection = crawlState.openConnections.get(to);
             if (!connection)
                 return;
             alreadyRequestedTo!.add(connection.remotePublicKey!);
@@ -118,7 +112,7 @@ export class QuorumSetManager {
                     this.logger.info({pk: to, hash: quorumSetHash}, 'Request timeout reached');
                     this.quorumSetRequests.delete(to);
                     this.quorumSetRequestHashesInProgress.delete(quorumSetHash);
-                    this.requestQuorumSet(quorumSetHash);
+                    this.requestQuorumSet(quorumSetHash, crawlState);
                 }, 2000), hash: quorumSetHash
             });
         }
@@ -127,7 +121,7 @@ export class QuorumSetManager {
         let notYetRequestedOwnerWithActiveConnection =
             Array.from(owners.keys())
                 .filter(owner => !alreadyRequestedTo!.has(owner))
-                .find(owner => this.openConnections.has(owner));
+                .find(owner => crawlState.openConnections.has(owner));
         if (notYetRequestedOwnerWithActiveConnection) {
             sendRequest(notYetRequestedOwnerWithActiveConnection);
             return;
@@ -135,7 +129,7 @@ export class QuorumSetManager {
 
         //try other open connections
         let notYetRequestedNonOwnerActiveConnection =
-            Array.from(this.openConnections.keys())
+            Array.from(crawlState.openConnections.keys())
                 //.filter(publicKey => this.getPeer(publicKey)!.participatingInSCP)
                 .find(publicKey => !alreadyRequestedTo!.has(publicKey));
 

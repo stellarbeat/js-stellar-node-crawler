@@ -21,6 +21,7 @@ import {NodeInfo} from "@stellarbeat/js-stellar-node-connector/lib/node";
 import * as P from "pino";
 import {Slots} from "./slots";
 import {QuorumSetManager} from "./quorum-set-manager";
+import {CrawlState} from "./crawl-state";
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -42,7 +43,7 @@ export interface Ledger {
 
 export class Crawler {
     protected crawledNodeAddresses: Set<PeerKey>;
-    protected openConnections: Map<PublicKey, Connection> = new Map<PublicKey, Connection>();
+    protected crawlState: CrawlState;
     protected quorumSetManager: QuorumSetManager;
     protected crawlerNode: NetworkNode;
     protected logger: P.Logger;
@@ -51,7 +52,6 @@ export class Crawler {
         closeTime: new Date(0)
     };
     protected crawlQueue: QueueObject<NodeAddress>;
-    protected peerNodes: Map<PublicKey, PeerNode> = new Map();
     protected listenTimeouts: Map<string, any> = new Map();
     protected envelopeCache = new LRUCache(5000);
     protected slots: Slots;
@@ -83,7 +83,8 @@ export class Crawler {
         this.logger = logger.child({mod: 'Crawler'});
         this.slots = new Slots(topTierQuorumSet);
 
-        this.quorumSetManager = new QuorumSetManager(this.peerNodes, this.openConnections, quorumSetMap, logger);
+        this.crawlState = new CrawlState(quorumSetMap);
+        this.quorumSetManager = new QuorumSetManager(logger);
 
         this.crawlerNode = new NetworkNode(
             usePublicNetwork,
@@ -181,7 +182,7 @@ export class Crawler {
                 }, "Don't have");
                 if (stellarMessage.dontHave().type().value === xdr.MessageType.getScpQuorumset().value) {
                     this.logger.info({pk: connection.remotePublicKey, hash: hash}, "Don't have");
-                    this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(connection.remotePublicKey!);
+                    this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(connection.remotePublicKey!, this.crawlState);
                 }
                 break;
             case MessageType.errorMsg():
@@ -210,15 +211,15 @@ export class Crawler {
         this.logger.info("processed all items in queue");
         this.logger.info("Finished with all nodes");
         this.logger.info("Connection attempts: " + this.crawledNodeAddresses.size);
-        this.logger.info("Detected public keys: " + this.peerNodes.size);
-        this.logger.info("Successful connections: " + Array.from(this.peerNodes.values()).filter(peer => peer.successfullyConnected).length)
-        this.logger.info('Validating nodes: ' + Array.from(this.peerNodes.values()).filter(node => node.isValidating).length);
-        this.logger.info('Overloaded nodes: ' + Array.from(this.peerNodes.values()).filter(node => node.overLoaded).length);
+        this.logger.info("Detected public keys: " + this.crawlState.peerNodes.size);
+        this.logger.info("Successful connections: " + Array.from(this.crawlState.peerNodes.values()).filter(peer => peer.successfullyConnected).length)
+        this.logger.info('Validating nodes: ' + Array.from(this.crawlState.peerNodes.values()).filter(node => node.isValidating).length);
+        this.logger.info('Overloaded nodes: ' + Array.from(this.crawlState.peerNodes.values()).filter(node => node.overLoaded).length);
         this.logger.info('Closed ledgers: ' + this.slots.getClosedSlotIndexes().length);
-        this.logger.info(Array.from(this.peerNodes.values()).filter(node => node.suppliedPeerList).length + " supplied us with a peers list.");
+        this.logger.info(Array.from(this.crawlState.peerNodes.values()).filter(node => node.suppliedPeerList).length + " supplied us with a peers list.");
 
         console.timeEnd("crawl")
-        let peers: PeerNode[] = Array.from(this.peerNodes.values());
+        let peers: PeerNode[] = Array.from(this.crawlState.peerNodes.values());
         resolve(
             peers
         );
@@ -234,8 +235,8 @@ export class Crawler {
             if (this.listenTimeouts.get(connection.remoteAddress))
                 clearTimeout(this.listenTimeouts.get(connection.remoteAddress));
 
-            this.openConnections.delete(connection.remotePublicKey!);
-            this.quorumSetManager.peerNodeDisconnected(connection.remotePublicKey!); //just in case a request to this node was happening
+            this.crawlState.openConnections.delete(connection.remotePublicKey!);
+            this.quorumSetManager.peerNodeDisconnected(connection.remotePublicKey!, this.crawlState); //just in case a request to this node was happening
             this.logger.debug("nodes left in queue: " + this.crawlQueue.length());
             done();//done processing
         } catch (error) {
@@ -245,7 +246,7 @@ export class Crawler {
     }
 
     protected disconnect(connection: Connection, error?: Error) {
-        this.openConnections.delete(connection.remotePublicKey!);//we don't want to send any more commands
+        this.crawlState.openConnections.delete(connection.remotePublicKey!);//we don't want to send any more commands
         connection.destroy(error);
     }
 
@@ -253,12 +254,12 @@ export class Crawler {
         try {
             this.logger.info({'peer': connection.remoteAddress, 'pk': publicKey}, 'Connected');
 
-            let peerNode = this.peerNodes.get(publicKey);
+            let peerNode = this.crawlState.peerNodes.get(publicKey);
             if (peerNode && peerNode.successfullyConnected) {//this public key is already used in this crawl! A node is not allowed to reuse public keys. Disconnecting.
                 this.logger.error({
                     'peer': connection.remoteAddress,
                     'pk': publicKey
-                }, 'PeerNode reusing publickey on address ' + this.peerNodes.get(publicKey)!.key);
+                }, 'PeerNode reusing publickey on address ' + this.crawlState.peerNodes.get(publicKey)!.key);
                 connection.destroy();
                 return; //we don't return this peernode to consumer of this library
             }
@@ -273,8 +274,8 @@ export class Crawler {
             peerNode.ip = connection.remoteIp;
             peerNode.port = connection.remotePort;
 
-            this.peerNodes.set(publicKey, peerNode);
-            this.quorumSetManager.connectedToPeerNode(peerNode);
+            this.crawlState.peerNodes.set(publicKey, peerNode);
+            this.quorumSetManager.connectedToPeerNode(peerNode, this.crawlState);
 
             /*if (!this._nodesThatSuppliedPeerList.has(connection.peer)) { //Most nodes send their peers automatically on successful handshake, better handled with timer.
                 this._connectionManager.sendGetPeers(connection);
@@ -295,7 +296,7 @@ export class Crawler {
         })
 
         this.logger.debug({'peer': connection.remoteAddress}, peerAddresses.length + ' peers received');
-        let peer = this.peerNodes.get(connection.remotePublicKey!)!;
+        let peer = this.crawlState.peerNodes.get(connection.remotePublicKey!)!;
         peer.suppliedPeerList = true;
         peerAddresses.forEach(peerAddress => this.crawlPeerNode(peerAddress));
     }
@@ -304,7 +305,7 @@ export class Crawler {
         try {
             this.logger.info({'peer': connection.remoteAddress}, 'Load too high message received');
             if (connection.remotePublicKey) {
-                let node = this.peerNodes.get(connection.remotePublicKey);
+                let node = this.crawlState.peerNodes.get(connection.remotePublicKey);
                 if (node) {
                     node.overLoaded = true;
                 }
@@ -326,7 +327,7 @@ export class Crawler {
         if (latestSequenceDifference > Crawler.MAX_LEDGER_DRIFT)
             return; //ledger message older than allowed by pure ledger sequence numbers
 
-        if (slotIndex <= this.latestClosedLedger.sequence && new Date().getTime() - this.latestClosedLedger.closeTime.getTime() > Crawler.MAX_CLOSED_LEDGER_PROCESSING_TIME){
+        if (slotIndex <= this.latestClosedLedger.sequence && new Date().getTime() - this.latestClosedLedger.closeTime.getTime() > Crawler.MAX_CLOSED_LEDGER_PROCESSING_TIME) {
             return; //we only allow for x seconds of processing of closed ledger messages
         }
 
@@ -352,15 +353,15 @@ export class Crawler {
             'slotIndex': scpStatement.slotIndex().toString()
         }, 'processing new scp statement: ' + scpStatement.pledges().switch().name);
 
-        let peer = this.peerNodes.get(publicKey);
+        let peer = this.crawlState.peerNodes.get(publicKey);
         if (!peer) {
             peer = new PeerNode(publicKey);
-            this.peerNodes.set(publicKey, peer);
+            this.crawlState.peerNodes.set(publicKey, peer);
         }
 
         peer.latestActiveSlotIndex = scpStatement.slotIndex().toString();
 
-        this.quorumSetManager.processQuorumSetHashFromStatement(peer, scpStatement);
+        this.quorumSetManager.processQuorumSetHashFromStatement(peer, scpStatement, this.crawlState);
 
         if (scpStatement.pledges().switch().value !== ScpStatementType.scpStExternalize().value) { //only if node is externalizing, we mark the node as validating
             return;
@@ -398,7 +399,7 @@ export class Crawler {
                     closeTime: new Date()
                 }
                 slot.getNodesAgreeingOnExternalizedValue().forEach(validatingPublicKey => {
-                    let validatingPeer = this.peerNodes.get(validatingPublicKey);
+                    let validatingPeer = this.crawlState.peerNodes.get(validatingPublicKey);
                     if (validatingPeer)
                         markNodeAsValidating(validatingPeer);
                 });
@@ -415,8 +416,11 @@ export class Crawler {
             connection.destroy(quorumSetResult.error);
             return;
         }
-        this.logger.info({'pk': connection.remotePublicKey, 'hash': quorumSetResult.value.hashKey!}, 'QuorumSet received');
-        this.quorumSetManager.processQuorumSet(quorumSetResult.value, connection.remotePublicKey!);
+        this.logger.info({
+            'pk': connection.remotePublicKey,
+            'hash': quorumSetResult.value.hashKey!
+        }, 'QuorumSet received');
+        this.quorumSetManager.processQuorumSet(quorumSetResult.value, connection.remotePublicKey!, this.crawlState);
     }
 
     protected listenFurther(peer: PeerNode, timeoutCounter: number = 0): boolean {
@@ -447,7 +451,7 @@ export class Crawler {
             'pk': peer.publicKey,
             'latestActiveSlotIndex': peer.latestActiveSlotIndex
         }, 'Listening for externalize msg'); //todo: if externalizing wrong values, we should disconnect.
-        this.openConnections.set(peer.publicKey, connection);
+        this.crawlState.openConnections.set(peer.publicKey, connection);
 
         this.listenTimeouts.set(peer.publicKey, setTimeout(() => {
             this.logger.debug({'pk': peer.publicKey}, 'SCP Listen timeout reached');
