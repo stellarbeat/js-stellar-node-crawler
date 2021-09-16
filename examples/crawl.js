@@ -1,5 +1,6 @@
 const Crawler = require("../lib").Crawler;
 const jsonStorage = require('../lib').jsonStorage;
+const CrawlerFactory = require("../lib").CrawlerFactory;
 const blocked = require('blocked-at')
 const {QuorumSet} = require("@stellarbeat/js-stellar-domain");
 
@@ -26,14 +27,13 @@ async function main() {
     let qSet = new QuorumSet('hash', 2, [
         'GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH', 'GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ', 'GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK'
     ]);
-    let myCrawler = new Crawler(qSet, true, 80);
-
+    let myCrawler = CrawlerFactory.createCrawler({usePublicNetwork: true, maxOpenConnections: 80});
 
     try {
-        activePeerNodes = await myCrawler.crawl(nodes.filter(node => node.publicKey).map(node => [node.ip, node.port]), {
-            sequence: BigInt(37229980),
-            closeTime: new Date(new Date().getTime()-100000)
-        });
+        activePeerNodes = await myCrawler.crawl(
+            nodes.filter(node => node.publicKey).map(node => [node.ip, node.port]),
+            qSet
+        );
     } catch (e) {
         console.log(e);
     }
