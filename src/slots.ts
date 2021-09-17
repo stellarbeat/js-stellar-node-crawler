@@ -23,6 +23,20 @@ export class Slot {
         return this.valuesMap.get(this.externalizedValue)!;
     }
 
+    getNodesDisagreeingOnExternalizedValue(): Set<NodeId> {
+        let nodes = new Set<NodeId>();
+        if(this.externalizedValue === undefined)
+            return nodes;
+
+        Array.from(this.valuesMap.keys())
+            .filter(value => value !== this.externalizedValue)
+            .forEach(value => {
+                nodes = new Set([...nodes,...this.valuesMap.get(value)!]);
+            })
+
+        return nodes;
+    }
+
     addExternalizeValue(nodeId: NodeId, value: SlotValue) {
         let nodes = this.valuesMap.get(value);
         if (!nodes) {

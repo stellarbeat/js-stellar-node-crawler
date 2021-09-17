@@ -5,18 +5,16 @@ import {
     Connection,
     Node as NetworkNode,
     getConfigFromEnv,
-    getPublicKeyStringFromBuffer,
     getIpFromPeerAddress,
-    verifySCPEnvelopeSignature, getQuorumSetFromMessage,
+    getQuorumSetFromMessage,
 } from "@stellarbeat/js-stellar-node-connector";
 
-import {hash, Networks, xdr} from "stellar-base";
+import {hash, xdr} from "stellar-base";
 import {PeerNode} from "./peer-node";
 import {NodeInfo} from "@stellarbeat/js-stellar-node-connector/lib/node";
 import * as P from "pino";
 import {QuorumSetManager} from "./quorum-set-manager";
 import {CrawlState} from "./crawl-state";
-import * as LRUCache from "lru-cache";
 import {ScpManager} from "./scp-manager";
 
 type PublicKey = string;
@@ -43,6 +41,9 @@ export interface CrawlerConfiguration {
     maxOpenConnections: number; //How many connections can be open at the same time. The higher the number, the faster the crawl
 }
 
+/**
+ * The Crawler manages the connections to every discovered Node Address. If a node is participating in SCP, it keeps listening until it can determine if it is validating correctly.
+ */
 export class Crawler {
     protected quorumSetManager: QuorumSetManager;
     protected scpManager: ScpManager;
@@ -286,6 +287,8 @@ export class Crawler {
             return true;//everyone gets a first listen. If it is already confirmed validating, we can still use it to request unknown quorumSets from.
         if (timeoutCounter >= 20)
             return false;//we wait for 100 seconds max if node is trying to reach consensus.
+        if (peer.isValidatingIncorrectValues)
+            return false;
         if (!peer.participatingInSCP)
             return false;//watcher node
         if (peer.isValidating && peer.quorumSet)
@@ -300,8 +303,9 @@ export class Crawler {
                 'pk': peer.publicKey,
                 'counter': timeoutCounter,
                 'validating': peer.isValidating,
+                'validatingIncorrectly': peer.isValidatingIncorrectValues,
                 'scp': peer.participatingInSCP
-            }, 'Disconnect'); //todo: if externalizing wrong values, we should disconnect, but not here, in receivedSCPMSG
+            }, 'Disconnect');
             this.disconnect(connection, crawlState);
             return;
         }

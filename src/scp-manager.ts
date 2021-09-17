@@ -96,7 +96,6 @@ export class ScpManager {
 
         let slot = crawlState.slots.getSlot(slotIndex);
         let slotWasClosedBefore = slot.closed();
-        //TODO: maybe not try to close older SLOTS
         slot.addExternalizeValue(peer.publicKey, value);
 
         if (slot.closed()) {
@@ -111,9 +110,16 @@ export class ScpManager {
                     if (validatingPeer)
                         markNodeAsValidating(validatingPeer);
                 });
+                slot.getNodesDisagreeingOnExternalizedValue().forEach(nodeId => {
+                    let badPeer = crawlState.peerNodes.get(nodeId);
+                    if(badPeer)
+                        badPeer.isValidatingIncorrectValues = true;
+                })
             } else { //if the slot was already closed, we check if this new (?) node should be marked as validating
                 if (value === slot.externalizedValue)
                     markNodeAsValidating(peer);
+                else
+                    peer.isValidatingIncorrectValues = true;
             }
         }
 

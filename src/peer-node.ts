@@ -7,6 +7,7 @@ export class PeerNode {
     public publicKey: string;
     public nodeInfo?: NodeInfo;
     public isValidating = false;
+    public isValidatingIncorrectValues = false;
     public overLoaded = false;
     public quorumSetHash: string | undefined;
     public quorumSet: QuorumSet | undefined;
