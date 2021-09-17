@@ -1,30 +1,62 @@
 import * as P from "pino";
 import {PeerNode} from "./peer-node";
-import {xdr} from "stellar-base";
+import {hash, Networks, xdr} from "stellar-base";
 import {CrawlState} from "./crawl-state";
-import {Connection, getPublicKeyStringFromBuffer} from "@stellarbeat/js-stellar-node-connector";
+import {
+    Connection,
+    getPublicKeyStringFromBuffer,
+    verifySCPEnvelopeSignature
+} from "@stellarbeat/js-stellar-node-connector";
 import {QuorumSetManager} from "./quorum-set-manager";
+import {err, ok, Result} from "neverthrow";
+import * as LRUCache from "lru-cache";
 
 export class ScpManager {
     protected logger: P.Logger;
     protected quorumSetManager: QuorumSetManager;
+    protected envelopeCache: LRUCache<any, any>;
 
-    constructor(quorumSetManager: QuorumSetManager, logger: P.Logger) {
+    protected static readonly MAX_LEDGER_DRIFT = 5; //how many ledgers can a node fall behind
+    protected static readonly MAX_CLOSED_LEDGER_PROCESSING_TIME = 90000; //how long in ms we still process messages of closed ledgers.
+
+    constructor(quorumSetManager: QuorumSetManager, envelopeCache: LRUCache<any, any>, logger: P.Logger) {
         this.logger = logger;
+        this.envelopeCache = envelopeCache;
         this.quorumSetManager = quorumSetManager;
     }
 
-    public processScpStatement(connection: Connection, scpStatement: xdr.ScpStatement, crawlState: CrawlState) {
+    public processScpEnvelope(scpEnvelope: xdr.ScpEnvelope, crawlState: CrawlState): Result<undefined, Error> {
+        if (this.envelopeCache.has(scpEnvelope.signature().toString())) {
+            return ok(undefined);
+        }
+        this.envelopeCache.set(scpEnvelope.signature().toString(), 1);
+
+        let slotIndex = BigInt(scpEnvelope.statement().slotIndex().toString());
+        let latestSequenceDifference = Number(crawlState.latestClosedLedger.sequence - slotIndex);
+
+        if (latestSequenceDifference > ScpManager.MAX_LEDGER_DRIFT)
+            return ok(undefined); //ledger message older than allowed by pure ledger sequence numbers
+
+        if (slotIndex <= crawlState.latestClosedLedger.sequence && new Date().getTime() - crawlState.latestClosedLedger.closeTime.getTime() > ScpManager.MAX_CLOSED_LEDGER_PROCESSING_TIME) {
+            return ok(undefined); //we only allow for x seconds of processing of closed ledger messages
+        }
+
+        let verifiedResult = verifySCPEnvelopeSignature(scpEnvelope, hash(Buffer.from(Networks.PUBLIC)));
+        if (verifiedResult.isErr())
+            return err(new Error('Invalid SCP Signature'));
+
+        return this.processScpStatement(scpEnvelope.statement(), crawlState);
+    }
+
+    protected processScpStatement(scpStatement: xdr.ScpStatement, crawlState: CrawlState): Result<undefined, Error> {
         let publicKeyResult = getPublicKeyStringFromBuffer(scpStatement.nodeId().value());
         if (publicKeyResult.isErr()) {
-            connection.destroy(publicKeyResult.error);
-            return;
+            return err(publicKeyResult.error);
         }
 
         let publicKey = publicKeyResult.value;
 
         this.logger.debug({
-            'peer': connection.remoteAddress,
             'publicKey': publicKey,
             'slotIndex': scpStatement.slotIndex().toString()
         }, 'processing new scp statement: ' + scpStatement.pledges().switch().name);
@@ -40,13 +72,13 @@ export class ScpManager {
         this.quorumSetManager.processQuorumSetHashFromStatement(peer, scpStatement, crawlState);
 
         if (scpStatement.pledges().switch().value !== xdr.ScpStatementType.scpStExternalize().value) { //only if node is externalizing, we mark the node as validating
-            return;
+            return ok(undefined);
         }
 
-        this.processExternalizeStatement(peer, BigInt(scpStatement.slotIndex().toString()), scpStatement.pledges().externalize(), crawlState)
+        return this.processExternalizeStatement(peer, BigInt(scpStatement.slotIndex().toString()), scpStatement.pledges().externalize(), crawlState)
     }
 
-    protected processExternalizeStatement(peer: PeerNode, slotIndex: bigint, statementExternalize: xdr.ScpStatementExternalize, crawlState: CrawlState) {
+    protected processExternalizeStatement(peer: PeerNode, slotIndex: bigint, statementExternalize: xdr.ScpStatementExternalize, crawlState: CrawlState): Result<undefined, Error> {
         let value = statementExternalize.commit().value().toString('base64');
         this.logger.debug({
             'publicKey': peer.publicKey,
@@ -84,6 +116,8 @@ export class ScpManager {
                     markNodeAsValidating(peer);
             }
         }
+
+        return ok(undefined);
     }
 
 }

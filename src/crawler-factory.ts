@@ -11,7 +11,7 @@ export class CrawlerFactory {
         }
 
         let quorumSetManager = new QuorumSetManager(logger);
-        return new Crawler(config, quorumSetManager, new ScpManager(quorumSetManager, logger), new LRUCache(5000), logger)
+        return new Crawler(config, quorumSetManager, new ScpManager(quorumSetManager, new LRUCache(5000), logger),  logger)
     }
 
     static initializeDefaultLogger() {

@@ -50,14 +50,10 @@ export class Crawler {
     protected logger: P.Logger;
     protected config: CrawlerConfiguration;
     protected crawlQueue: QueueObject<CrawlQueueTask>;
-    protected envelopeCache;// = new LRUCache(5000);
 
-    protected static readonly MAX_LEDGER_DRIFT = 5; //how many ledgers can a node fall behind
     protected static readonly SCP_LISTEN_TIMEOUT = 5000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
-    protected static readonly MAX_CLOSED_LEDGER_PROCESSING_TIME = 90000; //how long in ms we still process messages of closed ledgers.
 
-    constructor(config: CrawlerConfiguration, quorumSetManager: QuorumSetManager, scpManager: ScpManager, envelopeCache: LRUCache<any, any>, logger: P.Logger) {
-        this.envelopeCache = envelopeCache;
+    constructor(config: CrawlerConfiguration, quorumSetManager: QuorumSetManager, scpManager: ScpManager, logger: P.Logger) {
         this.scpManager = scpManager;
         this.config = config;
         this.logger = logger.child({mod: 'Crawler'});
@@ -139,93 +135,6 @@ export class Crawler {
         connection.destroy();
     }
 
-    protected onStellarMessage(connection: Connection, stellarMessage: xdr.StellarMessage, crawlState: CrawlState) {
-        switch (stellarMessage.switch()) {
-            case xdr.MessageType.scpMessage():
-                this.onSCPEnvelopeReceived(connection, stellarMessage.envelope(), crawlState);
-                break;
-            case xdr.MessageType.peers():
-                this.onPeersReceived(
-                    connection, stellarMessage.peers(), crawlState);
-                break;
-            case xdr.MessageType.scpQuorumset():
-                this.onQuorumSetReceived(connection, stellarMessage.qSet(), crawlState);
-                break;
-            case xdr.MessageType.dontHave():
-                this.logger.info({
-                    pk: connection.remotePublicKey,
-                    type: stellarMessage.dontHave().type().name
-                }, "Don't have");
-                if (stellarMessage.dontHave().type().value === xdr.MessageType.getScpQuorumset().value) {
-                    this.logger.info({pk: connection.remotePublicKey, hash: hash}, "Don't have");
-                    this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(connection.remotePublicKey!, crawlState);
-                }
-                break;
-            case xdr.MessageType.errorMsg():
-                this.onStellarMessageErrorReceived(connection, stellarMessage.error(), crawlState);
-        }
-    }
-
-    protected onStellarMessageErrorReceived(connection: Connection, errorMessage: xdr.Error, crawlState: CrawlState) {
-        switch (errorMessage.code()) {
-            case xdr.ErrorCode.errLoad():
-                this.onLoadTooHighReceived(connection, crawlState);
-                break;
-            default:
-                this.logger.info({
-                    'pk': connection.remotePublicKey,
-                    'peer': connection.remoteIp + ":" + connection.remotePort,
-                    'error': errorMessage.code().name
-                }, errorMessage.msg().toString());
-                break;
-        }
-
-        connection.destroy(new Error(errorMessage.msg().toString()));
-    }
-
-    protected wrapUp(resolve: any, crawlState: CrawlState) {
-        this.logger.info("processed all items in queue");
-        this.logger.info("Finished with all nodes");
-        this.logger.info("Connection attempts: " + crawlState.crawledNodeAddresses.size);
-        this.logger.info("Detected public keys: " + crawlState.peerNodes.size);
-        this.logger.info("Successful connections: " + Array.from(crawlState.peerNodes.values()).filter(peer => peer.successfullyConnected).length)
-        this.logger.info('Validating nodes: ' + Array.from(crawlState.peerNodes.values()).filter(node => node.isValidating).length);
-        this.logger.info('Overloaded nodes: ' + Array.from(crawlState.peerNodes.values()).filter(node => node.overLoaded).length);
-        this.logger.info('Closed ledgers: ' + crawlState.slots.getClosedSlotIndexes().length);
-        this.logger.info(Array.from(crawlState.peerNodes.values()).filter(node => node.suppliedPeerList).length + " supplied us with a peers list.");
-
-        console.timeEnd("crawl")
-        let peers: PeerNode[] = Array.from(crawlState.peerNodes.values());
-        resolve(
-            peers
-        );
-
-    }
-
-    /*
-    * CONNECTION EVENT LISTENERS
-     */
-    protected onNodeDisconnected(connection: Connection, crawlState: CrawlState, crawlQueueTaskDone: AsyncResultCallback<any>) {
-        try {
-            this.logger.info({'pk': connection.remotePublicKey, 'peer': connection.remoteAddress}, 'Node disconnected');
-            if (crawlState.listenTimeouts.get(connection.remoteAddress))
-                clearTimeout(crawlState.listenTimeouts.get(connection.remoteAddress));
-
-            crawlState.openConnections.delete(connection.remotePublicKey!);
-            this.quorumSetManager.peerNodeDisconnected(connection.remotePublicKey!, crawlState); //just in case a request to this node was happening
-            this.logger.debug("nodes left in queue: " + this.crawlQueue.length());
-            crawlQueueTaskDone();
-        } catch (error) {
-            this.logger.error({'peer': connection.remoteAddress}, 'Exception: ' + error.message);
-            crawlQueueTaskDone(error)
-        }
-    }
-
-    protected disconnect(connection: Connection, crawlState: CrawlState, error?: Error) {
-        crawlState.openConnections.delete(connection.remotePublicKey!);//we don't want to send any more commands
-        connection.destroy(error);
-    }
-
     protected onConnected(connection: Connection, publicKey: PublicKey, nodeInfo: NodeInfo, crawlState: CrawlState) {
         try {
             this.logger.info({'peer': connection.remoteAddress, 'pk': publicKey}, 'Connected');
@@ -263,6 +172,69 @@ export class Crawler {
         }
     }
 
+    protected onStellarMessage(connection: Connection, stellarMessage: xdr.StellarMessage, crawlState: CrawlState) {
+        switch (stellarMessage.switch()) {
+            case xdr.MessageType.scpMessage():
+                let result = this.scpManager.processScpEnvelope(stellarMessage.envelope(), crawlState);
+                if(result.isErr())
+                    this.disconnect(connection, crawlState, result.error);
+                break;
+            case xdr.MessageType.peers():
+                this.onPeersReceived(
+                    connection, stellarMessage.peers(), crawlState);
+                break;
+            case xdr.MessageType.scpQuorumset():
+                this.onQuorumSetReceived(connection, stellarMessage.qSet(), crawlState);
+                break;
+            case xdr.MessageType.dontHave():
+                this.logger.info({
+                    pk: connection.remotePublicKey,
+                    type: stellarMessage.dontHave().type().name
+                }, "Don't have");
+                if (stellarMessage.dontHave().type().value === xdr.MessageType.getScpQuorumset().value) {
+                    this.logger.info({pk: connection.remotePublicKey, hash: hash}, "Don't have");
+                    this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(connection.remotePublicKey!, crawlState);
+                }
+                break;
+            case xdr.MessageType.errorMsg():
+                this.onStellarMessageErrorReceived(connection, stellarMessage.error(), crawlState);
+                break;
+        }
+    }
+
+    protected onStellarMessageErrorReceived(connection: Connection, errorMessage: xdr.Error, crawlState: CrawlState) {
+        switch (errorMessage.code()) {
+            case xdr.ErrorCode.errLoad():
+                this.onLoadTooHighReceived(connection, crawlState);
+                break;
+            default:
+                this.logger.info({
+                    'pk': connection.remotePublicKey,
+                    'peer': connection.remoteIp + ":" + connection.remotePort,
+                    'error': errorMessage.code().name
+                }, errorMessage.msg().toString());
+                break;
+        }
+
+        connection.destroy(new Error(errorMessage.msg().toString()));
+    }
+
+    protected onNodeDisconnected(connection: Connection, crawlState: CrawlState, crawlQueueTaskDone: AsyncResultCallback<any>) {
+        try {
+            this.logger.info({'pk': connection.remotePublicKey, 'peer': connection.remoteAddress}, 'Node disconnected');
+            if (crawlState.listenTimeouts.get(connection.remoteAddress))
+                clearTimeout(crawlState.listenTimeouts.get(connection.remoteAddress));
+
+            crawlState.openConnections.delete(connection.remotePublicKey!);
+            this.quorumSetManager.peerNodeDisconnected(connection.remotePublicKey!, crawlState); //just in case a request to this node was happening
+            this.logger.debug("nodes left in queue: " + this.crawlQueue.length());
+            crawlQueueTaskDone();
+        } catch (error) {
+            this.logger.error({'peer': connection.remoteAddress}, 'Exception: ' + error.message);
+            crawlQueueTaskDone(error)
+        }
+    }
+
     protected onPeersReceived(connection: Connection, peers: xdr.PeerAddress[], crawlState: CrawlState) {
         let peerAddresses: Array<NodeAddress> = [];
         peers.forEach(peer => {
@@ -291,29 +263,6 @@ export class Crawler {
         }
     }
 
-    protected onSCPEnvelopeReceived(connection: Connection, scpEnvelope: xdr.ScpEnvelope, crawlState: CrawlState) {
-        if (this.envelopeCache.has(scpEnvelope.signature().toString())) {
-            return;
-        }
-        this.envelopeCache.set(scpEnvelope.signature().toString(), 1);
-
-        let slotIndex = BigInt(scpEnvelope.statement().slotIndex().toString());
-        let latestSequenceDifference = Number(crawlState.latestClosedLedger.sequence - slotIndex);
-
-        if (latestSequenceDifference > Crawler.MAX_LEDGER_DRIFT)
-            return; //ledger message older than allowed by pure ledger sequence numbers
-
-        if (slotIndex <= crawlState.latestClosedLedger.sequence && new Date().getTime() - crawlState.latestClosedLedger.closeTime.getTime() > Crawler.MAX_CLOSED_LEDGER_PROCESSING_TIME) {
-            return; //we only allow for x seconds of processing of closed ledger messages
-        }
-
-        let verifiedResult = verifySCPEnvelopeSignature(scpEnvelope, hash(Buffer.from(Networks.PUBLIC)));
-        if (verifiedResult.isOk() && verifiedResult.value)//todo: worker?
-            this.scpManager.processScpStatement(connection, scpEnvelope.statement(), crawlState)
-        else
-            connection.destroy(new Error("Invalid SCP Signature")); //nodes should generate or forward invalid messages
-    }
-
     protected onQuorumSetReceived(connection: Connection, quorumSetMessage: xdr.ScpQuorumSet, crawlState: CrawlState) {
         let quorumSetResult = getQuorumSetFromMessage(quorumSetMessage);
         if (quorumSetResult.isErr()) {
@@ -325,6 +274,11 @@ export class Crawler {
             'hash': quorumSetResult.value.hashKey!
         }, 'QuorumSet received');
         this.quorumSetManager.processQuorumSet(quorumSetResult.value, connection.remotePublicKey!, crawlState);
+    }
+
+    protected disconnect(connection: Connection, crawlState: CrawlState, error?: Error) {
+        crawlState.openConnections.delete(connection.remotePublicKey!);//we don't want to send any more commands
+        connection.destroy(error);
     }
 
     protected listenFurther(peer: PeerNode, timeoutCounter: number = 0): boolean {
@@ -362,5 +316,24 @@ export class Crawler {
             timeoutCounter++;
             this.listen(peer, connection, timeoutCounter, crawlState);
         }, Crawler.SCP_LISTEN_TIMEOUT));
+    }
+
+    protected wrapUp(resolve: any, crawlState: CrawlState) {
+        this.logger.info("processed all items in queue");
+        this.logger.info("Finished with all nodes");
+        this.logger.info("Connection attempts: " + crawlState.crawledNodeAddresses.size);
+        this.logger.info("Detected public keys: " + crawlState.peerNodes.size);
+        this.logger.info("Successful connections: " + Array.from(crawlState.peerNodes.values()).filter(peer => peer.successfullyConnected).length)
+        this.logger.info('Validating nodes: ' + Array.from(crawlState.peerNodes.values()).filter(node => node.isValidating).length);
+        this.logger.info('Overloaded nodes: ' + Array.from(crawlState.peerNodes.values()).filter(node => node.overLoaded).length);
+        this.logger.info('Closed ledgers: ' + crawlState.slots.getClosedSlotIndexes().length);
+        this.logger.info(Array.from(crawlState.peerNodes.values()).filter(node => node.suppliedPeerList).length + " supplied us with a peers list.");
+
+        console.timeEnd("crawl")
+        let peers: PeerNode[] = Array.from(crawlState.peerNodes.values());
+        resolve(
+            peers
+        );
+
     }
 }
