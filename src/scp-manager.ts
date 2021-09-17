@@ -10,14 +10,12 @@ import {
 import {QuorumSetManager} from "./quorum-set-manager";
 import {err, ok, Result} from "neverthrow";
 import * as LRUCache from "lru-cache";
+import {isLedgerSequenceValid} from "./ledger-validator";
 
 export class ScpManager {
     protected logger: P.Logger;
     protected quorumSetManager: QuorumSetManager;
     protected envelopeCache: LRUCache<any, any>;
-
-    protected static readonly MAX_LEDGER_DRIFT = 5; //how many ledgers can a node fall behind
-    protected static readonly MAX_CLOSED_LEDGER_PROCESSING_TIME = 90000; //how long in ms we still process messages of closed ledgers.
 
     constructor(quorumSetManager: QuorumSetManager, envelopeCache: LRUCache<any, any>, logger: P.Logger) {
         this.logger = logger;
@@ -31,15 +29,8 @@ export class ScpManager {
         }
         this.envelopeCache.set(scpEnvelope.signature().toString(), 1);
 
-        let slotIndex = BigInt(scpEnvelope.statement().slotIndex().toString());
-        let latestSequenceDifference = Number(crawlState.latestClosedLedger.sequence - slotIndex);
-
-        if (latestSequenceDifference > ScpManager.MAX_LEDGER_DRIFT)
-            return ok(undefined); //ledger message older than allowed by pure ledger sequence numbers
-
-        if (slotIndex <= crawlState.latestClosedLedger.sequence && new Date().getTime() - crawlState.latestClosedLedger.closeTime.getTime() > ScpManager.MAX_CLOSED_LEDGER_PROCESSING_TIME) {
-            return ok(undefined); //we only allow for x seconds of processing of closed ledger messages
-        }
+        if(!isLedgerSequenceValid(crawlState.latestClosedLedger, BigInt(scpEnvelope.statement().slotIndex().toString())))
+            return ok(undefined);
 
         let verifiedResult = verifySCPEnvelopeSignature(scpEnvelope, hash(Buffer.from(Networks.PUBLIC)));
         if (verifiedResult.isErr())
