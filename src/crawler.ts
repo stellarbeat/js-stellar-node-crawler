@@ -17,6 +17,7 @@ import * as P from "pino";
 import {QuorumSetManager} from "./quorum-set-manager";
 import {CrawlState} from "./crawl-state";
 import * as LRUCache from "lru-cache";
+import {ScpManager} from "./scp-manager";
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -44,6 +45,7 @@ export interface CrawlerConfiguration {
 
 export class Crawler {
     protected quorumSetManager: QuorumSetManager;
+    protected scpManager: ScpManager;
     protected crawlerNode: NetworkNode;
     protected logger: P.Logger;
     protected config: CrawlerConfiguration;
@@ -51,21 +53,12 @@ export class Crawler {
     protected envelopeCache;// = new LRUCache(5000);
 
     protected static readonly MAX_LEDGER_DRIFT = 5; //how many ledgers can a node fall behind
-    protected static readonly SCP_LISTEN_TIMEOUT = 5; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
+    protected static readonly SCP_LISTEN_TIMEOUT = 5000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
     protected static readonly MAX_CLOSED_LEDGER_PROCESSING_TIME = 90000; //how long in ms we still process messages of closed ledgers.
 
-    //todo: network string instead of boolean
-    /**
-     * @param topTierQuorumSet QuorumSet of top tier nodes that the crawler should trust to close ledgers and determine the correct externalized value.
-     * Top tier nodes are trusted by everyone transitively, otherwise there would be no quorum intersection. Stellar core forwards scp messages of every transitively trusted node. Thus we can close ledgers when connecting to any node.
-     * @param usePublicNetwork
-     * @param maxOpenConnections
-     * @param quorumSetMap Known quorumSets to speed up crawling // todo move to crawl method?
-     * @param logger
-     */
-    constructor(config: CrawlerConfiguration, quorumSetManager: QuorumSetManager, envelopeCache: LRUCache<any, any>, logger: P.Logger) {//todo networkId
-
+    constructor(config: CrawlerConfiguration, quorumSetManager: QuorumSetManager, scpManager: ScpManager, envelopeCache: LRUCache<any, any>, logger: P.Logger) {
         this.envelopeCache = envelopeCache;
+        this.scpManager = scpManager;
         this.config = config;
         this.logger = logger.child({mod: 'Crawler'});
         this.quorumSetManager = quorumSetManager;
@@ -78,9 +71,10 @@ export class Crawler {
         this.crawlQueue = queue(this.processCrawlPeerNodeInCrawlQueue.bind(this), config.maxOpenConnections);
     }
 
-
-
-    //todo add 'crawl' object, that holds necessary data structures for the 'current' crawl. this object is passed to every connection event handler.
+    /*
+     * @param topTierQuorumSet QuorumSet of top tier nodes that the crawler should trust to close ledgers and determine the correct externalized value.
+     * Top tier nodes are trusted by everyone transitively, otherwise there would be no quorum intersection. Stellar core forwards scp messages of every transitively trusted node. Thus we can close ledgers when connecting to any node.
+     */
     async crawl(
         nodeAddresses: NodeAddress[],
         topTierQuorumSet: QuorumSet,
@@ -121,7 +115,7 @@ export class Crawler {
         });
     }
 
-    protected processCrawlPeerNodeInCrawlQueue(crawlQueueTask: CrawlQueueTask, done: AsyncResultCallback<any>) {
+    protected processCrawlPeerNodeInCrawlQueue(crawlQueueTask: CrawlQueueTask, crawlQueueTaskDone: AsyncResultCallback<any>) {
         try {
             let connection = this.crawlerNode.connectTo(
                 crawlQueueTask.nodeAddress[0],
@@ -134,7 +128,7 @@ export class Crawler {
                 .on("connect", (publicKey: string, nodeInfo: NodeInfo) => this.onConnected(connection, publicKey, nodeInfo, crawlQueueTask.crawlState))
                 .on("data", (stellarMessage: xdr.StellarMessage) => this.onStellarMessage(connection, stellarMessage, crawlQueueTask.crawlState))
                 .on('timeout', () => this.onTimeout(connection))
-                .on("close", () => this.onNodeDisconnected(connection, crawlQueueTask.crawlState,done))
+                .on("close", () => this.onNodeDisconnected(connection, crawlQueueTask.crawlState,crawlQueueTaskDone))
         } catch (error) {
             this.logger.error({'peer': crawlQueueTask.nodeAddress[0] + ':' + crawlQueueTask.nodeAddress[1]}, error.message);
         }
@@ -211,7 +205,7 @@ export class Crawler {
     /*
     * CONNECTION EVENT LISTENERS
      */
-    protected onNodeDisconnected(connection: Connection, crawlState: CrawlState, done: AsyncResultCallback<any>) {
+    protected onNodeDisconnected(connection: Connection, crawlState: CrawlState, crawlQueueTaskDone: AsyncResultCallback<any>) {
         try {
             this.logger.info({'pk': connection.remotePublicKey, 'peer': connection.remoteAddress}, 'Node disconnected');
             if (crawlState.listenTimeouts.get(connection.remoteAddress))
@@ -220,10 +214,10 @@ export class Crawler {
             crawlState.openConnections.delete(connection.remotePublicKey!);
             this.quorumSetManager.peerNodeDisconnected(connection.remotePublicKey!, crawlState); //just in case a request to this node was happening
             this.logger.debug("nodes left in queue: " + this.crawlQueue.length());
-            done();//done processing
+            crawlQueueTaskDone();
         } catch (error) {
             this.logger.error({'peer': connection.remoteAddress}, 'Exception: ' + error.message);
-            done(error)
+            crawlQueueTaskDone(error)
         }
     }
 
@@ -315,81 +309,9 @@ export class Crawler {
 
         let verifiedResult = verifySCPEnvelopeSignature(scpEnvelope, hash(Buffer.from(Networks.PUBLIC)));
         if (verifiedResult.isOk() && verifiedResult.value)//todo: worker?
-            this.onSCPStatementReceived(connection, scpEnvelope.statement(), crawlState)
+            this.scpManager.processScpStatement(connection, scpEnvelope.statement(), crawlState)
         else
             connection.destroy(new Error("Invalid SCP Signature")); //nodes should generate or forward invalid messages
-    }
-
-    protected onSCPStatementReceived(connection: Connection, scpStatement: xdr.ScpStatement, crawlState: CrawlState) {
-        let publicKeyResult = getPublicKeyStringFromBuffer(scpStatement.nodeId().value()); //todo: compare with buffers for (slight) perf improvement?
-        if (publicKeyResult.isErr()) {
-            connection.destroy(publicKeyResult.error)
-            return;
-        }
-
-        let publicKey = publicKeyResult.value;
-
-        this.logger.debug({
-            'peer': connection.remoteAddress,
-            'publicKey': publicKey,
-            'slotIndex': scpStatement.slotIndex().toString()
-        }, 'processing new scp statement: ' + scpStatement.pledges().switch().name);
-
-        let peer = crawlState.peerNodes.get(publicKey);
-        if (!peer) {
-            peer = new PeerNode(publicKey);
-            crawlState.peerNodes.set(publicKey, peer);
-        }
-
-        peer.latestActiveSlotIndex = scpStatement.slotIndex().toString();
-
-        this.quorumSetManager.processQuorumSetHashFromStatement(peer, scpStatement, crawlState);
-
-        if (scpStatement.pledges().switch().value !== xdr.ScpStatementType.scpStExternalize().value) { //only if node is externalizing, we mark the node as validating
-            return;
-        }
-
-        this.processExternalizeStatement(peer, BigInt(scpStatement.slotIndex().toString()), scpStatement.pledges().externalize(), crawlState)
-    }
-
-    protected processExternalizeStatement(peer: PeerNode, slotIndex: bigint, statementExternalize: xdr.ScpStatementExternalize, crawlState: CrawlState) {
-        let value = statementExternalize.commit().value().toString('base64');
-        this.logger.debug({
-            'publicKey': peer.publicKey,
-            'slotIndex': slotIndex
-        }, 'externalize msg with value: ' + value);
-
-        let markNodeAsValidating = (peer: PeerNode) => {
-            if (!peer.isValidating) {
-                this.logger.info({
-                    'pk': peer.publicKey,
-                }, 'Validating');
-            }
-            peer.isValidating = true;
-        }
-
-        let slot = crawlState.slots.getSlot(slotIndex);
-        let slotWasClosedBefore = slot.closed();
-        //TODO: maybe not try to close older SLOTS
-        slot.addExternalizeValue(peer.publicKey, value);
-
-        if (slot.closed()) {
-            if (!slotWasClosedBefore) {//we just closed the slot, lets mark all nodes as validating!
-                this.logger.info({ledger: slotIndex.toString()}, 'Ledger closed!');
-                crawlState.latestClosedLedger = {
-                    sequence: slotIndex,
-                    closeTime: new Date()
-                }
-                slot.getNodesAgreeingOnExternalizedValue().forEach(validatingPublicKey => {
-                    let validatingPeer = crawlState.peerNodes.get(validatingPublicKey);
-                    if (validatingPeer)
-                        markNodeAsValidating(validatingPeer);
-                });
-            } else { //if the slot was already closed, we check if this new (?) node should be marked as validating
-                if (value === slot.externalizedValue)
-                    markNodeAsValidating(peer);
-            }
-        }
     }
 
     protected onQuorumSetReceived(connection: Connection, quorumSetMessage: xdr.ScpQuorumSet, crawlState: CrawlState) {
@@ -439,6 +361,6 @@ export class Crawler {
             this.logger.debug({'pk': peer.publicKey}, 'SCP Listen timeout reached');
             timeoutCounter++;
             this.listen(peer, connection, timeoutCounter, crawlState);
-        }, 5000)); //5 seconds for first scp message,
+        }, Crawler.SCP_LISTEN_TIMEOUT));
     }
 }
