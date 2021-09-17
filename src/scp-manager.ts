@@ -3,7 +3,6 @@ import {PeerNode} from "./peer-node";
 import {hash, Networks, xdr} from "stellar-base";
 import {CrawlState} from "./crawl-state";
 import {
-    Connection,
     getPublicKeyStringFromBuffer,
     verifySCPEnvelopeSignature
 } from "@stellarbeat/js-stellar-node-connector";
