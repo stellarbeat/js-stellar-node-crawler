@@ -90,7 +90,7 @@ export class ScpManager {
 
         if (slot.closed()) {
             if (!slotWasClosedBefore) {//we just closed the slot, lets mark all nodes as validating!
-                this.logger.info({ledger: slotIndex.toString()}, 'Ledger closed!');
+                this.logger.info({ledger: slotIndex.toString()}, 'Ledger closed!');//todo: is sequence higher?
                 crawlState.latestClosedLedger = {
                     sequence: slotIndex,
                     closeTime: new Date()

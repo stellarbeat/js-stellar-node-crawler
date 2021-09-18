@@ -529,10 +529,10 @@
     semver-compare "^1.0.0"
     to-semver "^3.0.0"
 
-"@stellarbeat/js-stellar-node-connector@^3.0.0-alpha.8":
-  version "3.0.0-alpha.10"
-  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-3.0.0-alpha.10.tgz#3fe9bd902e13d6fa64e030b1e0d8d93e7028dc2e"
-  integrity sha512-1ZPuPVxZ0RIiWREGKD9MjuTJiFSkFPPlAnQ9dna18F6nW9fBXW1g3t4nIMrWVOXHHt7M8KdLi/rF+6akykb3fA==
+"@stellarbeat/js-stellar-node-connector@^3.0.0-alpha.15":
+  version "3.0.0-alpha.15"
+  resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-3.0.0-alpha.15.tgz#a8a8435443092ef42d205f57a96930507cf28217"
+  integrity sha512-iYf9haT1nfilOwVPp4j3Db13NXvLRxOc4L8My7qTrQ8hZiDZo2UudJWBMsGKMQ7KcYwL1OMmHjMt80WcaD8O3Q==
   dependencies:
     async "^3.2.0"
     blocked-at "^1.2.0"

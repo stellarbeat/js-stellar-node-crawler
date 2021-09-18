@@ -16,7 +16,7 @@ export class CrawlState {
         sequence: BigInt(0),
         closeTime: new Date(0)
     };
-    listenTimeouts: Map<string, any> = new Map();
+    listenTimeouts: Map<PublicKey, any> = new Map();
     slots: Slots;
 
     constructor(topTierQuorumSet: QuorumSet, quorumSets: Map<QuorumSetHash, QuorumSet>, latestClosedLedger: Ledger) {

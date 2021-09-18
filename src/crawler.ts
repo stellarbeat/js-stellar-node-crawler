@@ -19,7 +19,10 @@ import {ScpManager} from "./scp-manager";
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
-
+export interface CrawlResult {
+    peers: Map<PublicKey, PeerNode>;
+    closedLedgers: bigint[]
+}
 function nodeAddressToPeerKey(nodeAddress: NodeAddress) {
     return nodeAddress[0] + ':' + nodeAddress[1];
 }
@@ -80,12 +83,12 @@ export class Crawler {
             closeTime: new Date(0)
         },
         quorumSets: Map<QuorumSetHash, QuorumSet> = new Map<QuorumSetHash, QuorumSet>()
-    ): Promise<Array<PeerNode>> {
+    ): Promise<CrawlResult> {
         console.time("crawl");
         let crawlState = new CrawlState(topTierQuorumSet, quorumSets, latestClosedLedger);//todo dependency inversion?
         this.logger.info("Starting crawl with seed of " + nodeAddresses.length + "addresses.");
 
-        return await new Promise<Array<PeerNode>>(async (resolve) => {
+        return await new Promise<CrawlResult>(async (resolve) => {
                 this.crawlQueue.drain(() => {
                     this.wrapUp(resolve, crawlState);
                 });//when queue is empty, we wrap up the crawl
@@ -121,7 +124,10 @@ export class Crawler {
             this.logger.info({'peer': connection.remoteAddress}, 'Connecting');
 
             connection
-                .on("error", (error: Error) => this.logger.debug({peer: connection.remoteAddress}, 'error: ' + error.message))
+                .on("error", (error: Error) => {
+                    this.logger.debug({peer: connection.remoteAddress}, 'error: ' + error.message)
+                    this.disconnect(connection, crawlQueueTask.crawlState, error);
+                })
                 .on("connect", (publicKey: string, nodeInfo: NodeInfo) => this.onConnected(connection, publicKey, nodeInfo, crawlQueueTask.crawlState))
                 .on("data", (stellarMessage: xdr.StellarMessage) => this.onStellarMessage(connection, stellarMessage, crawlQueueTask.crawlState))
                 .on('timeout', () => this.onTimeout(connection))
@@ -223,8 +229,8 @@ export class Crawler {
     protected onNodeDisconnected(connection: Connection, crawlState: CrawlState, crawlQueueTaskDone: AsyncResultCallback<any>) {
         try {
             this.logger.info({'pk': connection.remotePublicKey, 'peer': connection.remoteAddress}, 'Node disconnected');
-            if (crawlState.listenTimeouts.get(connection.remoteAddress))
-                clearTimeout(crawlState.listenTimeouts.get(connection.remoteAddress));
+            if (connection.remotePublicKey && crawlState.listenTimeouts.get(connection.remotePublicKey))
+                clearTimeout(crawlState.listenTimeouts.get(connection.remotePublicKey));
 
             crawlState.openConnections.delete(connection.remotePublicKey!);
             this.quorumSetManager.peerNodeDisconnected(connection.remotePublicKey!, crawlState); //just in case a request to this node was happening
@@ -278,7 +284,13 @@ export class Crawler {
     }
 
     protected disconnect(connection: Connection, crawlState: CrawlState, error?: Error) {
+        this.logger.debug({
+            'peer': connection.remoteAddress,
+            'error': error?.message,
+        }, 'Disconnecting');
         crawlState.openConnections.delete(connection.remotePublicKey!);//we don't want to send any more commands
+        if (connection.remotePublicKey && crawlState.listenTimeouts.get(connection.remotePublicKey))
+            clearTimeout(crawlState.listenTimeouts.get(connection.remotePublicKey));
         connection.destroy(error);
     }
 
@@ -322,7 +334,7 @@ export class Crawler {
         }, Crawler.SCP_LISTEN_TIMEOUT));
     }
 
-    protected wrapUp(resolve: any, crawlState: CrawlState) {
+    protected wrapUp(resolve: (value: (CrawlResult | PromiseLike<CrawlResult>)) => void, crawlState: CrawlState) {
         this.logger.info("processed all items in queue");
         this.logger.info("Finished with all nodes");
         this.logger.info("Connection attempts: " + crawlState.crawledNodeAddresses.size);
@@ -334,9 +346,12 @@ export class Crawler {
         this.logger.info(Array.from(crawlState.peerNodes.values()).filter(node => node.suppliedPeerList).length + " supplied us with a peers list.");
 
         console.timeEnd("crawl")
-        let peers: PeerNode[] = Array.from(crawlState.peerNodes.values());
+
         resolve(
-            peers
+            {
+                peers: crawlState.peerNodes,
+                closedLedgers: crawlState.slots.getClosedSlotIndexes()
+            }
         );
 
     }
