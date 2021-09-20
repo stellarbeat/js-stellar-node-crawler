@@ -1,12 +1,13 @@
 import {
     Node as NetworkNode,
-    Connection,
+    Connection, verifySCPEnvelopeSignature, SCPStatement, createSCPEnvelopeSignature,
 } from "@stellarbeat/js-stellar-node-connector";
 import {CrawlerFactory} from "../src";
-import {xdr, Keypair} from "stellar-base";
+import {xdr, Keypair, hash, Networks} from "stellar-base";
 import {QuorumSet} from "@stellarbeat/js-stellar-domain";
 import {NodeConfig} from "@stellarbeat/js-stellar-node-connector/lib/node-config";
 import {NodeAddress} from "../src/crawler";
+import {ok, Result, err} from "neverthrow";
 
 jest.setTimeout(10000);
 
@@ -16,11 +17,19 @@ let peerNetworkNode: NetworkNode;
 let crawledPeerNetworkNode: NetworkNode;
 let crawledPeerNodeAddress: NodeAddress;
 
+let qSet: xdr.ScpQuorumSet;
 beforeAll(() => {
     peerNodeAddress = ['127.0.0.1', 11621];
     peerNetworkNode = getListeningPeerNode(peerNodeAddress);
     crawledPeerNodeAddress = ['127.0.0.1', 11622];
     crawledPeerNetworkNode = getListeningPeerNode(crawledPeerNodeAddress);
+    qSet = new xdr.ScpQuorumSet({
+        threshold: 1,
+        validators: [
+            xdr.PublicKey.publicKeyTypeEd25519(crawledPeerNetworkNode.keyPair.rawPublicKey()),
+            xdr.PublicKey.publicKeyTypeEd25519(peerNetworkNode.keyPair.rawPublicKey())
+        ], innerSets: []
+    })
 })
 
 afterAll((done) => {
@@ -36,10 +45,9 @@ afterAll((done) => {
     crawledPeerNetworkNode.stopAcceptingIncomingConnections(cleanup);
 })
 
-test('crawl', async () => {
+test('it should crawl, listen for validating nodes and harvest quorumSets', async () => {
     peerNetworkNode.on("connection", (connection: Connection) => {
         connection.on("connect", () => {
-            console.log("Connect");
             let peerAddress = new xdr.PeerAddress({
                 ip: xdr.PeerAddressIp.iPv4(Buffer.from([127, 0, 0, 1])),
                 port: crawledPeerNodeAddress[1],
@@ -49,28 +57,24 @@ test('crawl', async () => {
                 peerAddress
             ])
             connection.sendStellarMessage(peers);
-            let commit = new xdr.ScpBallot({counter: 1, value: Buffer.alloc(32)});
-            let externalize = new xdr.ScpStatementExternalize({
-                commit: commit,
-                nH: 1,
-                commitQuorumSetHash: Buffer.alloc(32)
-            })
-            let pledges = xdr.ScpStatementPledges.scpStExternalize(externalize);
-
-            let statement = new xdr.ScpStatement(
-                {
-                    nodeId: xdr.PublicKey.publicKeyTypeEd25519(peerNetworkNode.keyPair.rawPublicKey()),
-                    slotIndex: xdr.Uint64.fromString("1"),
-                    pledges: pledges
-                }
-            )
-            let envelope = new xdr.ScpEnvelope({statement: statement, signature: Buffer.alloc(32)})
-            let message = xdr.StellarMessage.scpMessage(envelope);
-
-            connection.sendStellarMessage(message, (error) => console.log(error));
+            let externalizeResult = createExternalizeMessage(peerNetworkNode);
+            if (externalizeResult.isOk()) {
+                connection.sendStellarMessage(externalizeResult.value, (error) => {
+                    if (error) console.log(error)
+                });
+            }
+            else console.log(externalizeResult.error)
         });
         connection.on("data", (stellarMessage: xdr.StellarMessage) => {
-
+            switch (stellarMessage.switch()) {
+                case xdr.MessageType.getScpQuorumset():
+                    let dontHave = new xdr.DontHave({
+                        reqHash: stellarMessage.qSetHash(),
+                        type: xdr.MessageType.getScpQuorumset()
+                    })
+                    let dontHaveMessage = xdr.StellarMessage.dontHave(dontHave);
+                    connection.sendStellarMessage(dontHaveMessage);
+            }
         })
         connection.on("error", (error: Error) => console.log(error));
 
@@ -86,9 +90,19 @@ test('crawl', async () => {
 
     crawledPeerNetworkNode.on("connection", (connection: Connection) => {
         connection.on("connect", () => {
+            let externalizeResult = createExternalizeMessage(crawledPeerNetworkNode);
+            if (externalizeResult.isOk()) {
+                connection.sendStellarMessage(externalizeResult.value, (error) => {
+                    if (error) console.log(error)
+                });
+            }
         });
         connection.on("data", (stellarMessage: xdr.StellarMessage) => {
-
+            switch (stellarMessage.switch()) {
+                case xdr.MessageType.getScpQuorumset():
+                    let qSetMessage = xdr.StellarMessage.scpQuorumset(qSet);
+                    connection.sendStellarMessage(qSetMessage);
+            }
         })
         connection.on("error", (error: Error) => console.log(error));
 
@@ -102,19 +116,53 @@ test('crawl', async () => {
         console.log("crawled peer server close");
     })
 
-
-    let qSet = new QuorumSet('hash', 2, [
-        'GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH', 'GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ', 'GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK'
+    let trustedQSet = new QuorumSet('hash', 2, [
+        peerNetworkNode.keyPair.publicKey(), crawledPeerNetworkNode.keyPair.publicKey()
     ]);
-    let crawler = CrawlerFactory.createCrawler({usePublicNetwork: true, maxOpenConnections: 20});
-    let result = await crawler.crawl([peerNodeAddress], qSet);
-    let peerNode = result.peers.get(peerNetworkNode.keyPair.publicKey())!;
 
+    let crawler = CrawlerFactory.createCrawler({usePublicNetwork: true, maxOpenConnections: 20});
+    let result = await crawler.crawl([peerNodeAddress], trustedQSet);
+    let peerNode = result.peers.get(peerNetworkNode.keyPair.publicKey())!;
+    let crawledPeerNode = result.peers.get(crawledPeerNetworkNode.keyPair.publicKey())!;
     expect(peerNode.successfullyConnected).toBeTruthy();
     expect(peerNode.isValidating).toBeTruthy();
     expect(peerNode.overLoaded).toBeFalsy();
+    expect(peerNode.participatingInSCP).toBeTruthy();
+    expect(peerNode.latestActiveSlotIndex).toEqual("1");
     expect(peerNode.suppliedPeerList).toBeTruthy();
+    expect(peerNode.quorumSetHash).toEqual(hash(qSet.toXDR()).toString("base64"))
+    expect(peerNode.quorumSet).toBeDefined();
+    expect(crawledPeerNode.quorumSetHash).toEqual(hash(qSet.toXDR()).toString("base64"))
+    expect(crawledPeerNode.quorumSet).toBeDefined();
+    expect(crawledPeerNode.isValidating).toBeTruthy();
+    expect(crawledPeerNode.participatingInSCP).toBeTruthy();
+    expect(crawledPeerNode.latestActiveSlotIndex).toEqual("1");
 });
+
+function createExternalizeMessage(node: NetworkNode): Result<xdr.StellarMessage, Error> {
+    let commit = new xdr.ScpBallot({counter: 1, value: Buffer.alloc(32)});
+    let externalize = new xdr.ScpStatementExternalize({
+        commit: commit,
+        nH: 1,
+        commitQuorumSetHash: hash(qSet.toXDR())
+    })
+    let pledges = xdr.ScpStatementPledges.scpStExternalize(externalize);
+
+    let statement = new xdr.ScpStatement(
+        {
+            nodeId: xdr.PublicKey.publicKeyTypeEd25519(node.keyPair.rawPublicKey()),
+            slotIndex: xdr.Uint64.fromString("1"),
+            pledges: pledges
+        }
+    )
+    let signatureResult = createSCPEnvelopeSignature(statement, node.keyPair.rawPublicKey(), node.keyPair.rawSecretKey(), hash(Buffer.from(Networks.PUBLIC)));
+    if (signatureResult.isOk()) {
+        let envelope = new xdr.ScpEnvelope({statement: statement, signature: signatureResult.value})
+        let message = xdr.StellarMessage.scpMessage(envelope);
+        return ok(message);
+    }
+    return err(signatureResult.error);
+}
 
 function getListeningPeerNode(address: NodeAddress) {
     let peerNodeConfig: NodeConfig = {

@@ -45,10 +45,11 @@ export class ScpManager {
         }
 
         let publicKey = publicKeyResult.value;
+        let slotIndex = BigInt(scpStatement.slotIndex().toString());
 
         this.logger.debug({
             'publicKey': publicKey,
-            'slotIndex': scpStatement.slotIndex().toString()
+            'slotIndex': slotIndex.toString()
         }, 'processing new scp statement: ' + scpStatement.pledges().switch().name);
 
         let peer = crawlState.peerNodes.get(publicKey);
@@ -57,7 +58,7 @@ export class ScpManager {
             crawlState.peerNodes.set(publicKey, peer);
         }
 
-        peer.latestActiveSlotIndex = scpStatement.slotIndex().toString();
+        peer.latestActiveSlotIndex = slotIndex.toString();
 
         this.quorumSetManager.processQuorumSetHashFromStatement(peer, scpStatement, crawlState);
 
@@ -65,14 +66,14 @@ export class ScpManager {
             return ok(undefined);
         }
 
-        return this.processExternalizeStatement(peer, BigInt(scpStatement.slotIndex().toString()), scpStatement.pledges().externalize(), crawlState)
+        return this.processExternalizeStatement(peer, slotIndex, scpStatement.pledges().externalize(), crawlState)
     }
 
     protected processExternalizeStatement(peer: PeerNode, slotIndex: bigint, statementExternalize: xdr.ScpStatementExternalize, crawlState: CrawlState): Result<undefined, Error> {
         let value = statementExternalize.commit().value().toString('base64');
         this.logger.debug({
             'publicKey': peer.publicKey,
-            'slotIndex': slotIndex
+            'slotIndex': slotIndex.toString()
         }, 'externalize msg with value: ' + value);
 
         let markNodeAsValidating = (peer: PeerNode) => {

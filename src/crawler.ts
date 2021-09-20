@@ -167,6 +167,8 @@ export class Crawler {
             peerNode.port = connection.remotePort;
 
             crawlState.peerNodes.set(publicKey, peerNode);
+            crawlState.openConnections.set(publicKey, connection);
+
             this.quorumSetManager.connectedToPeerNode(peerNode, crawlState);
 
             /*if (!this._nodesThatSuppliedPeerList.has(connection.peer)) { //Most nodes send their peers automatically on successful handshake, better handled with timer.
@@ -303,7 +305,7 @@ export class Crawler {
             return false;
         if (!peer.participatingInSCP)
             return false;//watcher node
-        if (peer.isValidating && peer.quorumSet)
+        if (peer.isValidating && peer.quorumSet)//todo: a peer that is validating but doesnt have it's own quorumSet, could keep listening until max.
             return false;//we have all the needed information
 
         return true;
@@ -325,7 +327,6 @@ export class Crawler {
             'pk': peer.publicKey,
             'latestActiveSlotIndex': peer.latestActiveSlotIndex
         }, 'Listening for externalize msg'); //todo: if externalizing wrong values, we should disconnect.
-        crawlState.openConnections.set(peer.publicKey, connection);
 
         crawlState.listenTimeouts.set(peer.publicKey, setTimeout(() => {
             this.logger.debug({'pk': peer.publicKey}, 'SCP Listen timeout reached');

@@ -21,12 +21,13 @@ export class QuorumSetManager {
     }> = new Map();
     protected quorumSetRequestHashesInProgress: Set<QuorumSetHash> = new Set();
     protected logger:Logger;
+    protected unknownQuorumSets: Set<QuorumSetHash> = new Set();
 
     constructor(logger:P.Logger) {
         this.logger = logger;
     }
 
-    public processQuorumSetHashFromStatement(peer: PeerNode, scpStatement: xdr.ScpStatement, crawlState: CrawlState) {
+   public processQuorumSetHashFromStatement(peer: PeerNode, scpStatement: xdr.ScpStatement, crawlState: CrawlState) {
         peer.quorumSetHash = this.getQuorumSetHash(scpStatement);
         if (!this.getQuorumSetHashOwners(peer.quorumSetHash).has(peer.publicKey)) {
             this.logger.debug({'pk': peer.publicKey, hash: peer.quorumSetHash}, 'Detected new quorumSetHash');
@@ -65,6 +66,7 @@ export class QuorumSetManager {
             }
             this.requestQuorumSet(peerNode.quorumSetHash, crawlState);
         }
+        this.processUnknownQuorumSetHashes(crawlState);
     }
 
     public peerNodeDisconnected(publicKey: PublicKey, crawlState: CrawlState){
@@ -74,6 +76,7 @@ export class QuorumSetManager {
     }
 
     public peerNodeDoesNotHaveQuorumSet(publicKey: PublicKey, crawlState: CrawlState){
+        //todo: donthave sends the quorumsethash in the request hash field
         let hash = this.clearRequestQuorumSet(publicKey);
         if (hash)
             this.requestQuorumSet(hash, crawlState);
@@ -139,6 +142,13 @@ export class QuorumSetManager {
         }
 
         this.logger.warn({hash: quorumSetHash}, 'No active connections to request quorumSet from');
+        this.unknownQuorumSets.add(quorumSetHash);
+    }
+
+    protected processUnknownQuorumSetHashes(crawlState: CrawlState){
+        this.unknownQuorumSets.forEach(qsetHash => {
+            this.requestQuorumSet(qsetHash, crawlState);
+        })
     }
 
     protected getQuorumSetHashOwners(quorumSetHash: QuorumSetHash) {
