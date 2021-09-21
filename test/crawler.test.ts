@@ -1,6 +1,6 @@
 import {
     Node as NetworkNode,
-    Connection, verifySCPEnvelopeSignature, SCPStatement, createSCPEnvelopeSignature,
+    Connection,createSCPEnvelopeSignature,
 } from "@stellarbeat/js-stellar-node-connector";
 import {CrawlerFactory} from "../src";
 import {xdr, Keypair, hash, Networks} from "stellar-base";
