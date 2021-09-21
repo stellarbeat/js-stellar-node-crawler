@@ -132,7 +132,7 @@ export class Crawler {
                 .on("data", (stellarMessage: xdr.StellarMessage) => this.onStellarMessage(connection, stellarMessage, crawlQueueTask.crawlState))
                 .on('timeout', () => this.onTimeout(connection))
                 .on("close", () => this.onNodeDisconnected(connection, crawlQueueTask.crawlState,crawlQueueTaskDone))
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error({'peer': crawlQueueTask.nodeAddress[0] + ':' + crawlQueueTask.nodeAddress[1]}, error.message);
         }
     }
@@ -176,7 +176,7 @@ export class Crawler {
             }*/
 
             this.listen(peerNode, connection, 0, crawlState);
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error({'peer': connection.remoteAddress}, error.message);
         }
     }
@@ -238,7 +238,7 @@ export class Crawler {
             this.quorumSetManager.peerNodeDisconnected(connection.remotePublicKey!, crawlState); //just in case a request to this node was happening
             this.logger.debug("nodes left in queue: " + this.crawlQueue.length());
             crawlQueueTaskDone();
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error({'peer': connection.remoteAddress}, 'Exception: ' + error.message);
             crawlQueueTaskDone(error)
         }
@@ -267,7 +267,7 @@ export class Crawler {
                     node.overLoaded = true;
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error({'peer': connection.remoteAddress}, error.message);
         }
     }
