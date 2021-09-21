@@ -2,6 +2,8 @@
 
 Crawl the stellar network for nodes
 
+TODO: expand doc
+
 ## install
 `yarn install`
 

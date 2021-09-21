@@ -151,9 +151,9 @@ export class Crawler {
                 this.logger.error({
                     'peer': connection.remoteAddress,
                     'pk': publicKey
-                }, 'PeerNode reusing publickey on address ' + crawlState.peerNodes.get(publicKey)!.key);
+                }, 'PeerNode reusing publicKey on address ' + crawlState.peerNodes.get(publicKey)!.key);
                 connection.destroy();
-                return; //we don't return this peernode to consumer of this library
+                return; //we don't return this peerNode to consumer of this library
             }
 
             if (!peerNode) {
@@ -326,8 +326,7 @@ export class Crawler {
         this.logger.debug({
             'pk': peer.publicKey,
             'latestActiveSlotIndex': peer.latestActiveSlotIndex
-        }, 'Listening for externalize msg'); //todo: if externalizing wrong values, we should disconnect.
-
+        }, 'Listening for externalize msg');
         crawlState.listenTimeouts.set(peer.publicKey, setTimeout(() => {
             this.logger.debug({'pk': peer.publicKey}, 'SCP Listen timeout reached');
             timeoutCounter++;

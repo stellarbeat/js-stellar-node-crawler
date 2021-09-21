@@ -91,10 +91,12 @@ export class ScpManager {
 
         if (slot.closed()) {
             if (!slotWasClosedBefore) {//we just closed the slot, lets mark all nodes as validating!
-                this.logger.info({ledger: slotIndex.toString()}, 'Ledger closed!');//todo: is sequence higher?
-                crawlState.latestClosedLedger = {
-                    sequence: slotIndex,
-                    closeTime: new Date()
+                this.logger.info({ledger: slotIndex.toString()}, 'Ledger closed!');
+                if(slotIndex > crawlState.latestClosedLedger.sequence){
+                    crawlState.latestClosedLedger = {
+                        sequence: slotIndex,
+                        closeTime: new Date()
+                    }
                 }
                 slot.getNodesAgreeingOnExternalizedValue().forEach(validatingPublicKey => {
                     let validatingPeer = crawlState.peerNodes.get(validatingPublicKey);
