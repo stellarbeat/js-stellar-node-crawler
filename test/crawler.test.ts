@@ -45,7 +45,7 @@ afterAll((done) => {
     crawledPeerNetworkNode.stopAcceptingIncomingConnections(cleanup);
 })
 
-test('it should crawl, listen for validating nodes and harvest quorumSets', async () => {
+it('should crawl, listen for validating nodes and harvest quorumSets', async () => {
     peerNetworkNode.on("connection", (connection: Connection) => {
         connection.on("connect", () => {
             let peerAddress = new xdr.PeerAddress({
