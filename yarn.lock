@@ -518,7 +518,7 @@
     semver-compare "^1.0.0"
     to-semver "^3.0.0"
 
-"@stellarbeat/js-stellar-node-connector@^3.0.0-alpha.15":
+"@stellarbeat/js-stellar-node-connector@^3.0.0-alpha.18":
   version "3.0.0-alpha.18"
   resolved "https://registry.yarnpkg.com/@stellarbeat/js-stellar-node-connector/-/js-stellar-node-connector-3.0.0-alpha.18.tgz#2e1d2623a2670bba70f308937210fe82b3a5cef1"
   integrity sha512-d5QJbr75mCDnTyfpInUyvBPL7kjALjMU7QrBDf8zk3XYtufA7+W+iHQsm6rQXQ3BVANYtlw+Z7TdSnZw8W1IGA==

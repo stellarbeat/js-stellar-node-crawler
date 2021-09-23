@@ -1,6 +1,6 @@
 {
   "name": "@stellarbeat/js-stellar-node-crawler",
-  "version": "3.0.0-alpha.2",
+  "version": "3.0.0-alpha.3",
   "description": "Crawl the network for nodes",
   "repository": {
     "type": "git",
@@ -28,11 +28,11 @@
   },
   "peerDependencies": {
     "@stellarbeat/js-stellar-domain": "^2.23.2",
-    "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.4"
+    "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.18"
   },
   "devDependencies": {
     "@stellarbeat/js-stellar-domain": "^2.23.2",
-    "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.15",
+    "@stellarbeat/js-stellar-node-connector": "^3.0.0-alpha.18",
     "@types/async": "^3.2.7",
     "@types/jest": "^27.0.2",
     "jest": "^27.2.1",
