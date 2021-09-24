@@ -21,7 +21,8 @@ type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
 export interface CrawlResult {
     peers: Map<PublicKey, PeerNode>;
-    closedLedgers: bigint[]
+    closedLedgers: bigint[],
+    latestClosedLedger: bigint
 }
 function nodeAddressToPeerKey(nodeAddress: NodeAddress) {
     return nodeAddress[0] + ':' + nodeAddress[1];
@@ -350,7 +351,8 @@ export class Crawler {
         resolve(
             {
                 peers: crawlState.peerNodes,
-                closedLedgers: crawlState.slots.getClosedSlotIndexes()
+                closedLedgers: crawlState.slots.getClosedSlotIndexes(),
+                latestClosedLedger: crawlState.latestClosedLedger.sequence
             }
         );
 
