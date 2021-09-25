@@ -8,25 +8,22 @@ import {
 } from "@stellarbeat/js-stellar-node-connector";
 import {QuorumSetManager} from "./quorum-set-manager";
 import {err, ok, Result} from "neverthrow";
-import * as LRUCache from "lru-cache";
 import {isLedgerSequenceValid} from "./ledger-validator";
 
 export class ScpManager {
     protected logger: P.Logger;
     protected quorumSetManager: QuorumSetManager;
-    protected envelopeCache: LRUCache<any, any>;
 
-    constructor(quorumSetManager: QuorumSetManager, envelopeCache: LRUCache<any, any>, logger: P.Logger) {
+    constructor(quorumSetManager: QuorumSetManager, logger: P.Logger) {
         this.logger = logger;
-        this.envelopeCache = envelopeCache;
         this.quorumSetManager = quorumSetManager;
     }
 
     public processScpEnvelope(scpEnvelope: xdr.ScpEnvelope, crawlState: CrawlState): Result<undefined, Error> {
-        if (this.envelopeCache.has(scpEnvelope.signature().toString())) {
+        if (crawlState.envelopeCache.has(scpEnvelope.signature().toString())) {
             return ok(undefined);
         }
-        this.envelopeCache.set(scpEnvelope.signature().toString(), 1);
+        crawlState.envelopeCache.set(scpEnvelope.signature().toString(), 1);
 
         if(!isLedgerSequenceValid(crawlState.latestClosedLedger, BigInt(scpEnvelope.statement().slotIndex().toString())))
             return ok(undefined);
