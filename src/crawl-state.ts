@@ -34,7 +34,7 @@ export class CrawlState {
 		sequence: BigInt(0),
 		closeTime: new Date(0)
 	};
-	listenTimeouts: Map<PublicKey, any> = new Map();
+	listenTimeouts: Map<PublicKey, NodeJS.Timeout> = new Map();
 	slots: Slots;
 	envelopeCache: LRUCache<string, number>;
 	quorumSetState: QuorumSetState = new QuorumSetState();

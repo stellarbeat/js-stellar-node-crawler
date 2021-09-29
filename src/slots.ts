@@ -19,7 +19,10 @@ export class Slot {
 	getNodesAgreeingOnExternalizedValue(): Set<NodeId> {
 		if (this.externalizedValue === undefined) return new Set();
 
-		return this.valuesMap.get(this.externalizedValue)!;
+		const nodes = this.valuesMap.get(this.externalizedValue);
+		if (!nodes) return new Set();
+
+		return nodes;
 	}
 
 	getNodesDisagreeingOnExternalizedValue(): Set<NodeId> {
@@ -29,13 +32,14 @@ export class Slot {
 		Array.from(this.valuesMap.keys())
 			.filter((value) => value !== this.externalizedValue)
 			.forEach((value) => {
-				nodes = new Set([...nodes, ...this.valuesMap.get(value)!]);
+				const otherNodes = this.valuesMap.get(value);
+				if (otherNodes) nodes = new Set([...nodes, ...otherNodes]);
 			});
 
 		return nodes;
 	}
 
-	addExternalizeValue(nodeId: NodeId, value: SlotValue) {
+	addExternalizeValue(nodeId: NodeId, value: SlotValue): void {
 		let nodes = this.valuesMap.get(value);
 		if (!nodes) {
 			nodes = new Set();
@@ -55,7 +59,7 @@ export class Slot {
 			this.externalizedValue = value;
 	}
 
-	closed() {
+	closed(): boolean {
 		return this.externalizedValue !== undefined;
 	}
 }
@@ -68,7 +72,7 @@ export class Slots {
 		this.trustedQuorumSet = trustedQuorumSet;
 	}
 
-	public getSlot(slotIndex: SlotIndex) {
+	public getSlot(slotIndex: SlotIndex): Slot {
 		let slot = this.slots.get(slotIndex);
 		if (!slot) {
 			slot = new Slot(slotIndex, this.trustedQuorumSet);
@@ -78,18 +82,18 @@ export class Slots {
 		return slot;
 	}
 
-	hasClosedSlot() {
+	hasClosedSlot(): boolean {
 		return this.getClosedSlotIndexes().length !== 0;
 	}
 
-	public getLatestSlotIndex() {
+	public getLatestSlotIndex(): bigint {
 		return Array.from(this.slots.keys()).reduce(
 			(l, r) => (r > l ? r : l),
 			BigInt(0)
 		);
 	}
 
-	getClosedSlotIndexes() {
+	getClosedSlotIndexes(): bigint[] {
 		return Array.from(this.slots.values())
 			.filter((slot) => slot.closed())
 			.map((slot) => slot.index);

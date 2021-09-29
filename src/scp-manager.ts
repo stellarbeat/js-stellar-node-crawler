@@ -36,7 +36,7 @@ export class ScpManager {
 		)
 			return ok(undefined);
 
-		let verifiedResult = verifySCPEnvelopeSignature(
+		const verifiedResult = verifySCPEnvelopeSignature(
 			scpEnvelope,
 			hash(Buffer.from(Networks.PUBLIC))
 		);
@@ -49,15 +49,15 @@ export class ScpManager {
 		scpStatement: xdr.ScpStatement,
 		crawlState: CrawlState
 	): Result<undefined, Error> {
-		let publicKeyResult = getPublicKeyStringFromBuffer(
+		const publicKeyResult = getPublicKeyStringFromBuffer(
 			scpStatement.nodeId().value()
 		);
 		if (publicKeyResult.isErr()) {
 			return err(publicKeyResult.error);
 		}
 
-		let publicKey = publicKeyResult.value;
-		let slotIndex = BigInt(scpStatement.slotIndex().toString());
+		const publicKey = publicKeyResult.value;
+		const slotIndex = BigInt(scpStatement.slotIndex().toString());
 
 		this.logger.debug(
 			{
@@ -103,7 +103,7 @@ export class ScpManager {
 		statementExternalize: xdr.ScpStatementExternalize,
 		crawlState: CrawlState
 	): Result<undefined, Error> {
-		let value = statementExternalize.commit().value().toString('base64');
+		const value = statementExternalize.commit().value().toString('base64');
 		this.logger.debug(
 			{
 				publicKey: peer.publicKey,
@@ -112,7 +112,7 @@ export class ScpManager {
 			'externalize msg with value: ' + value
 		);
 
-		let markNodeAsValidating = (peer: PeerNode) => {
+		const markNodeAsValidating = (peer: PeerNode) => {
 			if (!peer.isValidating) {
 				this.logger.info(
 					{
@@ -124,8 +124,8 @@ export class ScpManager {
 			peer.isValidating = true;
 		};
 
-		let slot = crawlState.slots.getSlot(slotIndex);
-		let slotWasClosedBefore = slot.closed();
+		const slot = crawlState.slots.getSlot(slotIndex);
+		const slotWasClosedBefore = slot.closed();
 		slot.addExternalizeValue(peer.publicKey, value);
 
 		if (slot.closed()) {
@@ -141,11 +141,12 @@ export class ScpManager {
 				slot
 					.getNodesAgreeingOnExternalizedValue()
 					.forEach((validatingPublicKey) => {
-						let validatingPeer = crawlState.peerNodes.get(validatingPublicKey);
+						const validatingPeer =
+							crawlState.peerNodes.get(validatingPublicKey);
 						if (validatingPeer) markNodeAsValidating(validatingPeer);
 					});
 				slot.getNodesDisagreeingOnExternalizedValue().forEach((nodeId) => {
-					let badPeer = crawlState.peerNodes.get(nodeId);
+					const badPeer = crawlState.peerNodes.get(nodeId);
 					if (badPeer) badPeer.isValidatingIncorrectValues = true;
 				});
 			} else {

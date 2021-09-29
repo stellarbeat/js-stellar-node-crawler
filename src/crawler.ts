@@ -19,11 +19,13 @@ import { ScpManager } from './scp-manager';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
+
 export interface CrawlResult {
 	peers: Map<PublicKey, PeerNode>;
 	closedLedgers: bigint[];
 	latestClosedLedger: Ledger;
 }
+
 function nodeAddressToPeerKey(nodeAddress: NodeAddress) {
 	return nodeAddress[0] + ':' + nodeAddress[1];
 }
@@ -97,7 +99,7 @@ export class Crawler {
 		>()
 	): Promise<CrawlResult> {
 		console.time('crawl');
-		let crawlState = new CrawlState(
+		const crawlState = new CrawlState(
 			topTierQuorumSet,
 			quorumSets,
 			latestClosedLedger
@@ -106,7 +108,7 @@ export class Crawler {
 			'Starting crawl with seed of ' + nodeAddresses.length + 'addresses.'
 		);
 
-		return await new Promise<CrawlResult>(async (resolve) => {
+		return await new Promise<CrawlResult>((resolve) => {
 			this.crawlQueue.drain(() => {
 				this.wrapUp(resolve, crawlState);
 			}); //when queue is empty, we wrap up the crawl
@@ -116,8 +118,11 @@ export class Crawler {
 		});
 	}
 
-	protected crawlPeerNode(nodeAddress: NodeAddress, crawlState: CrawlState) {
-		let peerKey = nodeAddressToPeerKey(nodeAddress);
+	protected crawlPeerNode(
+		nodeAddress: NodeAddress,
+		crawlState: CrawlState
+	): void {
+		const peerKey = nodeAddressToPeerKey(nodeAddress);
 		if (crawlState.crawledNodeAddresses.has(peerKey)) {
 			this.logger.debug({ peer: peerKey }, 'Address already crawled');
 			return;
@@ -140,10 +145,10 @@ export class Crawler {
 
 	protected processCrawlPeerNodeInCrawlQueue(
 		crawlQueueTask: CrawlQueueTask,
-		crawlQueueTaskDone: AsyncResultCallback<any>
-	) {
+		crawlQueueTaskDone: AsyncResultCallback<void>
+	): void {
 		try {
-			let connection = this.crawlerNode.connectTo(
+			const connection = this.crawlerNode.connectTo(
 				crawlQueueTask.nodeAddress[0],
 				crawlQueueTask.nodeAddress[1]
 			);
@@ -180,18 +185,21 @@ export class Crawler {
 						crawlQueueTaskDone
 					)
 				);
-		} catch (error: any) {
+		} catch (error) {
+			let msg = 'Error processing peer in crawl queue';
+			if (error instanceof Error) msg = error.message;
+
 			this.logger.error(
 				{
 					peer:
 						crawlQueueTask.nodeAddress[0] + ':' + crawlQueueTask.nodeAddress[1]
 				},
-				error.message
+				msg
 			);
 		}
 	}
 
-	protected onTimeout(connection: Connection) {
+	protected onTimeout(connection: Connection): void {
 		this.logger.debug({ peer: connection.remoteAddress }, 'Connection timeout');
 		connection.destroy();
 	}
@@ -201,65 +209,61 @@ export class Crawler {
 		publicKey: PublicKey,
 		nodeInfo: NodeInfo,
 		crawlState: CrawlState
-	) {
-		try {
-			this.logger.info(
-				{ peer: connection.remoteAddress, pk: publicKey },
-				'Connected'
+	): void {
+		this.logger.info(
+			{ peer: connection.remoteAddress, pk: publicKey },
+			'Connected'
+		);
+
+		let peerNode = crawlState.peerNodes.get(publicKey);
+		if (peerNode && peerNode.successfullyConnected) {
+			//this public key is already used in this crawl! A node is not allowed to reuse public keys. Disconnecting.
+			this.logger.error(
+				{
+					peer: connection.remoteAddress,
+					pk: publicKey
+				},
+				'PeerNode reusing publicKey on address ' + peerNode.key
 			);
-
-			let peerNode = crawlState.peerNodes.get(publicKey);
-			if (peerNode && peerNode.successfullyConnected) {
-				//this public key is already used in this crawl! A node is not allowed to reuse public keys. Disconnecting.
-				this.logger.error(
-					{
-						peer: connection.remoteAddress,
-						pk: publicKey
-					},
-					'PeerNode reusing publicKey on address ' +
-						crawlState.peerNodes.get(publicKey)!.key
-				);
-				connection.destroy();
-				return; //we don't return this peerNode to consumer of this library
-			}
-
-			if (!peerNode) {
-				peerNode = new PeerNode(publicKey);
-			}
-
-			peerNode.nodeInfo = nodeInfo;
-			peerNode.ip = connection.remoteIp;
-			peerNode.port = connection.remotePort;
-
-			crawlState.peerNodes.set(publicKey, peerNode);
-			crawlState.openConnections.set(publicKey, connection);
-
-			this.quorumSetManager.connectedToPeerNode(peerNode, crawlState);
-
-			/*if (!this._nodesThatSuppliedPeerList.has(connection.peer)) { //Most nodes send their peers automatically on successful handshake, better handled with timer.
-                this._connectionManager.sendGetPeers(connection);
-            }*/
-
-			this.listen(peerNode, connection, 0, crawlState);
-		} catch (error: any) {
-			this.logger.error({ peer: connection.remoteAddress }, error.message);
+			connection.destroy();
+			return; //we don't return this peerNode to consumer of this library
 		}
+
+		if (!peerNode) {
+			peerNode = new PeerNode(publicKey);
+		}
+
+		peerNode.nodeInfo = nodeInfo;
+		peerNode.ip = connection.remoteIp;
+		peerNode.port = connection.remotePort;
+
+		crawlState.peerNodes.set(publicKey, peerNode);
+		crawlState.openConnections.set(publicKey, connection);
+
+		this.quorumSetManager.connectedToPeerNode(peerNode, crawlState);
+
+		/*if (!this._nodesThatSuppliedPeerList.has(connection.peer)) { //Most nodes send their peers automatically on successful handshake, better handled with timer.
+            this._connectionManager.sendGetPeers(connection);
+        }*/
+
+		this.listen(peerNode, connection, 0, crawlState);
 	}
 
 	protected onStellarMessage(
 		connection: Connection,
 		stellarMessage: xdr.StellarMessage,
 		crawlState: CrawlState
-	) {
+	): void {
 		switch (stellarMessage.switch()) {
-			case xdr.MessageType.scpMessage():
-				let result = this.scpManager.processScpEnvelope(
+			case xdr.MessageType.scpMessage(): {
+				const result = this.scpManager.processScpEnvelope(
 					stellarMessage.envelope(),
 					crawlState
 				);
 				if (result.isErr())
 					this.disconnect(connection, crawlState, result.error);
 				break;
+			}
 			case xdr.MessageType.peers():
 				this.onPeersReceived(connection, stellarMessage.peers(), crawlState);
 				break;
@@ -282,10 +286,11 @@ export class Crawler {
 						{ pk: connection.remotePublicKey, hash: hash },
 						"Don't have"
 					);
-					this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(
-						connection.remotePublicKey!,
-						crawlState
-					);
+					if (connection.remotePublicKey)
+						this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(
+							connection.remotePublicKey,
+							crawlState
+						);
 				}
 				break;
 			case xdr.MessageType.errorMsg():
@@ -302,7 +307,7 @@ export class Crawler {
 		connection: Connection,
 		errorMessage: xdr.Error,
 		crawlState: CrawlState
-	) {
+	): void {
 		switch (errorMessage.code()) {
 			case xdr.ErrorCode.errLoad():
 				this.onLoadTooHighReceived(connection, crawlState);
@@ -325,43 +330,34 @@ export class Crawler {
 	protected onNodeDisconnected(
 		connection: Connection,
 		crawlState: CrawlState,
-		crawlQueueTaskDone: AsyncResultCallback<any>
-	) {
-		try {
-			this.logger.info(
-				{ pk: connection.remotePublicKey, peer: connection.remoteAddress },
-				'Node disconnected'
-			);
-			if (
-				connection.remotePublicKey &&
-				crawlState.listenTimeouts.get(connection.remotePublicKey)
-			)
-				clearTimeout(crawlState.listenTimeouts.get(connection.remotePublicKey));
+		crawlQueueTaskDone: AsyncResultCallback<void>
+	): void {
+		this.logger.info(
+			{ pk: connection.remotePublicKey, peer: connection.remoteAddress },
+			'Node disconnected'
+		);
+		if (connection.remotePublicKey) {
+			const timeout = crawlState.listenTimeouts.get(connection.remotePublicKey);
+			if (timeout) clearTimeout(timeout);
 
-			crawlState.openConnections.delete(connection.remotePublicKey!);
+			crawlState.openConnections.delete(connection.remotePublicKey);
 			this.quorumSetManager.peerNodeDisconnected(
-				connection.remotePublicKey!,
+				connection.remotePublicKey,
 				crawlState
 			); //just in case a request to this node was happening
-			this.logger.debug('nodes left in queue: ' + this.crawlQueue.length());
-			crawlQueueTaskDone();
-		} catch (error: any) {
-			this.logger.error(
-				{ peer: connection.remoteAddress },
-				'Exception: ' + error.message
-			);
-			crawlQueueTaskDone(error);
 		}
+		this.logger.debug('nodes left in queue: ' + this.crawlQueue.length());
+		crawlQueueTaskDone();
 	}
 
 	protected onPeersReceived(
 		connection: Connection,
 		peers: xdr.PeerAddress[],
 		crawlState: CrawlState
-	) {
-		let peerAddresses: Array<NodeAddress> = [];
+	): void {
+		const peerAddresses: Array<NodeAddress> = [];
 		peers.forEach((peer) => {
-			let ipResult = getIpFromPeerAddress(peer);
+			const ipResult = getIpFromPeerAddress(peer);
 			if (ipResult.isOk()) peerAddresses.push([ipResult.value, peer.port()]);
 		});
 
@@ -369,8 +365,12 @@ export class Crawler {
 			{ peer: connection.remoteAddress },
 			peerAddresses.length + ' peers received'
 		);
-		let peer = crawlState.peerNodes.get(connection.remotePublicKey!)!;
-		peer.suppliedPeerList = true;
+
+		if (connection.remotePublicKey) {
+			const peer = crawlState.peerNodes.get(connection.remotePublicKey);
+			if (peer) peer.suppliedPeerList = true;
+		}
+
 		peerAddresses.forEach((peerAddress) =>
 			this.crawlPeerNode(peerAddress, crawlState)
 		);
@@ -379,20 +379,16 @@ export class Crawler {
 	protected onLoadTooHighReceived(
 		connection: Connection,
 		crawlState: CrawlState
-	) {
-		try {
-			this.logger.info(
-				{ peer: connection.remoteAddress },
-				'Load too high message received'
-			);
-			if (connection.remotePublicKey) {
-				let node = crawlState.peerNodes.get(connection.remotePublicKey);
-				if (node) {
-					node.overLoaded = true;
-				}
+	): void {
+		this.logger.info(
+			{ peer: connection.remoteAddress },
+			'Load too high message received'
+		);
+		if (connection.remotePublicKey) {
+			const node = crawlState.peerNodes.get(connection.remotePublicKey);
+			if (node) {
+				node.overLoaded = true;
 			}
-		} catch (error: any) {
-			this.logger.error({ peer: connection.remoteAddress }, error.message);
 		}
 	}
 
@@ -400,8 +396,8 @@ export class Crawler {
 		connection: Connection,
 		quorumSetMessage: xdr.ScpQuorumSet,
 		crawlState: CrawlState
-	) {
-		let quorumSetResult = getQuorumSetFromMessage(quorumSetMessage);
+	): void {
+		const quorumSetResult = getQuorumSetFromMessage(quorumSetMessage);
 		if (quorumSetResult.isErr()) {
 			connection.destroy(quorumSetResult.error);
 			return;
@@ -409,22 +405,23 @@ export class Crawler {
 		this.logger.info(
 			{
 				pk: connection.remotePublicKey,
-				hash: quorumSetResult.value.hashKey!
+				hash: quorumSetResult.value.hashKey
 			},
 			'QuorumSet received'
 		);
-		this.quorumSetManager.processQuorumSet(
-			quorumSetResult.value,
-			connection.remotePublicKey!,
-			crawlState
-		);
+		if (connection.remotePublicKey)
+			this.quorumSetManager.processQuorumSet(
+				quorumSetResult.value,
+				connection.remotePublicKey,
+				crawlState
+			);
 	}
 
 	protected disconnect(
 		connection: Connection,
 		crawlState: CrawlState,
 		error?: Error
-	) {
+	): void {
 		this.logger.debug(
 			{
 				peer: connection.remoteAddress,
@@ -432,16 +429,16 @@ export class Crawler {
 			},
 			'Disconnecting'
 		);
-		crawlState.openConnections.delete(connection.remotePublicKey!); //we don't want to send any more commands
-		if (
-			connection.remotePublicKey &&
-			crawlState.listenTimeouts.get(connection.remotePublicKey)
-		)
-			clearTimeout(crawlState.listenTimeouts.get(connection.remotePublicKey));
+		if (connection.remotePublicKey) {
+			crawlState.openConnections.delete(connection.remotePublicKey); //we don't want to send any more commands
+			const timeout = crawlState.listenTimeouts.get(connection.remotePublicKey);
+			if (timeout) clearTimeout(timeout);
+		}
+
 		connection.destroy(error);
 	}
 
-	protected listenFurther(peer: PeerNode, timeoutCounter: number = 0): boolean {
+	protected listenFurther(peer: PeerNode, timeoutCounter = 0): boolean {
 		if (timeoutCounter === 0) return true; //everyone gets a first listen. If it is already confirmed validating, we can still use it to request unknown quorumSets from.
 		if (timeoutCounter >= 20) return false; //we wait for 100 seconds max if node is trying to reach consensus.
 		if (peer.isValidatingIncorrectValues) return false;
@@ -456,9 +453,9 @@ export class Crawler {
 	protected listen(
 		peer: PeerNode,
 		connection: Connection,
-		timeoutCounter: number = 0,
+		timeoutCounter = 0,
 		crawlState: CrawlState
-	) {
+	): void {
 		if (!this.listenFurther(peer, timeoutCounter)) {
 			this.logger.debug(
 				{
@@ -493,7 +490,7 @@ export class Crawler {
 	protected wrapUp(
 		resolve: (value: CrawlResult | PromiseLike<CrawlResult>) => void,
 		crawlState: CrawlState
-	) {
+	): void {
 		this.logger.info('processed all items in queue');
 		this.logger.info('Finished with all nodes');
 		this.logger.info(

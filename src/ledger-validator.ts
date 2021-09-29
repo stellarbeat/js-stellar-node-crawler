@@ -6,20 +6,16 @@ const MAX_CLOSED_LEDGER_PROCESSING_TIME = 90000; //how long in ms we still proce
 export function isLedgerSequenceValid(
 	latestClosedLedger: Ledger,
 	ledgerSequence: bigint
-) {
-	let latestSequenceDifference = Number(
+): boolean {
+	const latestSequenceDifference = Number(
 		latestClosedLedger.sequence - ledgerSequence
 	);
 
 	if (latestSequenceDifference > MAX_LEDGER_DRIFT) return false; //ledger message older than allowed by pure ledger sequence numbers
 
-	if (
+	return !(
 		ledgerSequence <= latestClosedLedger.sequence &&
 		new Date().getTime() - latestClosedLedger.closeTime.getTime() >
 			MAX_CLOSED_LEDGER_PROCESSING_TIME
-	) {
-		return false; //we only allow for x seconds of processing of closed ledger messages
-	}
-
-	return true;
+	);
 }

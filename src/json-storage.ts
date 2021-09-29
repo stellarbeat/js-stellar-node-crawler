@@ -1,8 +1,8 @@
 import * as fs from 'fs';
-import { Node, QuorumSet } from '@stellarbeat/js-stellar-domain';
+import { Node } from '@stellarbeat/js-stellar-domain';
 
 export default {
-	readFilePromise: function (path: string) {
+	readFilePromise: function (path: string): Promise<unknown> {
 		return new Promise((resolve, reject) =>
 			fs.readFile(path, 'utf8', function callback(err, data) {
 				if (err) {
@@ -14,7 +14,10 @@ export default {
 		);
 	},
 
-	writeFilePromise: function (fileName: string, data: any) {
+	writeFilePromise: function (
+		fileName: string,
+		data: string
+	): Promise<unknown> {
 		return new Promise((resolve, reject) =>
 			fs.writeFile(fileName, data, 'utf8', function callback(err) {
 				if (err) {
@@ -26,11 +29,11 @@ export default {
 		);
 	},
 
-	getNodesFromFile: async function (fileName: string) {
-		let nodesJson = (await this.readFilePromise(fileName)) as string;
-		let nodesRaw = JSON.parse(nodesJson);
+	getNodesFromFile: async function (fileName: string): Promise<Node[]> {
+		const nodesJson = (await this.readFilePromise(fileName)) as string;
+		const nodesRaw = JSON.parse(nodesJson);
 
-		return nodesRaw.map((node: {}) => {
+		return nodesRaw.map((node: Record<string, unknown>) => {
 			return Node.fromJSON(node);
 		});
 	}

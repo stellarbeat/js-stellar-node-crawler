@@ -11,22 +11,22 @@ export class PeerNode {
 	public overLoaded = false;
 	public quorumSetHash: string | undefined;
 	public quorumSet: QuorumSet | undefined;
-	public suppliedPeerList: boolean = false;
+	public suppliedPeerList = false;
 	public latestActiveSlotIndex?: string;
 
 	constructor(publicKey: string) {
 		this.publicKey = publicKey;
 	}
 
-	get key() {
+	get key(): string {
 		return this.ip + ':' + this.port;
 	}
 
-	get participatingInSCP() {
+	get participatingInSCP(): boolean {
 		return this.latestActiveSlotIndex !== undefined;
 	}
 
-	get successfullyConnected() {
+	get successfullyConnected(): boolean {
 		return this.ip !== undefined;
 	}
 }

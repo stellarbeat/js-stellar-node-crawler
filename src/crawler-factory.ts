@@ -4,12 +4,15 @@ import * as P from 'pino';
 import { ScpManager } from './scp-manager';
 
 export class CrawlerFactory {
-	static createCrawler(config: CrawlerConfiguration, logger?: P.Logger) {
+	static createCrawler(
+		config: CrawlerConfiguration,
+		logger?: P.Logger
+	): Crawler {
 		if (!logger) {
 			logger = CrawlerFactory.initializeDefaultLogger();
 		}
 
-		let quorumSetManager = new QuorumSetManager(logger);
+		const quorumSetManager = new QuorumSetManager(logger);
 		return new Crawler(
 			config,
 			quorumSetManager,
@@ -18,7 +21,7 @@ export class CrawlerFactory {
 		);
 	}
 
-	static initializeDefaultLogger() {
+	static initializeDefaultLogger(): P.Logger {
 		return P({
 			level: process.env.LOG_LEVEL || 'info',
 			base: undefined

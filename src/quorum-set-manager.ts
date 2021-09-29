@@ -4,6 +4,7 @@ import { Logger } from 'pino';
 import { xdr } from 'stellar-base';
 import { PeerNode } from './peer-node';
 import { CrawlState } from './crawl-state';
+import { err, ok, Result } from 'neverthrow';
 
 type QuorumSetHash = string;
 
@@ -22,8 +23,11 @@ export class QuorumSetManager {
 		peer: PeerNode,
 		scpStatement: xdr.ScpStatement,
 		crawlState: CrawlState
-	) {
-		peer.quorumSetHash = this.getQuorumSetHash(scpStatement);
+	): void {
+		const quorumSetHashResult = this.getQuorumSetHash(scpStatement);
+		if (quorumSetHashResult.isErr()) return;
+
+		peer.quorumSetHash = quorumSetHashResult.value;
 		if (
 			!this.getQuorumSetHashOwners(peer.quorumSetHash, crawlState).has(
 				peer.publicKey
@@ -54,19 +58,19 @@ export class QuorumSetManager {
 		quorumSet: QuorumSet,
 		sender: PublicKey,
 		crawlState: CrawlState
-	) {
+	): void {
 		if (!quorumSet.hashKey) return;
 		crawlState.quorumSets.set(quorumSet.hashKey, quorumSet);
-		let owners = this.getQuorumSetHashOwners(quorumSet.hashKey, crawlState);
+		const owners = this.getQuorumSetHashOwners(quorumSet.hashKey, crawlState);
 
 		owners.forEach((owner) => {
-			let peer = crawlState.peerNodes.get(owner);
+			const peer = crawlState.peerNodes.get(owner);
 			if (peer) peer.quorumSet = quorumSet;
 		});
 		this.clearRequestQuorumSet(sender, crawlState);
 	}
 
-	public connectedToPeerNode(peerNode: PeerNode, crawlState: CrawlState) {
+	public connectedToPeerNode(peerNode: PeerNode, crawlState: CrawlState): void {
 		if (peerNode.quorumSetHash && !peerNode.quorumSet) {
 			this.logger.info(
 				{ hash: peerNode.quorumSetHash, pk: peerNode.publicKey },
@@ -75,7 +79,7 @@ export class QuorumSetManager {
 			crawlState.quorumSetState.quorumSetRequestHashesInProgress.delete(
 				peerNode.quorumSetHash
 			);
-			let runningQuorumSetRequest =
+			const runningQuorumSetRequest =
 				crawlState.quorumSetState.quorumSetRequests.get(peerNode.publicKey);
 			if (runningQuorumSetRequest) {
 				clearTimeout(runningQuorumSetRequest.timeout);
@@ -86,21 +90,27 @@ export class QuorumSetManager {
 		this.processUnknownQuorumSetHashes(crawlState);
 	}
 
-	public peerNodeDisconnected(publicKey: PublicKey, crawlState: CrawlState) {
-		let hash = this.clearRequestQuorumSet(publicKey, crawlState);
+	public peerNodeDisconnected(
+		publicKey: PublicKey,
+		crawlState: CrawlState
+	): void {
+		const hash = this.clearRequestQuorumSet(publicKey, crawlState);
 		if (hash) this.requestQuorumSet(hash, crawlState);
 	}
 
 	public peerNodeDoesNotHaveQuorumSet(
 		publicKey: PublicKey,
 		crawlState: CrawlState
-	) {
-		//todo: donthave sends the quorumsethash in the request hash field
-		let hash = this.clearRequestQuorumSet(publicKey, crawlState);
+	): void {
+		//todo: dont have sends the quorumSetHash in the request hash field
+		const hash = this.clearRequestQuorumSet(publicKey, crawlState);
 		if (hash) this.requestQuorumSet(hash, crawlState);
 	}
 
-	protected requestQuorumSet(quorumSetHash: string, crawlState: CrawlState) {
+	protected requestQuorumSet(
+		quorumSetHash: string,
+		crawlState: CrawlState
+	): void {
 		if (crawlState.quorumSets.has(quorumSetHash)) return;
 
 		if (
@@ -113,25 +123,25 @@ export class QuorumSetManager {
 		}
 
 		this.logger.debug({ hash: quorumSetHash }, 'Requesting quorumSet');
-		let alreadyRequestedTo =
+		const alreadyRequestedToResult =
 			crawlState.quorumSetState.quorumSetRequestedTo.get(quorumSetHash);
-		if (!alreadyRequestedTo) {
-			alreadyRequestedTo = new Set();
-			crawlState.quorumSetState.quorumSetRequestedTo.set(
-				quorumSetHash,
-				alreadyRequestedTo
-			);
-		}
+		const alreadyRequestedTo: Set<string> = alreadyRequestedToResult
+			? alreadyRequestedToResult
+			: new Set();
+		crawlState.quorumSetState.quorumSetRequestedTo.set(
+			quorumSetHash,
+			alreadyRequestedTo
+		);
 
-		let owners = this.getQuorumSetHashOwners(quorumSetHash, crawlState);
-		let quorumSetMessage = xdr.StellarMessage.getScpQuorumset(
+		const owners = this.getQuorumSetHashOwners(quorumSetHash, crawlState);
+		const quorumSetMessage = xdr.StellarMessage.getScpQuorumset(
 			Buffer.from(quorumSetHash, 'base64')
 		);
 
-		let sendRequest = (to: PublicKey) => {
-			let connection = crawlState.openConnections.get(to);
-			if (!connection) return;
-			alreadyRequestedTo!.add(connection.remotePublicKey!);
+		const sendRequest = (to: PublicKey) => {
+			const connection = crawlState.openConnections.get(to);
+			if (!connection || !connection.remotePublicKey) return;
+			alreadyRequestedTo.add(connection.remotePublicKey);
 			crawlState.quorumSetState.quorumSetRequestHashesInProgress.add(
 				quorumSetHash
 			);
@@ -158,8 +168,8 @@ export class QuorumSetManager {
 		};
 
 		//first try the owners of the hashes
-		let notYetRequestedOwnerWithActiveConnection = Array.from(owners.keys())
-			.filter((owner) => !alreadyRequestedTo!.has(owner))
+		const notYetRequestedOwnerWithActiveConnection = Array.from(owners.keys())
+			.filter((owner) => !alreadyRequestedTo.has(owner))
 			.find((owner) => crawlState.openConnections.has(owner));
 		if (notYetRequestedOwnerWithActiveConnection) {
 			sendRequest(notYetRequestedOwnerWithActiveConnection);
@@ -167,11 +177,9 @@ export class QuorumSetManager {
 		}
 
 		//try other open connections
-		let notYetRequestedNonOwnerActiveConnection = Array.from(
+		const notYetRequestedNonOwnerActiveConnection = Array.from(
 			crawlState.openConnections.keys()
-		)
-			//.filter(publicKey => this.getPeer(publicKey)!.participatingInSCP)
-			.find((publicKey) => !alreadyRequestedTo!.has(publicKey));
+		).find((publicKey) => !alreadyRequestedTo.has(publicKey));
 
 		if (notYetRequestedNonOwnerActiveConnection) {
 			sendRequest(notYetRequestedNonOwnerActiveConnection);
@@ -185,16 +193,16 @@ export class QuorumSetManager {
 		crawlState.quorumSetState.unknownQuorumSets.add(quorumSetHash);
 	}
 
-	protected processUnknownQuorumSetHashes(crawlState: CrawlState) {
-		crawlState.quorumSetState.unknownQuorumSets.forEach((qsetHash) => {
-			this.requestQuorumSet(qsetHash, crawlState);
+	protected processUnknownQuorumSetHashes(crawlState: CrawlState): void {
+		crawlState.quorumSetState.unknownQuorumSets.forEach((qSetHash) => {
+			this.requestQuorumSet(qSetHash, crawlState);
 		});
 	}
 
 	protected getQuorumSetHashOwners(
 		quorumSetHash: QuorumSetHash,
 		crawlState: CrawlState
-	) {
+	): Set<string> {
 		let quorumSetHashOwners =
 			crawlState.quorumSetState.quorumSetOwners.get(quorumSetHash);
 		if (!quorumSetHashOwners) {
@@ -208,49 +216,57 @@ export class QuorumSetManager {
 		return quorumSetHashOwners;
 	}
 
-	protected getQuorumSetHash(scpStatement: xdr.ScpStatement) {
-		let quorumSetHash: QuorumSetHash;
-		switch (scpStatement.pledges().switch()) {
-			case xdr.ScpStatementType.scpStExternalize():
-				quorumSetHash = scpStatement
-					.pledges()
-					.externalize()
-					.commitQuorumSetHash()
-					.toString('base64');
-				break;
-			case xdr.ScpStatementType.scpStConfirm():
-				quorumSetHash = scpStatement
-					.pledges()
-					.confirm()
-					.quorumSetHash()
-					.toString('base64');
-				break;
-			case xdr.ScpStatementType.scpStPrepare():
-				quorumSetHash = scpStatement
-					.pledges()
-					.prepare()
-					.quorumSetHash()
-					.toString('base64');
-				break;
-			case xdr.ScpStatementType.scpStNominate():
-				quorumSetHash = scpStatement
-					.pledges()
-					.nominate()
-					.quorumSetHash()
-					.toString('base64');
-				break;
-		}
+	protected getQuorumSetHash(
+		scpStatement: xdr.ScpStatement
+	): Result<QuorumSetHash, Error> {
+		try {
+			let quorumSetHash: QuorumSetHash | undefined;
+			switch (scpStatement.pledges().switch()) {
+				case xdr.ScpStatementType.scpStExternalize():
+					quorumSetHash = scpStatement
+						.pledges()
+						.externalize()
+						.commitQuorumSetHash()
+						.toString('base64');
+					break;
+				case xdr.ScpStatementType.scpStConfirm():
+					quorumSetHash = scpStatement
+						.pledges()
+						.confirm()
+						.quorumSetHash()
+						.toString('base64');
+					break;
+				case xdr.ScpStatementType.scpStPrepare():
+					quorumSetHash = scpStatement
+						.pledges()
+						.prepare()
+						.quorumSetHash()
+						.toString('base64');
+					break;
+				case xdr.ScpStatementType.scpStNominate():
+					quorumSetHash = scpStatement
+						.pledges()
+						.nominate()
+						.quorumSetHash()
+						.toString('base64');
+					break;
+			}
 
-		return quorumSetHash!;
+			if (quorumSetHash) return ok(quorumSetHash);
+			else return err(new Error('Cannot parse quorumSet'));
+		} catch (e) {
+			if (e instanceof Error) return err(e);
+			else return err(new Error('Cannot parse quorumSet'));
+		}
 	}
 
 	protected clearRequestQuorumSet(
 		publicKey: PublicKey,
 		crawlState: CrawlState
-	) {
-		let quorumSetRequest =
+	): QuorumSetHash {
+		const quorumSetRequest =
 			crawlState.quorumSetState.quorumSetRequests.get(publicKey);
-		if (!quorumSetRequest) return;
+		if (!quorumSetRequest) return '';
 		clearTimeout(quorumSetRequest.timeout);
 		crawlState.quorumSetState.quorumSetRequests.delete(publicKey);
 		crawlState.quorumSetState.quorumSetRequestHashesInProgress.delete(
