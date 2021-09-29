@@ -1,17 +1,25 @@
-import {Ledger} from "./crawler";
+import { Ledger } from './crawler';
 
 const MAX_LEDGER_DRIFT = 5; //how many ledgers can a node fall behind
 const MAX_CLOSED_LEDGER_PROCESSING_TIME = 90000; //how long in ms we still process messages of closed ledgers.
 
-export function isLedgerSequenceValid(latestClosedLedger: Ledger, ledgerSequence: bigint) {
-    let latestSequenceDifference = Number(latestClosedLedger.sequence - ledgerSequence);
+export function isLedgerSequenceValid(
+	latestClosedLedger: Ledger,
+	ledgerSequence: bigint
+) {
+	let latestSequenceDifference = Number(
+		latestClosedLedger.sequence - ledgerSequence
+	);
 
-    if (latestSequenceDifference > MAX_LEDGER_DRIFT)
-        return false;//ledger message older than allowed by pure ledger sequence numbers
+	if (latestSequenceDifference > MAX_LEDGER_DRIFT) return false; //ledger message older than allowed by pure ledger sequence numbers
 
-    if (ledgerSequence <= latestClosedLedger.sequence && new Date().getTime() - latestClosedLedger.closeTime.getTime() > MAX_CLOSED_LEDGER_PROCESSING_TIME) {
-        return false;//we only allow for x seconds of processing of closed ledger messages
-    }
+	if (
+		ledgerSequence <= latestClosedLedger.sequence &&
+		new Date().getTime() - latestClosedLedger.closeTime.getTime() >
+			MAX_CLOSED_LEDGER_PROCESSING_TIME
+	) {
+		return false; //we only allow for x seconds of processing of closed ledger messages
+	}
 
-    return true;
+	return true;
 }
