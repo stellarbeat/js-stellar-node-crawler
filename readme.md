@@ -1,3 +1,5 @@
+[![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
+[![test](https://github.com/stellarbeat/js-stellar-node-crawler/actions/workflows/test.yml/badge.svg)](https://github.com/stellarbeat/js-stellar-node-crawler/actions/workflows/test.yml)
 # stellar-js-node-crawler
 
 Crawl the stellar network for nodes
