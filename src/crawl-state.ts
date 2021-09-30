@@ -11,15 +11,7 @@ type PeerKey = string; //ip:port
 export class QuorumSetState {
 	quorumSetOwners: Map<QuorumSetHash, Set<PublicKey>> = new Map();
 	quorumSetRequestedTo: Map<QuorumSetHash, Set<PublicKey>> = new Map();
-	quorumSetRequests: Map<
-		PublicKey,
-		{
-			timeout: NodeJS.Timeout;
-			hash: QuorumSetHash;
-		}
-	> = new Map();
-	quorumSetRequestHashesInProgress: Set<QuorumSetHash> = new Set();
-	unknownQuorumSets: Set<QuorumSetHash> = new Set();
+	quorumSetRequestTimeouts: Map<QuorumSetHash, NodeJS.Timeout> = new Map();
 }
 
 export class CrawlState {

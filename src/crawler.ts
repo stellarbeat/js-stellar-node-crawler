@@ -240,8 +240,6 @@ export class Crawler {
 		crawlState.peerNodes.set(publicKey, peerNode);
 		crawlState.openConnections.set(publicKey, connection);
 
-		this.quorumSetManager.connectedToPeerNode(peerNode, crawlState);
-
 		/*if (!this._nodesThatSuppliedPeerList.has(connection.peer)) { //Most nodes send their peers automatically on successful handshake, better handled with timer.
             this._connectionManager.sendGetPeers(connection);
         }*/
@@ -283,12 +281,15 @@ export class Crawler {
 					xdr.MessageType.getScpQuorumset().value
 				) {
 					this.logger.info(
-						{ pk: connection.remotePublicKey, hash: hash },
+						{
+							pk: connection.remotePublicKey,
+							hash: stellarMessage.dontHave().reqHash().toString('base64')
+						},
 						"Don't have"
 					);
 					if (connection.remotePublicKey)
 						this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(
-							connection.remotePublicKey,
+							stellarMessage.dontHave().reqHash().toString('base64'),
 							crawlState
 						);
 				}
@@ -341,10 +342,6 @@ export class Crawler {
 			if (timeout) clearTimeout(timeout);
 
 			crawlState.openConnections.delete(connection.remotePublicKey);
-			this.quorumSetManager.peerNodeDisconnected(
-				connection.remotePublicKey,
-				crawlState
-			); //just in case a request to this node was happening
 		}
 		this.logger.debug('nodes left in queue: ' + this.crawlQueue.length());
 		crawlQueueTaskDone();

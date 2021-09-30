@@ -15,6 +15,8 @@ type QuorumSetHash = string;
 export class QuorumSetManager {
 	protected logger: Logger;
 
+	static MS_TO_WAIT_FOR_REPLY = 1500;
+
 	constructor(logger: P.Logger) {
 		this.logger = logger;
 	}
@@ -67,44 +69,15 @@ export class QuorumSetManager {
 			const peer = crawlState.peerNodes.get(owner);
 			if (peer) peer.quorumSet = quorumSet;
 		});
-		this.clearRequestQuorumSet(sender, crawlState);
-	}
-
-	public connectedToPeerNode(peerNode: PeerNode, crawlState: CrawlState): void {
-		if (peerNode.quorumSetHash && !peerNode.quorumSet) {
-			this.logger.info(
-				{ hash: peerNode.quorumSetHash, pk: peerNode.publicKey },
-				'Priority request'
-			);
-			crawlState.quorumSetState.quorumSetRequestHashesInProgress.delete(
-				peerNode.quorumSetHash
-			);
-			const runningQuorumSetRequest =
-				crawlState.quorumSetState.quorumSetRequests.get(peerNode.publicKey);
-			if (runningQuorumSetRequest) {
-				clearTimeout(runningQuorumSetRequest.timeout);
-				crawlState.quorumSetState.quorumSetRequests.delete(peerNode.publicKey);
-			}
-			this.requestQuorumSet(peerNode.quorumSetHash, crawlState);
-		}
-		this.processUnknownQuorumSetHashes(crawlState);
-	}
-
-	public peerNodeDisconnected(
-		publicKey: PublicKey,
-		crawlState: CrawlState
-	): void {
-		const hash = this.clearRequestQuorumSet(publicKey, crawlState);
-		if (hash) this.requestQuorumSet(hash, crawlState);
+		this.clearQuorumSetRequestTimeout(sender, crawlState);
 	}
 
 	public peerNodeDoesNotHaveQuorumSet(
-		publicKey: PublicKey,
+		quorumSetHash: QuorumSetHash,
 		crawlState: CrawlState
 	): void {
-		//todo: dont have sends the quorumSetHash in the request hash field
-		const hash = this.clearRequestQuorumSet(publicKey, crawlState);
-		if (hash) this.requestQuorumSet(hash, crawlState);
+		this.clearQuorumSetRequestTimeout(quorumSetHash, crawlState);
+		this.requestQuorumSet(quorumSetHash, crawlState);
 	}
 
 	protected requestQuorumSet(
@@ -113,11 +86,7 @@ export class QuorumSetManager {
 	): void {
 		if (crawlState.quorumSets.has(quorumSetHash)) return;
 
-		if (
-			crawlState.quorumSetState.quorumSetRequestHashesInProgress.has(
-				quorumSetHash
-			)
-		) {
+		if (crawlState.quorumSetState.quorumSetRequestTimeouts.has(quorumSetHash)) {
 			this.logger.debug({ hash: quorumSetHash }, 'Request already in progress');
 			return;
 		}
@@ -142,29 +111,26 @@ export class QuorumSetManager {
 			const connection = crawlState.openConnections.get(to);
 			if (!connection || !connection.remotePublicKey) return;
 			alreadyRequestedTo.add(connection.remotePublicKey);
-			crawlState.quorumSetState.quorumSetRequestHashesInProgress.add(
-				quorumSetHash
-			);
 			this.logger.info(
 				{ hash: quorumSetHash },
 				'Requesting quorumSet from ' + to
 			);
 
 			connection.sendStellarMessage(quorumSetMessage);
-			crawlState.quorumSetState.quorumSetRequests.set(to, {
-				timeout: setTimeout(() => {
+			crawlState.quorumSetState.quorumSetRequestTimeouts.set(
+				quorumSetHash,
+				setTimeout(() => {
 					this.logger.info(
 						{ pk: to, hash: quorumSetHash },
 						'Request timeout reached'
 					);
-					crawlState.quorumSetState.quorumSetRequests.delete(to);
-					crawlState.quorumSetState.quorumSetRequestHashesInProgress.delete(
+					crawlState.quorumSetState.quorumSetRequestTimeouts.delete(
 						quorumSetHash
 					);
+
 					this.requestQuorumSet(quorumSetHash, crawlState);
-				}, 2000),
-				hash: quorumSetHash
-			});
+				}, QuorumSetManager.MS_TO_WAIT_FOR_REPLY)
+			);
 		};
 
 		//first try the owners of the hashes
@@ -190,13 +156,6 @@ export class QuorumSetManager {
 			{ hash: quorumSetHash },
 			'No active connections to request quorumSet from'
 		);
-		crawlState.quorumSetState.unknownQuorumSets.add(quorumSetHash);
-	}
-
-	protected processUnknownQuorumSetHashes(crawlState: CrawlState): void {
-		crawlState.quorumSetState.unknownQuorumSets.forEach((qSetHash) => {
-			this.requestQuorumSet(qSetHash, crawlState);
-		});
 	}
 
 	protected getQuorumSetHashOwners(
@@ -260,19 +219,14 @@ export class QuorumSetManager {
 		}
 	}
 
-	protected clearRequestQuorumSet(
-		publicKey: PublicKey,
+	protected clearQuorumSetRequestTimeout(
+		quorumSetHash: QuorumSetHash,
 		crawlState: CrawlState
-	): QuorumSetHash {
-		const quorumSetRequest =
-			crawlState.quorumSetState.quorumSetRequests.get(publicKey);
-		if (!quorumSetRequest) return '';
-		clearTimeout(quorumSetRequest.timeout);
-		crawlState.quorumSetState.quorumSetRequests.delete(publicKey);
-		crawlState.quorumSetState.quorumSetRequestHashesInProgress.delete(
-			quorumSetRequest.hash
-		);
-
-		return quorumSetRequest.hash;
+	): void {
+		const timeout =
+			crawlState.quorumSetState.quorumSetRequestTimeouts.get(quorumSetHash);
+		if (!timeout) return;
+		clearTimeout(timeout);
+		crawlState.quorumSetState.quorumSetRequestTimeouts.delete(quorumSetHash);
 	}
 }
