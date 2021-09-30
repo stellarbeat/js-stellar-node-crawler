@@ -1,8 +1,8 @@
-const Crawler = require('../lib').Crawler;
 const jsonStorage = require('../lib').jsonStorage;
-const CrawlerFactory = require('../lib').CrawlerFactory;
 const blocked = require('blocked-at');
 const { QuorumSet } = require('@stellarbeat/js-stellar-domain');
+const { createCrawler } = require('../lib');
+const { getConfigFromEnv } = require('@stellarbeat/js-stellar-node-connector');
 
 // noinspection JSIgnoredPromiseFromCall
 main();
@@ -31,8 +31,8 @@ async function main() {
 		'GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ',
 		'GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK'
 	]);
-	let myCrawler = CrawlerFactory.createCrawler({
-		usePublicNetwork: true,
+	let myCrawler = createCrawler({
+		nodeConfig: getConfigFromEnv(),
 		maxOpenConnections: 800
 	});
 

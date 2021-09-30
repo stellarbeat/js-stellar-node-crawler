@@ -1,14 +1,16 @@
 import {
 	Node as NetworkNode,
 	Connection,
-	createSCPEnvelopeSignature
+	createSCPEnvelopeSignature,
+	createNode,
+	getConfigFromEnv
 } from '@stellarbeat/js-stellar-node-connector';
-import { CrawlerFactory } from '../src';
 import { xdr, Keypair, hash, Networks } from 'stellar-base';
 import { QuorumSet } from '@stellarbeat/js-stellar-domain';
 import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
 import { NodeAddress } from '../src/crawler';
 import { ok, Result, err } from 'neverthrow';
+import { createCrawler } from '../src';
 
 jest.setTimeout(10000);
 
@@ -128,10 +130,14 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 		crawledPeerNetworkNode.keyPair.publicKey()
 	]);
 
-	const crawler = CrawlerFactory.createCrawler({
-		usePublicNetwork: true,
-		maxOpenConnections: 20
+	const nodeConfig = getConfigFromEnv();
+	nodeConfig.network = 'test';
+
+	const crawler = createCrawler({
+		maxOpenConnections: 20,
+		nodeConfig: nodeConfig
 	});
+
 	const result = await crawler.crawl([peerNodeAddress], trustedQSet);
 	const peerNode = result.peers.get(peerNetworkNode.keyPair.publicKey());
 	expect(peerNode).toBeDefined();
@@ -193,6 +199,7 @@ function createExternalizeMessage(
 
 function getListeningPeerNode(address: NodeAddress) {
 	const peerNodeConfig: NodeConfig = {
+		network: 'test',
 		nodeInfo: {
 			ledgerVersion: 1,
 			overlayMinVersion: 1,
@@ -204,7 +211,7 @@ function getListeningPeerNode(address: NodeAddress) {
 		receiveSCPMessages: true,
 		receiveTransactionMessages: false
 	};
-	const peerNetworkNode = new NetworkNode(true, peerNodeConfig);
+	const peerNetworkNode = createNode(peerNodeConfig);
 	peerNetworkNode.acceptIncomingConnections(address[1], address[0]);
 
 	return peerNetworkNode;

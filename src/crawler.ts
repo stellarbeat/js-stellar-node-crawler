@@ -4,18 +4,18 @@ import { AsyncResultCallback, queue, QueueObject } from 'async';
 import {
 	Connection,
 	Node as NetworkNode,
-	getConfigFromEnv,
 	getIpFromPeerAddress,
 	getQuorumSetFromMessage
 } from '@stellarbeat/js-stellar-node-connector';
 
-import { hash, xdr } from 'stellar-base';
+import { xdr } from 'stellar-base';
 import { PeerNode } from './peer-node';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
 import { CrawlState } from './crawl-state';
 import { ScpManager } from './scp-manager';
+import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -43,8 +43,8 @@ export interface Ledger {
 }
 
 export interface CrawlerConfiguration {
-	usePublicNetwork: boolean;
 	maxOpenConnections: number; //How many connections can be open at the same time. The higher the number, the faster the crawl
+	nodeConfig: NodeConfig;
 }
 
 /**
@@ -62,6 +62,7 @@ export class Crawler {
 
 	constructor(
 		config: CrawlerConfiguration,
+		node: NetworkNode,
 		quorumSetManager: QuorumSetManager,
 		scpManager: ScpManager,
 		logger: P.Logger
@@ -70,11 +71,7 @@ export class Crawler {
 		this.config = config;
 		this.logger = logger.child({ mod: 'Crawler' });
 		this.quorumSetManager = quorumSetManager;
-		this.crawlerNode = new NetworkNode( //todo inject
-			config.usePublicNetwork,
-			getConfigFromEnv(), //todo: inject crawler config (or maybe crawlerNode itself?);
-			logger
-		);
+		this.crawlerNode = node;
 
 		this.crawlQueue = queue(
 			this.processCrawlPeerNodeInCrawlQueue.bind(this),
