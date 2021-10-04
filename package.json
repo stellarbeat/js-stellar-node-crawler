@@ -1,6 +1,6 @@
 {
   "name": "@stellarbeat/js-stellar-node-crawler",
-  "version": "3.0.0-10",
+  "version": "3.0.0-11",
   "description": "Crawl the network for nodes",
   "repository": {
     "type": "git",
@@ -24,6 +24,8 @@
   "author": "pieterjan84@github",
   "license": "MIT",
   "dependencies": {
+    "@stellarbeat/js-stellar-domain": "^3.0.0-3",
+    "@stellarbeat/js-stellar-node-connector": "^3.3.0",
     "@types/lru-cache": "^5.1.1",
     "@types/pino": "^6.3.11",
     "async": "^3.2.1",
@@ -32,12 +34,10 @@
     "lru-cache": "^6.0.0",
     "neverthrow": "^4.2.2",
     "pino": "^6.13.0",
-    "stellar-base": "^5.3.2",
-    "@stellarbeat/js-stellar-node-connector": "^3.3.0",
-    "@stellarbeat/js-stellar-domain": "^3.0.0-3"
+    "stellar-base": "^5.3.2"
   },
   "devDependencies": {
-   "@types/async": "^3.2.7",
+    "@types/async": "^3.2.7",
     "@types/jest": "^27.0.2",
     "@typescript-eslint/eslint-plugin": "^4.32.0",
     "@typescript-eslint/parser": "^4.32.0",
