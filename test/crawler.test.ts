@@ -125,7 +125,7 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 		console.log('crawled peer server close');
 	});
 
-	const trustedQSet = new QuorumSet('hash', 2, [
+	const trustedQSet = new QuorumSet(2, [
 		peerNetworkNode.keyPair.publicKey(),
 		crawledPeerNetworkNode.keyPair.publicKey()
 	]);

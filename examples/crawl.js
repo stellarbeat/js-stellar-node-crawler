@@ -26,22 +26,32 @@ async function main() {
 	let nodes = await jsonStorage.getNodesFromFile(nodesJsonPath);
 
 	console.log('[MAIN] Crawl!');
-	let qSet = new QuorumSet('hash', 2, [
+	let qSet = new QuorumSet(2, [
 		'GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH',
 		'GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ',
 		'GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK'
 	]);
+
 	let myCrawler = createCrawler({
 		nodeConfig: getConfigFromEnv(),
 		maxOpenConnections: 800
 	});
 
 	try {
+		let knownQuorumSets = new Map();
+		nodes.forEach((node) => {
+			knownQuorumSets.set(node.quorumSetHashKey, node.quorumSet);
+		});
+
 		let result = await myCrawler.crawl(
 			nodes
 				.filter((node) => node.publicKey)
 				.map((node) => [node.ip, node.port]),
-			qSet
+			qSet,
+			{
+				sequence: BigInt(0),
+				closeTime: new Date(0)
+			}
 		);
 		console.log(
 			'[MAIN] Writing results to file nodes.json in directory crawl_result'

@@ -8,7 +8,7 @@ import {
 	getQuorumSetFromMessage
 } from '@stellarbeat/js-stellar-node-connector';
 
-import { xdr } from 'stellar-base';
+import { hash, xdr } from 'stellar-base';
 import { PeerNode } from './peer-node';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
@@ -144,56 +144,43 @@ export class Crawler {
 		crawlQueueTask: CrawlQueueTask,
 		crawlQueueTaskDone: AsyncResultCallback<void>
 	): void {
-		try {
-			const connection = this.crawlerNode.connectTo(
-				crawlQueueTask.nodeAddress[0],
-				crawlQueueTask.nodeAddress[1]
-			);
-			this.logger.info({ peer: connection.remoteAddress }, 'Connecting');
+		const connection = this.crawlerNode.connectTo(
+			crawlQueueTask.nodeAddress[0],
+			crawlQueueTask.nodeAddress[1]
+		);
+		this.logger.info({ peer: connection.remoteAddress }, 'Connecting');
 
-			connection
-				.on('error', (error: Error) => {
-					this.logger.debug(
-						{ peer: connection.remoteAddress },
-						'error: ' + error.message
-					);
-					this.disconnect(connection, crawlQueueTask.crawlState, error);
-				})
-				.on('connect', (publicKey: string, nodeInfo: NodeInfo) =>
-					this.onConnected(
-						connection,
-						publicKey,
-						nodeInfo,
-						crawlQueueTask.crawlState
-					)
-				)
-				.on('data', (stellarMessage: xdr.StellarMessage) =>
-					this.onStellarMessage(
-						connection,
-						stellarMessage,
-						crawlQueueTask.crawlState
-					)
-				)
-				.on('timeout', () => this.onTimeout(connection))
-				.on('close', () =>
-					this.onNodeDisconnected(
-						connection,
-						crawlQueueTask.crawlState,
-						crawlQueueTaskDone
-					)
+		connection
+			.on('error', (error: Error) => {
+				this.logger.debug(
+					{ peer: connection.remoteAddress },
+					'error: ' + error.message
 				);
-		} catch (error) {
-			let msg = 'Error processing peer in crawl queue';
-			if (error instanceof Error) msg = error.message;
-
-			this.logger.error(
-				{
-					peer:
-						crawlQueueTask.nodeAddress[0] + ':' + crawlQueueTask.nodeAddress[1]
-				},
-				msg
+				this.disconnect(connection, crawlQueueTask.crawlState, error);
+			})
+			.on('connect', (publicKey: string, nodeInfo: NodeInfo) =>
+				this.onConnected(
+					connection,
+					publicKey,
+					nodeInfo,
+					crawlQueueTask.crawlState
+				)
+			)
+			.on('data', (stellarMessage: xdr.StellarMessage) =>
+				this.onStellarMessage(
+					connection,
+					stellarMessage,
+					crawlQueueTask.crawlState
+				)
+			)
+			.on('timeout', () => this.onTimeout(connection))
+			.on('close', () =>
+				this.onNodeDisconnected(
+					connection,
+					crawlQueueTask.crawlState,
+					crawlQueueTaskDone
+				)
 			);
-		}
 	}
 
 	protected onTimeout(connection: Connection): void {
@@ -391,6 +378,7 @@ export class Crawler {
 		quorumSetMessage: xdr.ScpQuorumSet,
 		crawlState: CrawlState
 	): void {
+		const quorumSetHash = hash(quorumSetMessage.toXDR()).toString('base64');
 		const quorumSetResult = getQuorumSetFromMessage(quorumSetMessage);
 		if (quorumSetResult.isErr()) {
 			connection.destroy(quorumSetResult.error);
@@ -399,13 +387,14 @@ export class Crawler {
 		this.logger.info(
 			{
 				pk: connection.remotePublicKey,
-				hash: quorumSetResult.value.hashKey
+				hash: quorumSetHash
 			},
 			'QuorumSet received'
 		);
 		if (connection.remotePublicKey)
 			this.quorumSetManager.processQuorumSet(
-				quorumSetResult.value,
+				quorumSetHash,
+				QuorumSet.fromJSON(quorumSetResult.value),
 				connection.remotePublicKey,
 				crawlState
 			);

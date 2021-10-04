@@ -57,13 +57,13 @@ export class QuorumSetManager {
 	}
 
 	public processQuorumSet(
+		quorumSetHash: QuorumSetHash,
 		quorumSet: QuorumSet,
 		sender: PublicKey,
 		crawlState: CrawlState
 	): void {
-		if (!quorumSet.hashKey) return;
-		crawlState.quorumSets.set(quorumSet.hashKey, quorumSet);
-		const owners = this.getQuorumSetHashOwners(quorumSet.hashKey, crawlState);
+		crawlState.quorumSets.set(quorumSetHash, quorumSet);
+		const owners = this.getQuorumSetHashOwners(quorumSetHash, crawlState);
 
 		owners.forEach((owner) => {
 			const peer = crawlState.peerNodes.get(owner);
