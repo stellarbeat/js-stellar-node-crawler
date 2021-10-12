@@ -192,7 +192,9 @@ it('should hit the max crawl limit', async function () {
 			)
 		).toThrowError();
 		// eslint-disable-next-line no-empty
-	} catch (e) {}
+	} catch (e) {
+		console.log(e);
+	}
 });
 
 function createExternalizeMessage(
