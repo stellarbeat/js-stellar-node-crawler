@@ -45,6 +45,19 @@ export interface Ledger {
 export interface CrawlerConfiguration {
 	maxOpenConnections: number; //How many connections can be open at the same time. The higher the number, the faster the crawl
 	nodeConfig: NodeConfig;
+	maxCrawlTime: number; //max nr of ms the crawl will last. Safety guard in case crawler is stuck.
+}
+
+export class CrawlerConfiguration implements CrawlerConfiguration {
+	constructor(
+		public nodeConfig: NodeConfig,
+		public maxOpenConnections = 25,
+		public maxCrawlTime = 900000
+	) {
+		this.nodeConfig = nodeConfig;
+		this.maxOpenConnections = maxOpenConnections;
+		this.maxCrawlTime = maxCrawlTime;
+	}
 }
 
 /**
@@ -105,8 +118,12 @@ export class Crawler {
 			'Starting crawl with seed of ' + nodeAddresses.length + 'addresses.'
 		);
 
-		return await new Promise<CrawlResult>((resolve) => {
+		return await new Promise<CrawlResult>((resolve, reject) => {
+			const maxCrawlTimeout = setTimeout(() => {
+				reject(new Error('Max crawl time hit, closing crawler'));
+			}, this.config.maxCrawlTime);
 			this.crawlQueue.drain(() => {
+				clearTimeout(maxCrawlTimeout);
 				this.wrapUp(resolve, crawlState);
 			}); //when queue is empty, we wrap up the crawl
 			nodeAddresses.forEach((address) =>
@@ -173,9 +190,11 @@ export class Crawler {
 					crawlQueueTask.crawlState
 				)
 			)
-			.on('timeout', () => this.onTimeout(connection))
+			.on('timeout', () =>
+				this.onTimeout(connection, crawlQueueTask.crawlState)
+			)
 			.on('close', () =>
-				this.onNodeDisconnected(
+				this.onConnectionClose(
 					connection,
 					crawlQueueTask.crawlState,
 					crawlQueueTaskDone
@@ -183,9 +202,9 @@ export class Crawler {
 			);
 	}
 
-	protected onTimeout(connection: Connection): void {
+	protected onTimeout(connection: Connection, crawlState: CrawlState): void {
 		this.logger.debug({ peer: connection.remoteAddress }, 'Connection timeout');
-		connection.destroy();
+		this.disconnect(connection, crawlState);
 	}
 
 	protected onConnected(
@@ -209,7 +228,12 @@ export class Crawler {
 				},
 				'PeerNode reusing publicKey on address ' + peerNode.key
 			);
-			connection.destroy();
+
+			this.disconnect(
+				connection,
+				crawlState,
+				new Error('PeerNode reusing publicKey on address ' + peerNode.key)
+			);
 			return; //we don't return this peerNode to consumer of this library
 		}
 
@@ -309,10 +333,14 @@ export class Crawler {
 				break;
 		}
 
-		connection.destroy(new Error(errorMessage.msg().toString()));
+		this.disconnect(
+			connection,
+			crawlState,
+			new Error(errorMessage.msg().toString())
+		);
 	}
 
-	protected onNodeDisconnected(
+	protected onConnectionClose(
 		connection: Connection,
 		crawlState: CrawlState,
 		crawlQueueTaskDone: AsyncResultCallback<void>
@@ -322,10 +350,14 @@ export class Crawler {
 			'Node disconnected'
 		);
 		if (connection.remotePublicKey) {
-			const timeout = crawlState.listenTimeouts.get(connection.remotePublicKey);
-			if (timeout) clearTimeout(timeout);
-
-			crawlState.openConnections.delete(connection.remotePublicKey);
+			const peer = crawlState.peerNodes.get(connection.remotePublicKey);
+			if (peer && peer.key === connection.remoteAddress) {
+				const timeout = crawlState.listenTimeouts.get(
+					connection.remotePublicKey
+				);
+				if (timeout) clearTimeout(timeout);
+				crawlState.openConnections.delete(connection.remotePublicKey);
+			} //if peer.key differs from remoteAddress,then this is a connection to a an ip that reuses a publickey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
 		}
 		this.logger.debug('nodes left in queue: ' + this.crawlQueue.length());
 		crawlQueueTaskDone();
@@ -381,7 +413,7 @@ export class Crawler {
 		const quorumSetHash = hash(quorumSetMessage.toXDR()).toString('base64');
 		const quorumSetResult = getQuorumSetFromMessage(quorumSetMessage);
 		if (quorumSetResult.isErr()) {
-			connection.destroy(quorumSetResult.error);
+			this.disconnect(connection, crawlState, quorumSetResult.error);
 			return;
 		}
 		this.logger.info(
@@ -405,20 +437,23 @@ export class Crawler {
 		crawlState: CrawlState,
 		error?: Error
 	): void {
-		this.logger.debug(
+		this.logger.trace(
 			{
 				peer: connection.remoteAddress,
+				pk: connection.remotePublicKey,
 				error: error?.message
 			},
 			'Disconnecting'
 		);
-		if (connection.remotePublicKey) {
+
+		//destroy should always trigger close event, where connection cleanup already happens
+		/*if (connection.remotePublicKey) {
 			crawlState.openConnections.delete(connection.remotePublicKey); //we don't want to send any more commands
 			const timeout = crawlState.listenTimeouts.get(connection.remotePublicKey);
 			if (timeout) clearTimeout(timeout);
-		}
+		}*/
 
-		connection.destroy(error);
+		connection.destroy();
 	}
 
 	protected listenFurther(peer: PeerNode, timeoutCounter = 0): boolean {

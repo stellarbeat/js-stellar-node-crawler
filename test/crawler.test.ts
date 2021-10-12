@@ -8,7 +8,7 @@ import {
 import { xdr, Keypair, hash, Networks } from 'stellar-base';
 import { QuorumSet } from '@stellarbeat/js-stellar-domain';
 import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
-import { NodeAddress } from '../src/crawler';
+import { CrawlerConfiguration, NodeAddress } from '../src/crawler';
 import { ok, Result, err } from 'neverthrow';
 import { createCrawler } from '../src';
 
@@ -20,12 +20,20 @@ let peerNetworkNode: NetworkNode;
 let crawledPeerNetworkNode: NetworkNode;
 let crawledPeerNodeAddress: NodeAddress;
 
+let publicKeyReusingPeerNodeAddress: NodeAddress;
+let publicKeyReusingPeerNetworkNode: NetworkNode;
+
 let qSet: xdr.ScpQuorumSet;
 beforeAll(() => {
 	peerNodeAddress = ['127.0.0.1', 11621];
 	peerNetworkNode = getListeningPeerNode(peerNodeAddress);
 	crawledPeerNodeAddress = ['127.0.0.1', 11622];
 	crawledPeerNetworkNode = getListeningPeerNode(crawledPeerNodeAddress);
+	publicKeyReusingPeerNodeAddress = ['127.0.0.1', 11623];
+	publicKeyReusingPeerNetworkNode = getListeningPeerNode(
+		publicKeyReusingPeerNodeAddress,
+		peerNetworkNode.keyPair.secret()
+	);
 	qSet = new xdr.ScpQuorumSet({
 		threshold: 1,
 		validators: [
@@ -49,6 +57,7 @@ afterAll((done) => {
 	};
 	peerNetworkNode.stopAcceptingIncomingConnections(cleanup);
 	crawledPeerNetworkNode.stopAcceptingIncomingConnections(cleanup);
+	publicKeyReusingPeerNetworkNode.stopAcceptingIncomingConnections(cleanup);
 });
 
 it('should crawl, listen for validating nodes and harvest quorumSets', async () => {
@@ -133,12 +142,12 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 	const nodeConfig = getConfigFromEnv();
 	nodeConfig.network = 'test';
 
-	const crawler = createCrawler({
-		maxOpenConnections: 20,
-		nodeConfig: nodeConfig
-	});
+	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig));
 
-	const result = await crawler.crawl([peerNodeAddress], trustedQSet);
+	const result = await crawler.crawl(
+		[peerNodeAddress, publicKeyReusingPeerNodeAddress],
+		trustedQSet
+	);
 	const peerNode = result.peers.get(peerNetworkNode.keyPair.publicKey());
 	expect(peerNode).toBeDefined();
 	if (!peerNode) return;
@@ -162,6 +171,28 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 	expect(crawledPeerNode.isValidating).toBeTruthy();
 	expect(crawledPeerNode.participatingInSCP).toBeTruthy();
 	expect(crawledPeerNode.latestActiveSlotIndex).toEqual('1');
+});
+
+it('should hit the max crawl limit', async function () {
+	const trustedQSet = new QuorumSet(2, [
+		peerNetworkNode.keyPair.publicKey(),
+		crawledPeerNetworkNode.keyPair.publicKey()
+	]);
+
+	const nodeConfig = getConfigFromEnv();
+	nodeConfig.network = 'test';
+
+	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig, 25, 1));
+
+	try {
+		expect(
+			await crawler.crawl(
+				[peerNodeAddress, publicKeyReusingPeerNodeAddress],
+				trustedQSet
+			)
+		).toThrowError();
+		// eslint-disable-next-line no-empty
+	} catch (e) {}
 });
 
 function createExternalizeMessage(
@@ -197,7 +228,7 @@ function createExternalizeMessage(
 	return err(signatureResult.error);
 }
 
-function getListeningPeerNode(address: NodeAddress) {
+function getListeningPeerNode(address: NodeAddress, privateKey?: string) {
 	const peerNodeConfig: NodeConfig = {
 		network: 'test',
 		nodeInfo: {
@@ -207,7 +238,7 @@ function getListeningPeerNode(address: NodeAddress) {
 			versionString: '1'
 		},
 		listeningPort: address[1],
-		privateKey: Keypair.random().secret(),
+		privateKey: privateKey ? privateKey : Keypair.random().secret(),
 		receiveSCPMessages: true,
 		receiveTransactionMessages: false
 	};
