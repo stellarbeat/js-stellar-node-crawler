@@ -24,7 +24,7 @@ let publicKeyReusingPeerNodeAddress: NodeAddress;
 let publicKeyReusingPeerNetworkNode: NetworkNode;
 
 let qSet: xdr.ScpQuorumSet;
-beforeAll(() => {
+beforeEach(() => {
 	peerNodeAddress = ['127.0.0.1', 11621];
 	peerNetworkNode = getListeningPeerNode(peerNodeAddress);
 	crawledPeerNodeAddress = ['127.0.0.1', 11622];
@@ -46,7 +46,7 @@ beforeAll(() => {
 	});
 });
 
-afterAll((done) => {
+afterEach((done) => {
 	let counter = 0;
 
 	const cleanup = () => {
