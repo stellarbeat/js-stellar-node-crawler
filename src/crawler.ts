@@ -120,11 +120,15 @@ export class Crawler {
 
 		return await new Promise<CrawlResult>((resolve, reject) => {
 			const maxCrawlTimeout = setTimeout(() => {
-				reject(new Error('Max crawl time hit, closing crawler'));
+				this.logger.fatal('Max crawl time hit, closing all connections');
+				crawlState.openConnections.forEach((connection) =>
+					this.disconnect(connection, crawlState)
+				);
+				crawlState.maxCrawlTimeHit = true;
 			}, this.config.maxCrawlTime);
 			this.crawlQueue.drain(() => {
 				clearTimeout(maxCrawlTimeout);
-				this.wrapUp(resolve, crawlState);
+				this.wrapUp(resolve, reject, crawlState);
 			}); //when queue is empty, we wrap up the crawl
 			nodeAddresses.forEach((address) =>
 				this.crawlPeerNode(address, crawlState)
@@ -507,8 +511,10 @@ export class Crawler {
 
 	protected wrapUp(
 		resolve: (value: CrawlResult | PromiseLike<CrawlResult>) => void,
+		reject: (error: Error) => void,
 		crawlState: CrawlState
 	): void {
+		//todo: close quorumset requests
 		this.logger.info('processed all items in queue');
 		this.logger.info('Finished with all nodes');
 		this.logger.info(
@@ -533,6 +539,7 @@ export class Crawler {
 					(node) => node.overLoaded
 				).length
 		);
+
 		this.logger.info(
 			'Closed ledgers: ' + crawlState.slots.getClosedSlotIndexes().length
 		);
@@ -543,6 +550,9 @@ export class Crawler {
 		);
 
 		console.timeEnd('crawl');
+
+		if (crawlState.maxCrawlTimeHit)
+			reject(new Error('Max crawl time hit, closing crawler'));
 
 		resolve({
 			peers: crawlState.peerNodes,

@@ -15,6 +15,7 @@ export class QuorumSetState {
 }
 
 export class CrawlState {
+	maxCrawlTimeHit = false;
 	openConnections: Map<PublicKey, Connection> = new Map<
 		PublicKey,
 		Connection
