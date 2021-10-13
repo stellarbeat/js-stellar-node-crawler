@@ -11,7 +11,14 @@ type PeerKey = string; //ip:port
 export class QuorumSetState {
 	quorumSetOwners: Map<QuorumSetHash, Set<PublicKey>> = new Map();
 	quorumSetRequestedTo: Map<QuorumSetHash, Set<PublicKey>> = new Map();
-	quorumSetRequestTimeouts: Map<QuorumSetHash, NodeJS.Timeout> = new Map();
+	quorumSetHashesInProgress: Set<QuorumSetHash> = new Set();
+	quorumSetRequests: Map<
+		PublicKey,
+		{
+			timeout: NodeJS.Timeout;
+			hash: QuorumSetHash;
+		}
+	> = new Map();
 }
 
 export class CrawlState {
@@ -21,7 +28,7 @@ export class CrawlState {
 		Connection
 	>();
 	peerNodes: Map<PublicKey, PeerNode> = new Map<PublicKey, PeerNode>();
-	quorumSets: Map<QuorumSetHash, QuorumSet>;
+	quorumSets: Map<string, QuorumSet>;
 	crawledNodeAddresses: Set<PeerKey> = new Set();
 	latestClosedLedger: Ledger = {
 		sequence: BigInt(0),
@@ -34,7 +41,7 @@ export class CrawlState {
 
 	constructor(
 		topTierQuorumSet: QuorumSet,
-		quorumSets: Map<QuorumSetHash, QuorumSet>,
+		quorumSets: Map<string, QuorumSet>,
 		latestClosedLedger: Ledger
 	) {
 		this.quorumSets = quorumSets;

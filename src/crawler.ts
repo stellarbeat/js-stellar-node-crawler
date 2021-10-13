@@ -280,7 +280,7 @@ export class Crawler {
 			case xdr.MessageType.scpQuorumset():
 				this.onQuorumSetReceived(connection, stellarMessage.qSet(), crawlState);
 				break;
-			case xdr.MessageType.dontHave():
+			case xdr.MessageType.dontHave(): {
 				this.logger.info(
 					{
 						pk: connection.remotePublicKey,
@@ -299,13 +299,16 @@ export class Crawler {
 						},
 						"Don't have"
 					);
-					if (connection.remotePublicKey)
+					if (connection.remotePublicKey) {
 						this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(
+							connection.remotePublicKey,
 							stellarMessage.dontHave().reqHash().toString('base64'),
 							crawlState
 						);
+					}
 				}
 				break;
+			}
 			case xdr.MessageType.errorMsg():
 				this.onStellarMessageErrorReceived(
 					connection,
@@ -354,6 +357,10 @@ export class Crawler {
 			'Node disconnected'
 		);
 		if (connection.remotePublicKey) {
+			this.quorumSetManager.onNodeDisconnected(
+				connection.remotePublicKey,
+				crawlState
+			);
 			const peer = crawlState.peerNodes.get(connection.remotePublicKey);
 			if (peer && peer.key === connection.remoteAddress) {
 				const timeout = crawlState.listenTimeouts.get(
@@ -514,7 +521,6 @@ export class Crawler {
 		reject: (error: Error) => void,
 		crawlState: CrawlState
 	): void {
-		//todo: close quorumset requests
 		this.logger.info('processed all items in queue');
 		this.logger.info('Finished with all nodes');
 		this.logger.info(

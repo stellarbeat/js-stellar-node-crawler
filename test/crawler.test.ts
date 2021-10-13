@@ -185,14 +185,13 @@ it('should hit the max crawl limit', async function () {
 	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig, 25, 1000));
 
 	try {
-		await crawler.crawl(
-			[peerNodeAddress, publicKeyReusingPeerNodeAddress],
-			trustedQSet
-		);
-
-		// eslint-disable-next-line no-empty
+		expect(
+			await crawler.crawl(
+				[peerNodeAddress, publicKeyReusingPeerNodeAddress],
+				trustedQSet
+			)
+		).toThrowError();
 	} catch (e) {
-		console.log(e);
 		expect(e).toBeInstanceOf(Error);
 	}
 });
