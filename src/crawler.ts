@@ -52,7 +52,7 @@ export class CrawlerConfiguration implements CrawlerConfiguration {
 	constructor(
 		public nodeConfig: NodeConfig,
 		public maxOpenConnections = 25,
-		public maxCrawlTime = 900000
+		public maxCrawlTime = 1800000
 	) {
 		this.nodeConfig = nodeConfig;
 		this.maxOpenConnections = maxOpenConnections;
@@ -71,7 +71,7 @@ export class Crawler {
 	protected config: CrawlerConfiguration;
 	protected crawlQueue: QueueObject<CrawlQueueTask>;
 
-	protected static readonly SCP_LISTEN_TIMEOUT = 5000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
+	protected static readonly SCP_LISTEN_TIMEOUT = 6000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
 
 	constructor(
 		config: CrawlerConfiguration,
@@ -469,7 +469,7 @@ export class Crawler {
 
 	protected listenFurther(peer: PeerNode, timeoutCounter = 0): boolean {
 		if (timeoutCounter === 0) return true; //everyone gets a first listen. If it is already confirmed validating, we can still use it to request unknown quorumSets from.
-		if (timeoutCounter >= 20) return false; //we wait for 100 seconds max if node is trying to reach consensus.
+		if (timeoutCounter >= 17) return false; //we wait for 100 seconds max (maxCounter = 100 / SCP_TIMEOUT)if node is trying to reach consensus.
 		if (peer.isValidatingIncorrectValues) return false;
 		if (!peer.participatingInSCP) return false; //watcher node
 		if (peer.isValidating && peer.quorumSet)
