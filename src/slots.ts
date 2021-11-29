@@ -59,7 +59,7 @@ export class Slot {
 
 		if (this.closed()) return;
 
-		if (this.trustedQuorumSet.validators.includes(nodeId)) {
+		if (QuorumSet.getAllValidators(this.trustedQuorumSet).includes(nodeId)) {
 			if (this.logger) {
 				this.logger.debug(
 					'Node part of trusted quorumSet, attempting slot close',

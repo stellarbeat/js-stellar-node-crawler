@@ -46,7 +46,7 @@ export class QuorumSetManager {
 		) {
 			this.logger.debug(
 				{ pk: peer.publicKey, hash: peer.quorumSetHash },
-				'Detected new quorumSetHash'
+				'Detected quorumSetHash'
 			);
 		}
 
