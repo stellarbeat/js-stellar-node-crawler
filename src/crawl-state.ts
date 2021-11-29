@@ -4,6 +4,7 @@ import { PeerNode } from './peer-node';
 import { Ledger } from './crawler';
 import { Slots } from './slots';
 import * as LRUCache from 'lru-cache';
+import * as P from 'pino';
 
 type QuorumSetHash = string;
 type PeerKey = string; //ip:port
@@ -42,11 +43,12 @@ export class CrawlState {
 	constructor(
 		topTierQuorumSet: QuorumSet,
 		quorumSets: Map<string, QuorumSet>,
-		latestClosedLedger: Ledger
+		latestClosedLedger: Ledger,
+		protected logger: P.Logger
 	) {
 		this.quorumSets = quorumSets;
 		this.latestClosedLedger = latestClosedLedger;
-		this.slots = new Slots(topTierQuorumSet);
+		this.slots = new Slots(topTierQuorumSet, logger);
 		this.envelopeCache = new LRUCache<string, number>(5000);
 	}
 }

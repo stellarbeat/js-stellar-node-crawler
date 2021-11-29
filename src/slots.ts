@@ -1,5 +1,6 @@
 import containsSlice from '@stellarbeat/js-stellar-domain/lib/quorum/containsSlice';
 import { QuorumSet } from '@stellarbeat/js-stellar-domain';
+import * as P from 'pino';
 
 type SlotIndex = bigint;
 type NodeId = string;
@@ -11,7 +12,11 @@ export class Slot {
 	protected valuesMap: Map<SlotValue, Set<NodeId>> = new Map();
 	protected trustedQuorumSet: QuorumSet;
 
-	constructor(index: SlotIndex, trustedQuorumSet: QuorumSet) {
+	constructor(
+		index: SlotIndex,
+		trustedQuorumSet: QuorumSet,
+		protected logger: P.Logger
+	) {
 		this.index = index;
 		this.trustedQuorumSet = trustedQuorumSet;
 	}
@@ -40,23 +45,31 @@ export class Slot {
 	}
 
 	addExternalizeValue(nodeId: NodeId, value: SlotValue): void {
-		let nodes = this.valuesMap.get(value);
-		if (!nodes) {
-			nodes = new Set();
-			this.valuesMap.set(value, nodes);
+		let nodesThatExternalizedValue = this.valuesMap.get(value);
+		if (!nodesThatExternalizedValue) {
+			nodesThatExternalizedValue = new Set();
+			this.valuesMap.set(value, nodesThatExternalizedValue);
 		}
 
-		if (nodes.has(nodeId))
+		if (nodesThatExternalizedValue.has(nodeId))
 			//already recorded, no need to check if closed
 			return;
 
-		nodes.add(nodeId);
+		nodesThatExternalizedValue.add(nodeId);
 
 		if (this.closed()) return;
 
-		if (containsSlice(this.trustedQuorumSet, nodes))
-			//try to close slot
-			this.externalizedValue = value;
+		if (this.trustedQuorumSet.validators.includes(nodeId)) {
+			if (this.logger) {
+				this.logger.debug(
+					'Node part of trusted quorumSet, attempting slot close',
+					{ node: nodeId }
+				);
+			}
+			if (containsSlice(this.trustedQuorumSet, nodesThatExternalizedValue))
+				//try to close slot
+				this.externalizedValue = value;
+		}
 	}
 
 	closed(): boolean {
@@ -68,14 +81,14 @@ export class Slots {
 	protected slots: Map<SlotIndex, Slot> = new Map<SlotIndex, Slot>();
 	protected trustedQuorumSet: QuorumSet;
 
-	constructor(trustedQuorumSet: QuorumSet) {
+	constructor(trustedQuorumSet: QuorumSet, protected logger: P.Logger) {
 		this.trustedQuorumSet = trustedQuorumSet;
 	}
 
 	public getSlot(slotIndex: SlotIndex): Slot {
 		let slot = this.slots.get(slotIndex);
 		if (!slot) {
-			slot = new Slot(slotIndex, this.trustedQuorumSet);
+			slot = new Slot(slotIndex, this.trustedQuorumSet, this.logger);
 			this.slots.set(slotIndex, slot);
 		}
 

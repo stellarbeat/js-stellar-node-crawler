@@ -112,7 +112,8 @@ export class Crawler {
 		const crawlState = new CrawlState(
 			topTierQuorumSet,
 			quorumSets,
-			latestClosedLedger
+			latestClosedLedger,
+			this.logger
 		); //todo dependency inversion?
 		this.logger.info(
 			'Starting crawl with seed of ' + nodeAddresses.length + 'addresses.'
@@ -368,7 +369,7 @@ export class Crawler {
 				);
 				if (timeout) clearTimeout(timeout);
 				crawlState.openConnections.delete(connection.remotePublicKey);
-			} //if peer.key differs from remoteAddress,then this is a connection to a an ip that reuses a publickey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
+			} //if peer.key differs from remoteAddress,then this is a connection to a an ip that reuses a publicKey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
 		}
 		this.logger.debug('nodes left in queue: ' + this.crawlQueue.length());
 		crawlQueueTaskDone();
