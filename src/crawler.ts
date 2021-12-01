@@ -170,7 +170,7 @@ export class Crawler {
 			crawlQueueTask.nodeAddress[0],
 			crawlQueueTask.nodeAddress[1]
 		);
-		this.logger.info({ peer: connection.remoteAddress }, 'Connecting');
+		this.logger.debug({ peer: connection.remoteAddress }, 'Connecting');
 
 		connection
 			.on('error', (error: Error) => {
