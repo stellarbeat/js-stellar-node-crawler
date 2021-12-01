@@ -35,7 +35,7 @@ async function main() {
 	let myCrawler = createCrawler({
 		nodeConfig: getConfigFromEnv(),
 		maxOpenConnections: 25,
-		maxCrawlTime: 90000
+		maxCrawlTime: 900000
 	});
 
 	try {

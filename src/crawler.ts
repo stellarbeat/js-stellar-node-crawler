@@ -371,31 +371,14 @@ export class Crawler {
 				if (timeout) clearTimeout(timeout);
 				crawlState.openConnections.delete(connection.remotePublicKey);
 			} //if peer.key differs from remoteAddress,then this is a connection to a an ip that reuses a publicKey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
-
-			if (peer) {
-				this.logger.info({
-					ip: connection.remoteAddress,
-					pk: connection.remotePublicKey,
-					connected: peer.successfullyConnected,
-					scp: peer.participatingInSCP,
-					validating: peer.isValidating,
-					overLoaded: peer.overLoaded,
-					leftInQueue: this.crawlQueue.length()
-				});
-			} else {
-				this.logger.info({
-					ip: connection.remoteAddress,
-					pk: connection.remotePublicKey,
-					connected: false,
-					leftInQueue: this.crawlQueue.length()
-				});
-			}
 		} else {
-			this.logger.info({
-				ip: connection.remoteAddress,
-				connected: false,
-				leftInQueue: this.crawlQueue.length()
-			});
+			this.logger.info(
+				{
+					ip: connection.remoteAddress,
+					leftInQueue: this.crawlQueue.length()
+				},
+				'handshake failed'
+			);
 		}
 		this.logger.debug('nodes left in queue: ' + this.crawlQueue.length());
 		crawlQueueTaskDone();
@@ -548,8 +531,17 @@ export class Crawler {
 		reject: (error: Error) => void,
 		crawlState: CrawlState
 	): void {
-		this.logger.info('processed all items in queue');
-		this.logger.info('Finished with all nodes');
+		crawlState.peerNodes.forEach((peer) => {
+			this.logger.info({
+				ip: peer.key,
+				pk: peer.publicKey,
+				connected: peer.successfullyConnected,
+				scp: peer.participatingInSCP,
+				validating: peer.isValidating,
+				overLoaded: peer.overLoaded
+			});
+		});
+		this.logger.info('processed all nodes in queue');
 		this.logger.info(
 			'Connection attempts: ' + crawlState.crawledNodeAddresses.size
 		);
