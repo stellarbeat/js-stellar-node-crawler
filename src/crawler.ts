@@ -372,7 +372,8 @@ export class Crawler {
 				crawlState.openConnections.delete(connection.remotePublicKey);
 			} //if peer.key differs from remoteAddress,then this is a connection to a an ip that reuses a publicKey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
 		} else {
-			this.logger.info(
+			crawlState.failedConnections.push(connection.remoteAddress);
+			this.logger.debug(
 				{
 					ip: connection.remoteAddress,
 					leftInQueue: this.crawlQueue.length()
@@ -380,7 +381,10 @@ export class Crawler {
 				'handshake failed'
 			);
 		}
-		this.logger.debug('nodes left in queue: ' + this.crawlQueue.length());
+		if (this.crawlQueue.length() !== 0 && this.crawlQueue.length() % 50 === 0) {
+			this.logger.info('nodes left in queue: ' + this.crawlQueue.length());
+		}
+
 		crawlQueueTaskDone();
 	}
 
@@ -531,6 +535,10 @@ export class Crawler {
 		reject: (error: Error) => void,
 		crawlState: CrawlState
 	): void {
+		this.logger.info(
+			{ peers: crawlState.failedConnections },
+			'Failed connections'
+		);
 		crawlState.peerNodes.forEach((peer) => {
 			this.logger.info({
 				ip: peer.key,

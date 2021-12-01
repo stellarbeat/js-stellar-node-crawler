@@ -39,6 +39,7 @@ export class CrawlState {
 	slots: Slots;
 	envelopeCache: LRUCache<string, number>;
 	quorumSetState: QuorumSetState = new QuorumSetState();
+	failedConnections: string[] = [];
 
 	constructor(
 		topTierQuorumSet: QuorumSet,
