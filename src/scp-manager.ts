@@ -114,7 +114,7 @@ export class ScpManager {
 
 		const markNodeAsValidating = (peer: PeerNode) => {
 			if (!peer.isValidating) {
-				this.logger.info(
+				this.logger.debug(
 					{
 						pk: peer.publicKey
 					},

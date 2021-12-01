@@ -218,7 +218,7 @@ export class Crawler {
 		nodeInfo: NodeInfo,
 		crawlState: CrawlState
 	): void {
-		this.logger.info(
+		this.logger.debug(
 			{ peer: connection.remoteAddress, pk: publicKey },
 			'Connected'
 		);
@@ -226,7 +226,7 @@ export class Crawler {
 		let peerNode = crawlState.peerNodes.get(publicKey);
 		if (peerNode && peerNode.successfullyConnected) {
 			//this public key is already used in this crawl! A node is not allowed to reuse public keys. Disconnecting.
-			this.logger.error(
+			this.logger.info(
 				{
 					peer: connection.remoteAddress,
 					pk: publicKey
@@ -353,10 +353,11 @@ export class Crawler {
 		crawlState: CrawlState,
 		crawlQueueTaskDone: AsyncResultCallback<void>
 	): void {
-		this.logger.info(
+		this.logger.debug(
 			{ pk: connection.remotePublicKey, peer: connection.remoteAddress },
 			'Node disconnected'
 		);
+
 		if (connection.remotePublicKey) {
 			this.quorumSetManager.onNodeDisconnected(
 				connection.remotePublicKey,
@@ -370,6 +371,31 @@ export class Crawler {
 				if (timeout) clearTimeout(timeout);
 				crawlState.openConnections.delete(connection.remotePublicKey);
 			} //if peer.key differs from remoteAddress,then this is a connection to a an ip that reuses a publicKey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
+
+			if (peer) {
+				this.logger.info({
+					ip: connection.remoteAddress,
+					pk: connection.remotePublicKey,
+					connected: peer.successfullyConnected,
+					scp: peer.participatingInSCP,
+					validating: peer.isValidating,
+					overLoaded: peer.overLoaded,
+					leftInQueue: this.crawlQueue.length()
+				});
+			} else {
+				this.logger.info({
+					ip: connection.remoteAddress,
+					pk: connection.remotePublicKey,
+					connected: false,
+					leftInQueue: this.crawlQueue.length()
+				});
+			}
+		} else {
+			this.logger.info({
+				ip: connection.remoteAddress,
+				connected: false,
+				leftInQueue: this.crawlQueue.length()
+			});
 		}
 		this.logger.debug('nodes left in queue: ' + this.crawlQueue.length());
 		crawlQueueTaskDone();
@@ -405,7 +431,7 @@ export class Crawler {
 		connection: Connection,
 		crawlState: CrawlState
 	): void {
-		this.logger.info(
+		this.logger.debug(
 			{ peer: connection.remoteAddress },
 			'Load too high message received'
 		);
