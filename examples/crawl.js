@@ -8,13 +8,6 @@ const { getConfigFromEnv } = require('@stellarbeat/js-stellar-node-connector');
 main();
 
 async function main() {
-	blocked(
-		(time, stack) => {
-			console.log(`Blocked for ${time}ms, operation started here:`, stack);
-		},
-		{ trimFalsePositives: true }
-	);
-
 	if (process.argv.length <= 2) {
 		console.log('Usage: ' + __filename + ' NODES.JSON_PATH ');
 
@@ -26,7 +19,7 @@ async function main() {
 	let nodes = await jsonStorage.getNodesFromFile(nodesJsonPath);
 
 	console.log('[MAIN] Crawl!');
-	let qSet = new QuorumSet(2, [
+	let trustedQSet = new QuorumSet(2, [
 		'GCGB2S2KGYARPVIA37HYZXVRM2YZUEXA6S33ZU5BUDC6THSB62LZSTYH',
 		'GABMKJM6I25XI4K7U6XWMULOUQIQ27BCTMLS6BYYSOWKTBUXVRJSXHYQ',
 		'GCM6QMP3DLRPTAZW2UZPCPX2LF3SXWXKPMP3GKFZBDSF3QZGV2G5QSTK'
@@ -48,7 +41,7 @@ async function main() {
 			nodes
 				.filter((node) => node.publicKey)
 				.map((node) => [node.ip, node.port]),
-			qSet,
+			trustedQSet,
 			{
 				sequence: BigInt(0),
 				closeTime: new Date(0)
