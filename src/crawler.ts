@@ -16,6 +16,7 @@ import { QuorumSetManager } from './quorum-set-manager';
 import { CrawlState } from './crawl-state';
 import { ScpManager } from './scp-manager';
 import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
+import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -188,13 +189,15 @@ export class Crawler {
 					crawlQueueTask.crawlState
 				)
 			)
-			.on('data', (stellarMessage: xdr.StellarMessage) =>
+			.on('data', (stellarMessageWork: StellarMessageWork) => {
 				this.onStellarMessage(
 					connection,
-					stellarMessage,
+					stellarMessageWork.stellarMessage,
 					crawlQueueTask.crawlState
-				)
-			)
+				);
+
+				stellarMessageWork.done();
+			})
 			.on('timeout', () =>
 				this.onTimeout(connection, crawlQueueTask.crawlState)
 			)

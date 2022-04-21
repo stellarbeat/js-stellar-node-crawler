@@ -11,6 +11,7 @@ import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-conf
 import { CrawlerConfiguration, NodeAddress } from '../src/crawler';
 import { ok, Result, err } from 'neverthrow';
 import { createCrawler } from '../src';
+import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 
 jest.setTimeout(10000);
 
@@ -77,7 +78,8 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 				});
 			} else console.log(externalizeResult.error);
 		});
-		connection.on('data', (stellarMessage: xdr.StellarMessage) => {
+		connection.on('data', (stellarMessageWork: StellarMessageWork) => {
+			const stellarMessage = stellarMessageWork.stellarMessage;
 			switch (stellarMessage.switch()) {
 				case xdr.MessageType.getScpQuorumset(): {
 					const dontHave = new xdr.DontHave({
@@ -113,7 +115,8 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 				});
 			}
 		});
-		connection.on('data', (stellarMessage: xdr.StellarMessage) => {
+		connection.on('data', (stellarMessageWork: StellarMessageWork) => {
+			const stellarMessage = stellarMessageWork.stellarMessage;
 			switch (stellarMessage.switch()) {
 				case xdr.MessageType.getScpQuorumset(): {
 					const qSetMessage = xdr.StellarMessage.scpQuorumset(qSet);
@@ -235,13 +238,14 @@ function getListeningPeerNode(address: NodeAddress, privateKey?: string) {
 		nodeInfo: {
 			ledgerVersion: 1,
 			overlayMinVersion: 1,
-			overlayVersion: 1,
+			overlayVersion: 20,
 			versionString: '1'
 		},
 		listeningPort: address[1],
 		privateKey: privateKey ? privateKey : Keypair.random().secret(),
 		receiveSCPMessages: true,
-		receiveTransactionMessages: false
+		receiveTransactionMessages: false,
+		maxFloodMessageCapacity: 200
 	};
 	const peerNetworkNode = createNode(peerNodeConfig);
 	peerNetworkNode.acceptIncomingConnections(address[1], address[0]);
