@@ -25,7 +25,7 @@
   "license": "MIT",
   "dependencies": {
     "@stellarbeat/js-stellar-domain": "^3.3.1",
-    "@stellarbeat/js-stellar-node-connector": "^4.0.0-1",
+    "@stellarbeat/js-stellar-node-connector": "^4.0.0-2",
     "@types/lru-cache": "^5.1.1",
     "@types/pino": "^6.3.11",
     "async": "^3.2.1",
