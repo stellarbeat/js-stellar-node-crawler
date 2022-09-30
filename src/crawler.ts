@@ -47,17 +47,16 @@ export interface CrawlerConfiguration {
 	maxOpenConnections: number; //How many connections can be open at the same time. The higher the number, the faster the crawl
 	nodeConfig: NodeConfig;
 	maxCrawlTime: number; //max nr of ms the crawl will last. Safety guard in case crawler is stuck.
+	blackList: Set<PublicKey>;
 }
 
 export class CrawlerConfiguration implements CrawlerConfiguration {
 	constructor(
 		public nodeConfig: NodeConfig,
 		public maxOpenConnections = 25,
-		public maxCrawlTime = 1800000
+		public maxCrawlTime = 1800000,
+		public blackList = new Set<PublicKey>()
 	) {
-		this.nodeConfig = nodeConfig;
-		this.maxOpenConnections = maxOpenConnections;
-		this.maxCrawlTime = maxCrawlTime;
 	}
 }
 
@@ -71,6 +70,7 @@ export class Crawler {
 	protected logger: P.Logger;
 	protected config: CrawlerConfiguration;
 	protected crawlQueue: QueueObject<CrawlQueueTask>;
+	protected blackList: Set<PublicKey>;
 
 	protected static readonly SCP_LISTEN_TIMEOUT = 6000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
 
@@ -86,6 +86,7 @@ export class Crawler {
 		this.logger = logger.child({ mod: 'Crawler' });
 		this.quorumSetManager = quorumSetManager;
 		this.crawlerNode = node;
+		this.blackList = config.blackList;
 
 		this.crawlQueue = queue(
 			this.processCrawlPeerNodeInCrawlQueue.bind(this),
@@ -225,6 +226,23 @@ export class Crawler {
 			{ peer: connection.remoteAddress, pk: publicKey },
 			'Connected'
 		);
+
+		if(this.blackList.has(publicKey)){
+			this.logger.info(
+				{
+					peer: connection.remoteAddress,
+					pk: publicKey
+				},
+				'PeerNode on blacklist' + publicKey
+			);
+
+			this.disconnect(
+				connection,
+				crawlState
+			);
+
+			return;
+		}
 
 		let peerNode = crawlState.peerNodes.get(publicKey);
 		if (peerNode && peerNode.successfullyConnected) {
