@@ -1,6 +1,6 @@
 {
   "name": "@stellarbeat/js-stellar-node-crawler",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Crawl the network for nodes",
   "repository": {
     "type": "git",
