@@ -1,8 +1,8 @@
-import {QuorumSet} from "@stellarbeat/js-stellar-domain";
-import containsSlice from "@stellarbeat/js-stellar-domain/lib/quorum/containsSlice";
+import {QuorumSet} from "@stellarbeat/js-stellarbeat-shared";
+import containsSlice from "@stellarbeat/js-stellarbeat-shared/lib/quorum/containsSlice";
 
 it('should only take trusted validators into account to close slots', function () {
-    const qSet = QuorumSet.fromJSON("{\n" +
+    const qSet = QuorumSet.fromBaseQuorumSet(JSON.parse("{\n" +
         "  \"threshold\": 2,\n" +
         "  \"validators\": [\n" +
         "    \"GDKXE2OZMJIPOSLNA6N6F2BVCI3O777I2OOC4BV7VOYUEHYX7RTRYA7Y\",\n" +
@@ -10,7 +10,7 @@ it('should only take trusted validators into account to close slots', function (
         "    \"GC2V2EFSXN6SQTWVYA5EPJPBWWIMSD2XQNKUOHGEKB535AQE2I6IXV2Z\"\n" +
         "  ],\n" +
         "  \"innerQuorumSets\": []\n" +
-        "}");
+        "}"));
 
     expect(QuorumSet.getAllValidators(qSet)).toEqual(["GDKXE2OZMJIPOSLNA6N6F2BVCI3O777I2OOC4BV7VOYUEHYX7RTRYA7Y", "GCUCJTIYXSOXKBSNFGNFWW5MUQ54HKRPGJUTQFJ5RQXZXNOLNXYDHRAP", "GC2V2EFSXN6SQTWVYA5EPJPBWWIMSD2XQNKUOHGEKB535AQE2I6IXV2Z"])
     expect(QuorumSet.getAllValidators(qSet).includes("GDKXE2OZMJIPOSLNA6N6F2BVCI3O777I2OOC4BV7VOYUEHYX7RTRYA7Y")).toBeTruthy();

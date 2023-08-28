@@ -1,5 +1,5 @@
-import containsSlice from '@stellarbeat/js-stellar-domain/lib/quorum/containsSlice';
-import { QuorumSet } from '@stellarbeat/js-stellar-domain';
+import containsSlice from '@stellarbeat/js-stellarbeat-shared/lib/quorum/containsSlice';
+import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
 
 type SlotIndex = bigint;

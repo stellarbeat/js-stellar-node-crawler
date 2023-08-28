@@ -1,5 +1,5 @@
 import { Connection } from '@stellarbeat/js-stellar-node-connector';
-import { PublicKey, QuorumSet } from '@stellarbeat/js-stellar-domain';
+import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { PeerNode } from './peer-node';
 import { Ledger } from './crawler';
 import { Slots } from './slots';

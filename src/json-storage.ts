@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { Node } from '@stellarbeat/js-stellar-domain';
+import { Node } from '@stellarbeat/js-stellarbeat-shared';
 
 export default {
 	readFilePromise: function (path: string): Promise<unknown> {
@@ -34,7 +34,8 @@ export default {
 		const nodesRaw = JSON.parse(nodesJson);
 
 		return nodesRaw.map((node: Record<string, unknown>) => {
-			return Node.fromJSON(node);
+			//@ts-ignore
+			return Node.fromNodeV1DTO(node);
 		});
 	}
 };

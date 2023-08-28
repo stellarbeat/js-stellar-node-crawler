@@ -1,4 +1,4 @@
-import { QuorumSet } from '@stellarbeat/js-stellar-domain';
+import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 
 export class PeerNode {

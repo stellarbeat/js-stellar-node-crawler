@@ -1,4 +1,4 @@
-import { PublicKey, QuorumSet } from '@stellarbeat/js-stellar-domain';
+import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
 import { Logger } from 'pino';
 import { xdr } from 'stellar-base';

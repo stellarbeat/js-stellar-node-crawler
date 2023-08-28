@@ -1,4 +1,4 @@
-import { QuorumSet } from '@stellarbeat/js-stellar-domain';
+import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { AsyncResultCallback, queue, QueueObject } from 'async';
 
 import {
@@ -472,7 +472,7 @@ export class Crawler {
 		if (connection.remotePublicKey)
 			this.quorumSetManager.processQuorumSet(
 				quorumSetHash,
-				QuorumSet.fromJSON(quorumSetResult.value),
+				QuorumSet.fromBaseQuorumSet(quorumSetResult.value),
 				connection.remotePublicKey,
 				crawlState
 			);
