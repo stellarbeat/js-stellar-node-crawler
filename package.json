@@ -33,12 +33,11 @@
     "dotenv": "^10.0.0",
     "lru-cache": "^6.0.0",
     "neverthrow": "^4.2.2",
-    "pino": "^6.13.0"
+    "pino": "^8.15.0"
   },
   "devDependencies": {
     "@types/async": "^3.2.7",
     "@types/jest": "^27.0.2",
-    "@types/pino-std-serializers": "^4.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.44.0",
