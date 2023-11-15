@@ -1,9 +1,9 @@
-import {QuorumSet} from '@stellarbeat/js-stellarbeat-shared';
+import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
-import {Slot, SlotIndex} from "./slot";
+import { Slot, SlotIndex } from './slot';
 
 export class Slots {
-	protected slots: Map<SlotIndex, Slot> = new Map<SlotIndex, Slot>();//todo: cleanup to avoid mem leaks
+	protected slots: Map<SlotIndex, Slot> = new Map<SlotIndex, Slot>(); //todo: cleanup to avoid mem leaks
 	protected trustedQuorumSet: QuorumSet;
 
 	constructor(trustedQuorumSet: QuorumSet, protected logger: P.Logger) {
@@ -13,7 +13,7 @@ export class Slots {
 	public getSlot(slotIndex: SlotIndex): Slot {
 		let slot = this.slots.get(slotIndex);
 		if (!slot) {
-			slot = new Slot(slotIndex, this.trustedQuorumSet, this.logger);
+			slot = new Slot(slotIndex, this.trustedQuorumSet);
 			this.slots.set(slotIndex, slot);
 		}
 
