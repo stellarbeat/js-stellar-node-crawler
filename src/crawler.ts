@@ -118,11 +118,18 @@ export class Crawler {
 			latestClosedLedger,
 			this.logger
 		); //todo dependency inversion?
-		this.logger.info(
-			'Starting crawl with seed of ' + nodeAddresses.length + 'addresses.'
-		);
 
 		return await new Promise<CrawlResult>((resolve, reject) => {
+			if (this.config.maxOpenConnections <= crawlState.topTierNodes.size)
+				return reject(
+					new Error(
+						'Max open connections should be higher than top tier size: ' +
+							crawlState.topTierNodes.size
+					)
+				);
+			this.logger.info(
+				'Starting crawl with seed of ' + nodeAddresses.length + 'addresses.'
+			);
 			const maxCrawlTimeout = setTimeout(() => {
 				this.logger.fatal('Max crawl time hit, closing all connections');
 				crawlState.openConnections.forEach((connection) =>
