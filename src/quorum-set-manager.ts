@@ -5,6 +5,7 @@ import { xdr } from 'stellar-base';
 import { PeerNode } from './peer-node';
 import { CrawlState } from './crawl-state';
 import { err, ok, Result } from 'neverthrow';
+import { truncate } from './truncate';
 
 type QuorumSetHash = string;
 
@@ -131,7 +132,7 @@ export class QuorumSetManager {
 			alreadyRequestedTo.add(connection.remotePublicKey);
 			this.logger.info(
 				{ hash: quorumSetHash },
-				'Requesting quorumSet from ' + to
+				'Requesting quorumSet from ' + truncate(to)
 			);
 
 			connection.sendStellarMessage(quorumSetMessage);
@@ -140,7 +141,7 @@ export class QuorumSetManager {
 				hash: quorumSetHash,
 				timeout: setTimeout(() => {
 					this.logger.info(
-						{ pk: to, hash: quorumSetHash },
+						{ pk: truncate(to), hash: quorumSetHash },
 						'Request timeout reached'
 					);
 					crawlState.quorumSetState.quorumSetRequests.delete(to);

@@ -17,6 +17,8 @@ import { CrawlState } from './crawl-state';
 import { ScpManager } from './scp-manager';
 import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
+import { listenFurther } from './listen-further';
+import { truncate } from './truncate';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -56,8 +58,7 @@ export class CrawlerConfiguration implements CrawlerConfiguration {
 		public maxOpenConnections = 25,
 		public maxCrawlTime = 1800000,
 		public blackList = new Set<PublicKey>()
-	) {
-	}
+	) {}
 }
 
 /**
@@ -73,7 +74,7 @@ export class Crawler {
 	protected blackList: Set<PublicKey>;
 
 	protected static readonly SCP_LISTEN_TIMEOUT = 6000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
-
+	protected static readonly CONSENSUS_STUCK_TIMEOUT = 35000; //https://github.com/stellar/stellar-core/blob/2b16c2599e9167c67032b402b71e37d2bf1b15e3/src/herder/Herder.cpp#L9C36-L9C36
 	constructor(
 		config: CrawlerConfiguration,
 		node: NetworkNode,
@@ -223,23 +224,20 @@ export class Crawler {
 		crawlState: CrawlState
 	): void {
 		this.logger.debug(
-			{ peer: connection.remoteAddress, pk: publicKey },
+			{ peer: connection.remoteAddress, pk: truncate(publicKey) },
 			'Connected'
 		);
 
-		if(this.blackList.has(publicKey)){
+		if (this.blackList.has(publicKey)) {
 			this.logger.info(
 				{
 					peer: connection.remoteAddress,
-					pk: publicKey
+					pk: truncate(publicKey)
 				},
 				'PeerNode on blacklist' + publicKey
 			);
 
-			this.disconnect(
-				connection,
-				crawlState
-			);
+			this.disconnect(connection, crawlState);
 
 			return;
 		}
@@ -250,7 +248,7 @@ export class Crawler {
 			this.logger.info(
 				{
 					peer: connection.remoteAddress,
-					pk: publicKey
+					pk: truncate(publicKey)
 				},
 				'PeerNode reusing publicKey on address ' + peerNode.key
 			);
@@ -305,7 +303,7 @@ export class Crawler {
 			case xdr.MessageType.dontHave(): {
 				this.logger.info(
 					{
-						pk: connection.remotePublicKey,
+						pk: truncate(connection.remotePublicKey),
 						type: stellarMessage.dontHave().type().name
 					},
 					"Don't have"
@@ -316,7 +314,7 @@ export class Crawler {
 				) {
 					this.logger.info(
 						{
-							pk: connection.remotePublicKey,
+							pk: truncate(connection.remotePublicKey),
 							hash: stellarMessage.dontHave().reqHash().toString('base64')
 						},
 						"Don't have"
@@ -353,7 +351,7 @@ export class Crawler {
 			default:
 				this.logger.info(
 					{
-						pk: connection.remotePublicKey,
+						pk: truncate(connection.remotePublicKey),
 						peer: connection.remoteIp + ':' + connection.remotePort,
 						error: errorMessage.code().name
 					},
@@ -375,7 +373,10 @@ export class Crawler {
 		crawlQueueTaskDone: AsyncResultCallback<void>
 	): void {
 		this.logger.debug(
-			{ pk: connection.remotePublicKey, peer: connection.remoteAddress },
+			{
+				pk: truncate(connection.remotePublicKey),
+				peer: connection.remoteAddress
+			},
 			'Node disconnected'
 		);
 
@@ -391,7 +392,7 @@ export class Crawler {
 				);
 				if (timeout) clearTimeout(timeout);
 				crawlState.openConnections.delete(connection.remotePublicKey);
-			} //if peer.key differs from remoteAddress,then this is a connection to a an ip that reuses a publicKey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
+			} //if peer.key differs from remoteAddress,then this is a connection to an ip that reuses a publicKey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
 		} else {
 			crawlState.failedConnections.push(connection.remoteAddress);
 			this.logger.debug(
@@ -464,7 +465,7 @@ export class Crawler {
 		}
 		this.logger.info(
 			{
-				pk: connection.remotePublicKey,
+				pk: truncate(connection.remotePublicKey),
 				hash: quorumSetHash
 			},
 			'QuorumSet received'
@@ -486,7 +487,7 @@ export class Crawler {
 		this.logger.trace(
 			{
 				peer: connection.remoteAddress,
-				pk: connection.remotePublicKey,
+				pk: truncate(connection.remotePublicKey),
 				error: error?.message
 			},
 			'Disconnecting'
@@ -502,28 +503,28 @@ export class Crawler {
 		connection.destroy();
 	}
 
-	protected listenFurther(peer: PeerNode, timeoutCounter = 0): boolean {
-		if (timeoutCounter === 0) return true; //everyone gets a first listen. If it is already confirmed validating, we can still use it to request unknown quorumSets from.
-		if (timeoutCounter >= 17) return false; //we wait for 100 seconds max (maxCounter = 100 / SCP_TIMEOUT)if node is trying to reach consensus.
-		if (peer.isValidatingIncorrectValues) return false;
-		if (!peer.participatingInSCP) return false; //watcher node
-		if (peer.isValidating && peer.quorumSet)
-			//todo: a peer that is validating but doesnt have it's own quorumSet, could keep listening until max.
-			return false; //we have all the needed information
-
-		return true;
-	}
-
 	protected listen(
 		peer: PeerNode,
 		connection: Connection,
 		timeoutCounter = 0,
 		crawlState: CrawlState
 	): void {
-		if (!this.listenFurther(peer, timeoutCounter)) {
+		if (
+			!listenFurther(
+				peer,
+				timeoutCounter,
+				//we wait max twice CONSENSUS_STUCK_TIMEOUT to ensure we receive al externalizing messages from straggling nodes;
+				Math.ceil(
+					(2 * Crawler.CONSENSUS_STUCK_TIMEOUT) / Crawler.SCP_LISTEN_TIMEOUT
+				),
+				crawlState.topTierNodes,
+				this.crawlQueue.length(),
+				crawlState.peerNodes
+			)
+		) {
 			this.logger.debug(
 				{
-					pk: peer.publicKey,
+					pk: truncate(peer.publicKey),
 					counter: timeoutCounter,
 					validating: peer.isValidating,
 					validatingIncorrectly: peer.isValidatingIncorrectValues,
@@ -536,7 +537,7 @@ export class Crawler {
 		}
 		this.logger.debug(
 			{
-				pk: peer.publicKey,
+				pk: truncate(peer.publicKey),
 				latestActiveSlotIndex: peer.latestActiveSlotIndex
 			},
 			'Listening for externalize msg'
@@ -544,7 +545,10 @@ export class Crawler {
 		crawlState.listenTimeouts.set(
 			peer.publicKey,
 			setTimeout(() => {
-				this.logger.debug({ pk: peer.publicKey }, 'SCP Listen timeout reached');
+				this.logger.debug(
+					{ pk: truncate(peer.publicKey) },
+					'SCP Listen timeout reached'
+				);
 				timeoutCounter++;
 				this.listen(peer, connection, timeoutCounter, crawlState);
 			}, Crawler.SCP_LISTEN_TIMEOUT)
@@ -563,7 +567,7 @@ export class Crawler {
 		crawlState.peerNodes.forEach((peer) => {
 			this.logger.info({
 				ip: peer.key,
-				pk: peer.publicKey,
+				pk: truncate(peer.publicKey),
 				connected: peer.successfullyConnected,
 				scp: peer.participatingInSCP,
 				validating: peer.isValidating,

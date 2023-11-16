@@ -40,6 +40,7 @@ export class CrawlState {
 	envelopeCache: LRUCache<string, number>;
 	quorumSetState: QuorumSetState = new QuorumSetState();
 	failedConnections: string[] = [];
+	topTierNodes: Set<PublicKey>;
 
 	constructor(
 		topTierQuorumSet: QuorumSet,
@@ -51,5 +52,8 @@ export class CrawlState {
 		this.latestClosedLedger = latestClosedLedger;
 		this.slots = new Slots(topTierQuorumSet, logger);
 		this.envelopeCache = new LRUCache<string, number>(5000);
+		this.topTierNodes = new Set(
+			topTierQuorumSet.validators.map((validator) => validator.toString())
+		);
 	}
 }
