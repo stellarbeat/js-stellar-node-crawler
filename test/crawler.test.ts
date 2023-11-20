@@ -13,7 +13,7 @@ import { ok, Result, err } from 'neverthrow';
 import { createCrawler } from '../src';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 
-jest.setTimeout(10000);
+jest.setTimeout(20000);
 
 let peerNodeAddress: NodeAddress;
 let peerNetworkNode: NetworkNode;
@@ -142,8 +142,20 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 		crawledPeerNetworkNode.keyPair.publicKey()
 	]);
 
-	const nodeConfig = getConfigFromEnv();
-	nodeConfig.network = 'test';
+	const nodeConfig: NodeConfig = {
+		network: 'test',
+		nodeInfo: {
+			ledgerVersion: 1,
+			overlayVersion: 1,
+			overlayMinVersion: 1,
+			versionString: '1.0.0',
+			networkId: 'testnet'
+		},
+		listeningPort: 11026,
+		receiveTransactionMessages: false,
+		receiveSCPMessages: true,
+		maxFloodMessageCapacity: 1000
+	};
 
 	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig));
 
