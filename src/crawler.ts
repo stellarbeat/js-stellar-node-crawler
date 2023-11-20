@@ -38,6 +38,7 @@ type QuorumSetHash = string;
 interface CrawlQueueTask {
 	nodeAddress: NodeAddress;
 	crawlState: CrawlState;
+	topTier?: boolean;
 }
 
 export interface Ledger {
@@ -73,7 +74,7 @@ export class Crawler {
 	protected crawlQueue: QueueObject<CrawlQueueTask>;
 	protected blackList: Set<PublicKey>;
 
-	protected static readonly SCP_LISTEN_TIMEOUT = 6000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
+	protected static readonly SCP_LISTEN_TIMEOUT = 10000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
 	protected static readonly CONSENSUS_STUCK_TIMEOUT = 35000; //https://github.com/stellar/stellar-core/blob/2b16c2599e9167c67032b402b71e37d2bf1b15e3/src/herder/Herder.cpp#L9C36-L9C36
 	constructor(
 		config: CrawlerConfiguration,
@@ -130,6 +131,15 @@ export class Crawler {
 			this.logger.info(
 				'Starting crawl with seed of ' + nodeAddresses.length + 'addresses.'
 			);
+			crawlState.loggingTimer = setInterval(() => {
+				this.logger.info(
+					'nodes left in queue: ' +
+						this.crawlQueue.length() +
+						'. open connections: ' +
+						crawlState.openConnections.size
+				);
+			}, 10000);
+
 			const maxCrawlTimeout = setTimeout(() => {
 				this.logger.fatal('Max crawl time hit, closing all connections');
 				crawlState.openConnections.forEach((connection) =>
@@ -190,14 +200,16 @@ export class Crawler {
 				);
 				this.disconnect(connection, crawlQueueTask.crawlState, error);
 			})
-			.on('connect', (publicKey: string, nodeInfo: NodeInfo) =>
+			.on('connect', (publicKey: string, nodeInfo: NodeInfo) => {
+				crawlQueueTask.topTier =
+					crawlQueueTask.crawlState.topTierNodes.has(publicKey);
 				this.onConnected(
 					connection,
 					publicKey,
 					nodeInfo,
 					crawlQueueTask.crawlState
-				)
-			)
+				);
+			})
 			.on('data', (stellarMessageWork: StellarMessageWork) => {
 				this.onStellarMessage(
 					connection,
@@ -410,9 +422,6 @@ export class Crawler {
 				'handshake failed'
 			);
 		}
-		if (this.crawlQueue.length() !== 0 && this.crawlQueue.length() % 50 === 0) {
-			this.logger.info('nodes left in queue: ' + this.crawlQueue.length());
-		}
 
 		crawlQueueTaskDone();
 	}
@@ -525,7 +534,7 @@ export class Crawler {
 					(2 * Crawler.CONSENSUS_STUCK_TIMEOUT) / Crawler.SCP_LISTEN_TIMEOUT
 				),
 				crawlState.topTierNodes,
-				this.crawlQueue.length(),
+				this.readyWithNonTopTierPeers(),
 				crawlState.peerNodes
 			)
 		) {
@@ -562,11 +571,24 @@ export class Crawler {
 		);
 	}
 
+	private readyWithNonTopTierPeers(): boolean {
+		if (this.crawlQueue.length() !== 0) return false; //we don't know yet because there are still peers left to be crawled
+
+		return !this.workersListContainsNonTopTierPeers();
+	}
+
+	private workersListContainsNonTopTierPeers() {
+		return this.crawlQueue.workersList().some((worker) => {
+			return worker.data.topTier !== true;
+		});
+	}
+
 	protected wrapUp(
 		resolve: (value: CrawlResult | PromiseLike<CrawlResult>) => void,
 		reject: (error: Error) => void,
 		crawlState: CrawlState
 	): void {
+		if (crawlState.loggingTimer) clearInterval(crawlState.loggingTimer);
 		this.logger.info(
 			{ peers: crawlState.failedConnections },
 			'Failed connections'

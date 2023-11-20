@@ -5,7 +5,7 @@ export function listenFurther(
 	timeoutCounter: number,
 	maxTimeoutCounter: number,
 	topTierNodes: Set<string>,
-	queueLength: number,
+	readyWithNonTopTierPeers: boolean,
 	peerNodes: Map<string, PeerNode>
 ): boolean {
 	if (timeoutCounter === 0) return true; //everyone gets a first listen. If it is already confirmed validating, we can still use it to request unknown quorumSets from.
@@ -19,19 +19,19 @@ export function listenFurther(
 		return false; //we have all the needed information
 
 	return !queueIsEmptyAndTopTierNodesParticipatingInSCPAreAllValidating(
-		queueLength,
+		readyWithNonTopTierPeers,
 		peerNodes,
 		topTierNodes
 	);
 }
 
 function queueIsEmptyAndTopTierNodesParticipatingInSCPAreAllValidating(
-	queueLength: number,
+	readyWitNonTopTierPeers: boolean,
 	peerNodes: Map<string, PeerNode>,
 	topTierNodes: Set<string>
 ) {
 	return (
-		queueLength === 0 &&
+		readyWitNonTopTierPeers &&
 		Array.from(topTierNodes).every((publicKey) => {
 			const peerNode = peerNodes.get(publicKey);
 			if (!peerNode) return true; //at this point, we won't receive anymore peerNodes, so we can't let it stall the process.
