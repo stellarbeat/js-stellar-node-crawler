@@ -27,7 +27,7 @@
   "author": "pieterjan84@github",
   "license": "MIT",
   "dependencies": {
-    "@stellarbeat/js-stellar-node-connector": "5.0.3",
+    "@stellarbeat/js-stellar-node-connector": "^6.0.0-1",
     "@stellarbeat/js-stellarbeat-shared": "^6.0.1",
     "async": "^3.2.1",
     "blocked-at": "^1.2.0",
