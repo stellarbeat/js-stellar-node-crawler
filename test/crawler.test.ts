@@ -154,7 +154,10 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 		listeningPort: 11026,
 		receiveTransactionMessages: false,
 		receiveSCPMessages: true,
-		maxFloodMessageCapacity: 1000
+		peerFloodReadingCapacity: 200,
+		flowControlSendMoreBatchSize: 40,
+		peerFloodReadingCapacityBytes: 300000,
+		flowControlSendMoreBatchSizeBytes: 100000
 	};
 
 	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig));
@@ -257,7 +260,10 @@ function getListeningPeerNode(address: NodeAddress, privateKey?: string) {
 		privateKey: privateKey ? privateKey : Keypair.random().secret(),
 		receiveSCPMessages: true,
 		receiveTransactionMessages: false,
-		maxFloodMessageCapacity: 200
+		peerFloodReadingCapacity: 200,
+		flowControlSendMoreBatchSize: 40,
+		peerFloodReadingCapacityBytes: 300000,
+		flowControlSendMoreBatchSizeBytes: 100000
 	};
 	const peerNetworkNode = createNode(peerNodeConfig);
 	peerNetworkNode.acceptIncomingConnections(address[1], address[0]);
