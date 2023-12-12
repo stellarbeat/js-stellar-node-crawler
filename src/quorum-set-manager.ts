@@ -1,7 +1,7 @@
 import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
 import { Logger } from 'pino';
-import { xdr } from 'stellar-base';
+import { xdr } from '@stellar/stellar-base';
 import { PeerNode } from './peer-node';
 import { CrawlState } from './crawl-state';
 import { err, ok, Result } from 'neverthrow';

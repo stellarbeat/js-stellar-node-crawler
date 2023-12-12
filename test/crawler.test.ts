@@ -5,7 +5,7 @@ import {
 	createNode,
 	getConfigFromEnv
 } from '@stellarbeat/js-stellar-node-connector';
-import { xdr, Keypair, hash, Networks } from 'stellar-base';
+import { xdr, Keypair, hash, Networks } from '@stellar/stellar-base';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
 import { CrawlerConfiguration, NodeAddress } from '../src/crawler';

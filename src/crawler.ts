@@ -8,7 +8,7 @@ import {
 	getQuorumSetFromMessage
 } from '@stellarbeat/js-stellar-node-connector';
 
-import { hash, xdr } from 'stellar-base';
+import { hash, xdr } from '@stellar/stellar-base';
 import { PeerNode } from './peer-node';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';

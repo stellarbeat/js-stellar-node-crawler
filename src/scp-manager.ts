@@ -1,6 +1,6 @@
 import * as P from 'pino';
 import { PeerNode } from './peer-node';
-import { hash, Networks, xdr } from 'stellar-base';
+import { hash, Networks, xdr } from '@stellar/stellar-base';
 import { CrawlState } from './crawl-state';
 import {
 	getPublicKeyStringFromBuffer,
