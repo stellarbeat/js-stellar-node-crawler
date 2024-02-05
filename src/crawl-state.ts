@@ -5,6 +5,7 @@ import { Ledger } from './crawler';
 import { Slots } from './slots';
 import * as LRUCache from 'lru-cache';
 import * as P from 'pino';
+import { truncate } from './truncate';
 
 type QuorumSetHash = string;
 type PeerKey = string; //ip:port
@@ -55,6 +56,47 @@ export class CrawlState {
 		this.envelopeCache = new LRUCache<string, number>(5000);
 		this.topTierNodes = new Set(
 			topTierQuorumSet.validators.map((validator) => validator.toString())
+		);
+	}
+
+	log() {
+		this.logger.info({ peers: this.failedConnections }, 'Failed connections');
+		this.peerNodes.forEach((peer) => {
+			this.logger.info({
+				ip: peer.key,
+				pk: truncate(peer.publicKey),
+				connected: peer.successfullyConnected,
+				scp: peer.participatingInSCP,
+				validating: peer.isValidating,
+				overLoaded: peer.overLoaded
+			});
+		});
+		this.logger.info('Connection attempts: ' + this.crawledNodeAddresses.size);
+		this.logger.info('Detected public keys: ' + this.peerNodes.size);
+		this.logger.info(
+			'Successful connections: ' +
+				Array.from(this.peerNodes.values()).filter(
+					(peer) => peer.successfullyConnected
+				).length
+		);
+		this.logger.info(
+			'Validating nodes: ' +
+				Array.from(this.peerNodes.values()).filter((node) => node.isValidating)
+					.length
+		);
+		this.logger.info(
+			'Overloaded nodes: ' +
+				Array.from(this.peerNodes.values()).filter((node) => node.overLoaded)
+					.length
+		);
+
+		this.logger.info(
+			'Closed ledgers: ' + this.slots.getClosedSlotIndexes().length
+		);
+		this.logger.info(
+			Array.from(this.peerNodes.values()).filter(
+				(node) => node.suppliedPeerList
+			).length + ' supplied us with a peers list.'
 		);
 	}
 }

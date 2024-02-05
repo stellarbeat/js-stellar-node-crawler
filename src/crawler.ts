@@ -1,13 +1,11 @@
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { AsyncResultCallback, queue, QueueObject } from 'async';
-
 import {
 	Connection,
-	Node as NetworkNode,
 	getIpFromPeerAddress,
-	getQuorumSetFromMessage
+	getQuorumSetFromMessage,
+	Node as NetworkNode
 } from '@stellarbeat/js-stellar-node-connector';
-
 import { hash, xdr } from '@stellar/stellar-base';
 import { PeerNode } from './peer-node';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
@@ -19,16 +17,10 @@ import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-conf
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { listenFurther } from './listen-further';
 import { truncate } from './truncate';
-import { CrawlStateLogger } from './crawl-state-logger';
+import { CrawlResult } from './crawl-result';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
-
-export interface CrawlResult {
-	peers: Map<PublicKey, PeerNode>;
-	closedLedgers: bigint[];
-	latestClosedLedger: Ledger;
-}
 
 function nodeAddressToPeerKey(nodeAddress: NodeAddress) {
 	return nodeAddress[0] + ':' + nodeAddress[1];
@@ -590,7 +582,7 @@ export class Crawler {
 		crawlState: CrawlState
 	): void {
 		if (crawlState.loggingTimer) clearInterval(crawlState.loggingTimer);
-		CrawlStateLogger.log(crawlState, this.logger);
+		crawlState.log();
 		console.timeEnd('crawl');
 
 		if (crawlState.maxCrawlTimeHit)
