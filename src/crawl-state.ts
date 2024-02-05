@@ -42,7 +42,6 @@ export class CrawlState {
 	quorumSetState: QuorumSetState = new QuorumSetState();
 	failedConnections: string[] = [];
 	topTierNodes: Set<PublicKey>;
-	loggingTimer?: NodeJS.Timeout;
 
 	constructor(
 		topTierQuorumSet: QuorumSet,

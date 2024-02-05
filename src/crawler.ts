@@ -18,6 +18,8 @@ import { listenFurther } from './listen-further';
 import { truncate } from './truncate';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
+import { CrawlStateValidator } from './crawl-state-validator';
+import { CrawlLogger } from './crawl-logger';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -66,9 +68,8 @@ export class Crawler {
 		this.quorumSetManager = quorumSetManager;
 		this.crawlerNode = node;
 		this.blackList = config.blackList;
-
 		this.crawlQueue = queue(
-			this.processCrawlPeerNodeInCrawlQueue.bind(this),
+			this.performCrawlQueueTask.bind(this),
 			config.maxOpenConnections
 		);
 	}
@@ -89,7 +90,6 @@ export class Crawler {
 			QuorumSet
 		>()
 	): Promise<CrawlResult> {
-		console.time('crawl');
 		const crawlState = new CrawlState(
 			topTierQuorumSet,
 			quorumSets,
@@ -98,40 +98,40 @@ export class Crawler {
 		); //todo dependency inversion?
 
 		return await new Promise<CrawlResult>((resolve, reject) => {
-			if (this.config.maxOpenConnections <= crawlState.topTierNodes.size)
-				return reject(
-					new Error(
-						'Max open connections should be higher than top tier size: ' +
-							crawlState.topTierNodes.size
-					)
-				);
-			this.logger.info(
-				'Starting crawl with seed of ' + nodeAddresses.length + 'addresses.'
+			const errorOrNull = CrawlStateValidator.validateCrawlState(
+				crawlState,
+				this.config
 			);
-			crawlState.loggingTimer = setInterval(() => {
-				this.logger.info(
-					'nodes left in queue: ' +
-						this.crawlQueue.length() +
-						'. open connections: ' +
-						crawlState.openConnections.size
-				);
-			}, 10000);
+			if (errorOrNull) return reject(errorOrNull);
 
-			const maxCrawlTimeout = setTimeout(() => {
-				this.logger.fatal('Max crawl time hit, closing all connections');
-				crawlState.openConnections.forEach((connection) =>
-					this.disconnect(connection, crawlState)
-				);
-				crawlState.maxCrawlTimeHit = true;
-			}, this.config.maxCrawlTime);
+			const crawlLogger = new CrawlLogger(
+				crawlState,
+				this.crawlQueue,
+				this.logger
+			);
+			crawlLogger.start(nodeAddresses.length);
+
+			const maxCrawlTimeout = this.startMaxCrawlTimeout(crawlState);
+
 			this.crawlQueue.drain(() => {
 				clearTimeout(maxCrawlTimeout);
-				this.wrapUp(resolve, reject, crawlState);
-			}); //when queue is empty, we wrap up the crawl
+				this.wrapUp(resolve, reject, crawlState, crawlLogger);
+			});
+
 			nodeAddresses.forEach((address) =>
 				this.crawlPeerNode(address, crawlState)
 			);
 		});
+	}
+
+	private startMaxCrawlTimeout(crawlState: CrawlState) {
+		return setTimeout(() => {
+			this.logger.fatal('Max crawl time hit, closing all connections');
+			crawlState.openConnections.forEach((connection) =>
+				this.disconnect(connection, crawlState)
+			);
+			crawlState.maxCrawlTimeHit = true;
+		}, this.config.maxCrawlTime);
 	}
 
 	protected crawlPeerNode(
@@ -159,7 +159,7 @@ export class Crawler {
 		);
 	}
 
-	protected processCrawlPeerNodeInCrawlQueue(
+	protected performCrawlQueueTask(
 		crawlQueueTask: CrawlQueueTask,
 		crawlQueueTaskDone: AsyncResultCallback<void>
 	): void {
@@ -563,11 +563,10 @@ export class Crawler {
 	protected wrapUp(
 		resolve: (value: CrawlResult | PromiseLike<CrawlResult>) => void,
 		reject: (error: Error) => void,
-		crawlState: CrawlState
+		crawlState: CrawlState,
+		crawlLogger: CrawlLogger
 	): void {
-		if (crawlState.loggingTimer) clearInterval(crawlState.loggingTimer);
-		crawlState.log();
-		console.timeEnd('crawl');
+		crawlLogger.stop();
 
 		if (crawlState.maxCrawlTimeHit)
 			reject(new Error('Max crawl time hit, closing crawler'));
