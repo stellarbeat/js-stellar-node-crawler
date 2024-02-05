@@ -19,6 +19,7 @@ import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-conf
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { listenFurther } from './listen-further';
 import { truncate } from './truncate';
+import { CrawlStateLogger } from './crawl-state-logger';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -589,53 +590,7 @@ export class Crawler {
 		crawlState: CrawlState
 	): void {
 		if (crawlState.loggingTimer) clearInterval(crawlState.loggingTimer);
-		this.logger.info(
-			{ peers: crawlState.failedConnections },
-			'Failed connections'
-		);
-		crawlState.peerNodes.forEach((peer) => {
-			this.logger.info({
-				ip: peer.key,
-				pk: truncate(peer.publicKey),
-				connected: peer.successfullyConnected,
-				scp: peer.participatingInSCP,
-				validating: peer.isValidating,
-				overLoaded: peer.overLoaded
-			});
-		});
-		this.logger.info('processed all nodes in queue');
-		this.logger.info(
-			'Connection attempts: ' + crawlState.crawledNodeAddresses.size
-		);
-		this.logger.info('Detected public keys: ' + crawlState.peerNodes.size);
-		this.logger.info(
-			'Successful connections: ' +
-				Array.from(crawlState.peerNodes.values()).filter(
-					(peer) => peer.successfullyConnected
-				).length
-		);
-		this.logger.info(
-			'Validating nodes: ' +
-				Array.from(crawlState.peerNodes.values()).filter(
-					(node) => node.isValidating
-				).length
-		);
-		this.logger.info(
-			'Overloaded nodes: ' +
-				Array.from(crawlState.peerNodes.values()).filter(
-					(node) => node.overLoaded
-				).length
-		);
-
-		this.logger.info(
-			'Closed ledgers: ' + crawlState.slots.getClosedSlotIndexes().length
-		);
-		this.logger.info(
-			Array.from(crawlState.peerNodes.values()).filter(
-				(node) => node.suppliedPeerList
-			).length + ' supplied us with a peers list.'
-		);
-
+		CrawlStateLogger.log(crawlState, this.logger);
 		console.timeEnd('crawl');
 
 		if (crawlState.maxCrawlTimeHit)
