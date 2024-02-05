@@ -13,11 +13,11 @@ import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
 import { CrawlState } from './crawl-state';
 import { ScpManager } from './scp-manager';
-import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { listenFurther } from './listen-further';
 import { truncate } from './truncate';
 import { CrawlResult } from './crawl-result';
+import { CrawlerConfiguration } from './crawler-configuration';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -37,22 +37,6 @@ interface CrawlQueueTask {
 export interface Ledger {
 	sequence: bigint;
 	closeTime: Date;
-}
-
-export interface CrawlerConfiguration {
-	maxOpenConnections: number; //How many connections can be open at the same time. The higher the number, the faster the crawl
-	nodeConfig: NodeConfig;
-	maxCrawlTime: number; //max nr of ms the crawl will last. Safety guard in case crawler is stuck.
-	blackList: Set<PublicKey>;
-}
-
-export class CrawlerConfiguration implements CrawlerConfiguration {
-	constructor(
-		public nodeConfig: NodeConfig,
-		public maxOpenConnections = 25,
-		public maxCrawlTime = 1800000,
-		public blackList = new Set<PublicKey>()
-	) {}
 }
 
 /**
