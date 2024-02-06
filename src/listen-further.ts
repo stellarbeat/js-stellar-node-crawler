@@ -1,4 +1,5 @@
 import { PeerNode } from './peer-node';
+import { PeerNodeCollection } from './peer-node-collection';
 
 export function listenFurther(
 	peer: PeerNode,
@@ -6,7 +7,7 @@ export function listenFurther(
 	maxTimeoutCounter: number,
 	topTierNodes: Set<string>,
 	readyWithNonTopTierPeers: boolean,
-	peerNodes: Map<string, PeerNode>
+	peerNodes: PeerNodeCollection
 ): boolean {
 	if (timeoutCounter === 0) return true; //everyone gets a first listen. If it is already confirmed validating, we can still use it to request unknown quorumSets from.
 	//CONSENSUS_STUCK_TIMEOUT_SECONDS in stellar core is 35 seconds, we wait twice that time to ensure we receive al externalizing messages from straggling nodes;
@@ -27,7 +28,7 @@ export function listenFurther(
 
 function queueIsEmptyAndTopTierNodesParticipatingInSCPAreAllValidating(
 	readyWitNonTopTierPeers: boolean,
-	peerNodes: Map<string, PeerNode>,
+	peerNodes: PeerNodeCollection,
 	topTierNodes: Set<string>
 ) {
 	return (

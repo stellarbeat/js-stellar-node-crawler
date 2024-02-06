@@ -76,7 +76,7 @@ export class Crawler {
 
 	/*
 	 * @param topTierQuorumSet QuorumSet of top tier nodes that the crawler should trust to close ledgers and determine the correct externalized value.
-	 * Top tier nodes are trusted by everyone transitively, otherwise there would be no quorum intersection. Stellar core forwards scp messages of every transitively trusted node. Thus we can close ledgers when connecting to any node.
+	 * Top tier nodes are trusted by everyone transitively, otherwise there would be no quorum intersection. Stellar core forwards scp messages of every transitively trusted node. Thus, we can close ledgers when connecting to any node.
 	 */
 	async crawl(
 		nodeAddresses: NodeAddress[],
@@ -238,13 +238,12 @@ export class Crawler {
 			return;
 		}
 
-		const peerNodeOrError =
-			crawlState.peerNodeCollection.addSuccessfullyConnected(
-				publicKey,
-				connection.remoteIp,
-				connection.remotePort,
-				nodeInfo
-			);
+		const peerNodeOrError = crawlState.peerNodes.addSuccessfullyConnected(
+			publicKey,
+			connection.remoteIp,
+			connection.remotePort,
+			nodeInfo
+		);
 
 		if (peerNodeOrError instanceof Error) {
 			this.disconnect(
@@ -379,7 +378,7 @@ export class Crawler {
 				);
 				if (timeout) clearTimeout(timeout);
 				crawlState.openConnections.delete(connection.remotePublicKey);
-			} //if peer.key differs from remoteAddress,then this is a connection to an ip that reuses a publicKey. These connections are ignored and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
+			} //if peer.key differs from remoteAddress,then this is a connection to an ip that reuses a publicKey. These connections are ignored, and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
 		} else {
 			crawlState.failedConnections.push(connection.remoteAddress);
 			this.logger.debug(
@@ -566,7 +565,7 @@ export class Crawler {
 			reject(new Error('Max crawl time hit, closing crawler'));
 
 		resolve({
-			peers: crawlState.peerNodes,
+			peers: crawlState.peerNodes.getAll(),
 			closedLedgers: crawlState.slots.getClosedSlotIndexes(),
 			latestClosedLedger: crawlState.latestClosedLedger
 		});

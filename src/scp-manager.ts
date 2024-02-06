@@ -67,11 +67,7 @@ export class ScpManager {
 			'processing new scp statement: ' + scpStatement.pledges().switch().name
 		);
 
-		let peer = crawlState.peerNodes.get(publicKey);
-		if (!peer) {
-			peer = new PeerNode(publicKey);
-			crawlState.peerNodes.set(publicKey, peer);
-		}
+		const peer = crawlState.peerNodes.add(publicKey);
 
 		peer.latestActiveSlotIndex = slotIndex.toString();
 

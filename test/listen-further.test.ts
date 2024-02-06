@@ -1,15 +1,14 @@
 import { listenFurther } from '../src/listen-further';
 import { PeerNode } from '../src';
+import { PeerNodeCollection } from '../src/peer-node-collection';
 
 describe('listen-further', () => {
 	function setupSUT() {
-		const peer = new PeerNode('A');
-		const otherPeer = new PeerNode('B');
-		const peerNodes = new Map<string, PeerNode>();
+		const peerNodes = new PeerNodeCollection();
+		const peer = peerNodes.add('A');
+		const otherPeer = peerNodes.add('B');
 		const topTierNodes = new Set<string>();
 		topTierNodes.add('A');
-		peerNodes.set('A', peer);
-		peerNodes.set('B', otherPeer);
 		return { peer, otherPeer, peerNodes, topTierNodes };
 	}
 
@@ -87,11 +86,10 @@ describe('listen-further', () => {
 		const { peer, otherPeer, peerNodes, topTierNodes } = setupSUT();
 		peer.isValidating = true;
 		peer.latestActiveSlotIndex = '1';
-		const otherTopTierNode = new PeerNode('C');
+		const otherTopTierNode = peerNodes.add('C');
 		otherTopTierNode.isValidating = true;
 		otherTopTierNode.latestActiveSlotIndex = '1';
 		topTierNodes.add('C');
-		peerNodes.set('C', otherTopTierNode);
 		expect(listenFurther(peer, 1, 2, topTierNodes, true, peerNodes)).toBe(
 			false
 		);
@@ -101,11 +99,10 @@ describe('listen-further', () => {
 		const { peer, otherPeer, peerNodes, topTierNodes } = setupSUT();
 		peer.isValidating = false;
 		peer.latestActiveSlotIndex = '1';
-		const otherTopTierNode = new PeerNode('C');
+		const otherTopTierNode = peerNodes.add('C');
 		otherTopTierNode.isValidating = true;
 		otherTopTierNode.latestActiveSlotIndex = '1';
 		topTierNodes.add('C');
-		peerNodes.set('C', otherTopTierNode);
 		expect(listenFurther(peer, 1, 2, topTierNodes, true, peerNodes)).toBe(true);
 	});
 });

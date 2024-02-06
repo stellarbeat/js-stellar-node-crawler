@@ -41,4 +41,16 @@ export class PeerNodeCollection {
 
 		return peerNode;
 	}
+
+	getAll() {
+		return this.peerNodes;
+	}
+
+	values() {
+		return this.peerNodes.values();
+	}
+
+	get size() {
+		return this.peerNodes.size;
+	}
 }

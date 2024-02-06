@@ -30,8 +30,7 @@ export class CrawlState {
 		PublicKey,
 		Connection
 	>();
-	peerNodeCollection: PeerNodeCollection;
-	peerNodes: Map<PublicKey, PeerNode> = new Map<PublicKey, PeerNode>();
+	peerNodes: PeerNodeCollection;
 	quorumSets: Map<string, QuorumSet>;
 	crawledNodeAddresses: Set<PeerKey> = new Set();
 	latestClosedLedger: Ledger = {
@@ -58,12 +57,12 @@ export class CrawlState {
 		this.topTierNodes = new Set(
 			topTierQuorumSet.validators.map((validator) => validator.toString())
 		);
-		this.peerNodeCollection = new PeerNodeCollection(this.peerNodes);
+		this.peerNodes = new PeerNodeCollection();
 	}
 
 	log() {
 		this.logger.info({ peers: this.failedConnections }, 'Failed connections');
-		this.peerNodes.forEach((peer) => {
+		this.peerNodes.getAll().forEach((peer) => {
 			this.logger.info({
 				ip: peer.key,
 				pk: truncate(peer.publicKey),
@@ -77,7 +76,7 @@ export class CrawlState {
 		this.logger.info('Detected public keys: ' + this.peerNodes.size);
 		this.logger.info(
 			'Successful connections: ' +
-				Array.from(this.peerNodes.values()).filter(
+				Array.from(this.peerNodes.getAll().values()).filter(
 					(peer) => peer.successfullyConnected
 				).length
 		);
