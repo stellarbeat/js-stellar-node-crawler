@@ -238,41 +238,32 @@ export class Crawler {
 			return;
 		}
 
-		let peerNode = crawlState.peerNodes.get(publicKey);
-		if (peerNode && peerNode.successfullyConnected) {
-			//this public key is already used in this crawl! A node is not allowed to reuse public keys. Disconnecting.
-			this.logger.info(
-				{
-					peer: connection.remoteAddress,
-					pk: truncate(publicKey)
-				},
-				'PeerNode reusing publicKey on address ' + peerNode.key
+		const peerNodeOrError =
+			crawlState.peerNodeCollection.addSuccessfullyConnected(
+				publicKey,
+				connection.remoteIp,
+				connection.remotePort,
+				nodeInfo
 			);
 
+		if (peerNodeOrError instanceof Error) {
 			this.disconnect(
 				connection,
 				crawlState,
-				new Error('PeerNode reusing publicKey on address ' + peerNode.key)
+				new Error(
+					'PeerNode reusing publicKey on address ' + connection.remoteAddress
+				)
 			);
 			return; //we don't return this peerNode to consumer of this library
 		}
 
-		if (!peerNode) {
-			peerNode = new PeerNode(publicKey);
-		}
-
-		peerNode.nodeInfo = nodeInfo;
-		peerNode.ip = connection.remoteIp;
-		peerNode.port = connection.remotePort;
-
-		crawlState.peerNodes.set(publicKey, peerNode);
 		crawlState.openConnections.set(publicKey, connection);
 
 		/*if (!this._nodesThatSuppliedPeerList.has(connection.peer)) { //Most nodes send their peers automatically on successful handshake, better handled with timer.
             this._connectionManager.sendGetPeers(connection);
         }*/
 
-		this.listen(peerNode, connection, 0, crawlState);
+		this.listen(peerNodeOrError, connection, 0, crawlState);
 	}
 
 	protected onStellarMessage(
@@ -477,21 +468,24 @@ export class Crawler {
 		crawlState: CrawlState,
 		error?: Error
 	): void {
-		this.logger.trace(
-			{
-				peer: connection.remoteAddress,
-				pk: truncate(connection.remotePublicKey),
-				error: error?.message
-			},
-			'Disconnecting'
-		);
-
-		//destroy should always trigger close event, where connection cleanup already happens
-		/*if (connection.remotePublicKey) {
-			crawlState.openConnections.delete(connection.remotePublicKey); //we don't want to send any more commands
-			const timeout = crawlState.listenTimeouts.get(connection.remotePublicKey);
-			if (timeout) clearTimeout(timeout);
-		}*/
+		if (error) {
+			this.logger.debug(
+				{
+					peer: connection.remoteAddress,
+					pk: truncate(connection.remotePublicKey),
+					error: error.message
+				},
+				'Disconnecting'
+			);
+		} else {
+			this.logger.trace(
+				{
+					peer: connection.remoteAddress,
+					pk: truncate(connection.remotePublicKey)
+				},
+				'Disconnecting'
+			);
+		}
 
 		connection.destroy();
 	}

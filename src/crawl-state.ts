@@ -6,6 +6,7 @@ import { Slots } from './slots';
 import * as LRUCache from 'lru-cache';
 import * as P from 'pino';
 import { truncate } from './truncate';
+import { PeerNodeCollection } from './peer-node-collection';
 
 type QuorumSetHash = string;
 type PeerKey = string; //ip:port
@@ -29,6 +30,7 @@ export class CrawlState {
 		PublicKey,
 		Connection
 	>();
+	peerNodeCollection: PeerNodeCollection;
 	peerNodes: Map<PublicKey, PeerNode> = new Map<PublicKey, PeerNode>();
 	quorumSets: Map<string, QuorumSet>;
 	crawledNodeAddresses: Set<PeerKey> = new Set();
@@ -56,6 +58,7 @@ export class CrawlState {
 		this.topTierNodes = new Set(
 			topTierQuorumSet.validators.map((validator) => validator.toString())
 		);
+		this.peerNodeCollection = new PeerNodeCollection(this.peerNodes);
 	}
 
 	log() {
