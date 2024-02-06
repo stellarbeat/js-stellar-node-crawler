@@ -2,11 +2,8 @@ import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { AsyncResultCallback, queue, QueueObject } from 'async';
 import {
 	Connection,
-	getIpFromPeerAddress,
-	getQuorumSetFromMessage,
 	Node as NetworkNode
 } from '@stellarbeat/js-stellar-node-connector';
-import { hash, xdr } from '@stellar/stellar-base';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
@@ -19,6 +16,7 @@ import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlStateValidator } from './crawl-state-validator';
 import { CrawlLogger } from './crawl-logger';
 import { DisconnectTimeout } from './disconnect-timeout';
+import { StellarMessageHandler } from './stellar-message-handler';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -52,6 +50,7 @@ export class Crawler {
 	protected crawlQueue: QueueObject<CrawlQueueTask>;
 	protected blackList: Set<PublicKey>;
 
+	private stellarMessageHandler: StellarMessageHandler;
 	private disconnectTimeout: DisconnectTimeout;
 
 	constructor(
@@ -72,6 +71,34 @@ export class Crawler {
 			config.maxOpenConnections
 		);
 		this.disconnectTimeout = new DisconnectTimeout(logger);
+		this.stellarMessageHandler = new StellarMessageHandler(
+			this.scpManager,
+			this.quorumSetManager,
+			this.logger
+		);
+		this.setupStellarMessageHandlerEvents();
+	}
+
+	private setupStellarMessageHandlerEvents() {
+		this.stellarMessageHandler.on(
+			'peerAddresses',
+			(data: {
+				from: PublicKey | undefined;
+				peerAddresses: NodeAddress[];
+				crawlState: CrawlState;
+			}) => {
+				if (data.from) {
+					const peer = data.crawlState.peerNodes.get(data.from);
+					if (peer) peer.suppliedPeerList = true;
+				}
+				data.peerAddresses.forEach((peerAddress) =>
+					this.crawlPeerNode(peerAddress, data.crawlState)
+				);
+			}
+		);
+		this.stellarMessageHandler.on('disconnect', (connection: Connection) => {
+			this.disconnect(connection);
+		});
 	}
 
 	/*
@@ -128,7 +155,7 @@ export class Crawler {
 		return setTimeout(() => {
 			this.logger.fatal('Max crawl time hit, closing all connections');
 			crawlState.openConnections.forEach((connection) =>
-				this.disconnect(connection, crawlState)
+				this.disconnect(connection)
 			);
 			crawlState.maxCrawlTimeHit = true;
 		}, this.config.maxCrawlTime);
@@ -175,7 +202,7 @@ export class Crawler {
 					{ peer: connection.remoteAddress },
 					'error: ' + error.message
 				);
-				this.disconnect(connection, crawlQueueTask.crawlState, error);
+				this.disconnect(connection, error);
 			})
 			.on('connect', (publicKey: string, nodeInfo: NodeInfo) => {
 				crawlQueueTask.topTier =
@@ -188,17 +215,13 @@ export class Crawler {
 				);
 			})
 			.on('data', (stellarMessageWork: StellarMessageWork) => {
-				this.onStellarMessage(
+				this.stellarMessageHandler.handleStellarMessage(
 					connection,
-					stellarMessageWork.stellarMessage,
+					stellarMessageWork,
 					crawlQueueTask.crawlState
 				);
-
-				stellarMessageWork.done();
 			})
-			.on('timeout', () =>
-				this.onTimeout(connection, crawlQueueTask.crawlState)
-			)
+			.on('timeout', () => this.onTimeout(connection))
 			.on('close', () =>
 				this.onConnectionClose(
 					connection,
@@ -208,9 +231,9 @@ export class Crawler {
 			);
 	}
 
-	protected onTimeout(connection: Connection, crawlState: CrawlState): void {
+	protected onTimeout(connection: Connection): void {
 		this.logger.debug({ peer: connection.remoteAddress }, 'Connection timeout');
-		this.disconnect(connection, crawlState);
+		this.disconnect(connection);
 	}
 
 	protected onConnected(
@@ -233,7 +256,7 @@ export class Crawler {
 				'PeerNode on blacklist' + publicKey
 			);
 
-			this.disconnect(connection, crawlState);
+			this.disconnect(connection);
 
 			return;
 		}
@@ -248,7 +271,6 @@ export class Crawler {
 		if (peerNodeOrError instanceof Error) {
 			this.disconnect(
 				connection,
-				crawlState,
 				new Error(
 					'PeerNode reusing publicKey on address ' + connection.remoteAddress
 				)
@@ -266,96 +288,8 @@ export class Crawler {
 			peerNodeOrError,
 			0,
 			crawlState,
-			() => this.disconnect(connection, crawlState),
+			() => this.disconnect(connection),
 			this.readyWithNonTopTierPeers.bind(this)
-		);
-	}
-
-	protected onStellarMessage(
-		connection: Connection,
-		stellarMessage: xdr.StellarMessage,
-		crawlState: CrawlState
-	): void {
-		switch (stellarMessage.switch()) {
-			case xdr.MessageType.scpMessage(): {
-				const result = this.scpManager.processScpEnvelope(
-					stellarMessage.envelope(),
-					crawlState
-				);
-				if (result.isErr())
-					this.disconnect(connection, crawlState, result.error);
-				break;
-			}
-			case xdr.MessageType.peers():
-				this.onPeersReceived(connection, stellarMessage.peers(), crawlState);
-				break;
-			case xdr.MessageType.scpQuorumset():
-				this.onQuorumSetReceived(connection, stellarMessage.qSet(), crawlState);
-				break;
-			case xdr.MessageType.dontHave(): {
-				this.logger.info(
-					{
-						pk: truncate(connection.remotePublicKey),
-						type: stellarMessage.dontHave().type().name
-					},
-					"Don't have"
-				);
-				if (
-					stellarMessage.dontHave().type().value ===
-					xdr.MessageType.getScpQuorumset().value
-				) {
-					this.logger.info(
-						{
-							pk: truncate(connection.remotePublicKey),
-							hash: stellarMessage.dontHave().reqHash().toString('base64')
-						},
-						"Don't have"
-					);
-					if (connection.remotePublicKey) {
-						this.quorumSetManager.peerNodeDoesNotHaveQuorumSet(
-							connection.remotePublicKey,
-							stellarMessage.dontHave().reqHash().toString('base64'),
-							crawlState
-						);
-					}
-				}
-				break;
-			}
-			case xdr.MessageType.errorMsg():
-				this.onStellarMessageErrorReceived(
-					connection,
-					stellarMessage.error(),
-					crawlState
-				);
-				break;
-		}
-	}
-
-	protected onStellarMessageErrorReceived(
-		connection: Connection,
-		errorMessage: xdr.Error,
-		crawlState: CrawlState
-	): void {
-		switch (errorMessage.code()) {
-			case xdr.ErrorCode.errLoad():
-				this.onLoadTooHighReceived(connection, crawlState);
-				break;
-			default:
-				this.logger.info(
-					{
-						pk: truncate(connection.remotePublicKey),
-						peer: connection.remoteIp + ':' + connection.remotePort,
-						error: errorMessage.code().name
-					},
-					errorMessage.msg().toString()
-				);
-				break;
-		}
-
-		this.disconnect(
-			connection,
-			crawlState,
-			new Error(errorMessage.msg().toString())
 		);
 	}
 
@@ -399,80 +333,7 @@ export class Crawler {
 		crawlQueueTaskDone();
 	}
 
-	protected onPeersReceived(
-		connection: Connection,
-		peers: xdr.PeerAddress[],
-		crawlState: CrawlState
-	): void {
-		const peerAddresses: Array<NodeAddress> = [];
-		peers.forEach((peer) => {
-			const ipResult = getIpFromPeerAddress(peer);
-			if (ipResult.isOk()) peerAddresses.push([ipResult.value, peer.port()]);
-		});
-
-		this.logger.debug(
-			{ peer: connection.remoteAddress },
-			peerAddresses.length + ' peers received'
-		);
-
-		if (connection.remotePublicKey) {
-			const peer = crawlState.peerNodes.get(connection.remotePublicKey);
-			if (peer) peer.suppliedPeerList = true;
-		}
-
-		peerAddresses.forEach((peerAddress) =>
-			this.crawlPeerNode(peerAddress, crawlState)
-		);
-	}
-
-	protected onLoadTooHighReceived(
-		connection: Connection,
-		crawlState: CrawlState
-	): void {
-		this.logger.debug(
-			{ peer: connection.remoteAddress },
-			'Load too high message received'
-		);
-		if (connection.remotePublicKey) {
-			const node = crawlState.peerNodes.get(connection.remotePublicKey);
-			if (node) {
-				node.overLoaded = true;
-			}
-		}
-	}
-
-	protected onQuorumSetReceived(
-		connection: Connection,
-		quorumSetMessage: xdr.ScpQuorumSet,
-		crawlState: CrawlState
-	): void {
-		const quorumSetHash = hash(quorumSetMessage.toXDR()).toString('base64');
-		const quorumSetResult = getQuorumSetFromMessage(quorumSetMessage);
-		if (quorumSetResult.isErr()) {
-			this.disconnect(connection, crawlState, quorumSetResult.error);
-			return;
-		}
-		this.logger.info(
-			{
-				pk: truncate(connection.remotePublicKey),
-				hash: quorumSetHash
-			},
-			'QuorumSet received'
-		);
-		if (connection.remotePublicKey)
-			this.quorumSetManager.processQuorumSet(
-				quorumSetHash,
-				QuorumSet.fromBaseQuorumSet(quorumSetResult.value),
-				connection.remotePublicKey,
-				crawlState
-			);
-	}
-
-	protected disconnect(
-		connection: Connection,
-		crawlState: CrawlState,
-		error?: Error
-	): void {
+	protected disconnect(connection: Connection, error?: Error): void {
 		if (error) {
 			this.logger.debug(
 				{
