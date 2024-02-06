@@ -7,19 +7,18 @@ import {
 	Node as NetworkNode
 } from '@stellarbeat/js-stellar-node-connector';
 import { hash, xdr } from '@stellar/stellar-base';
-import { PeerNode } from './peer-node';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
 import { CrawlState } from './crawl-state';
 import { ScpManager } from './scp-manager';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
-import { listenFurther } from './listen-further';
 import { truncate } from './truncate';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlStateValidator } from './crawl-state-validator';
 import { CrawlLogger } from './crawl-logger';
+import { DisconnectTimeout } from './disconnect-timeout';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -53,8 +52,8 @@ export class Crawler {
 	protected crawlQueue: QueueObject<CrawlQueueTask>;
 	protected blackList: Set<PublicKey>;
 
-	protected static readonly SCP_LISTEN_TIMEOUT = 10000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
-	protected static readonly CONSENSUS_STUCK_TIMEOUT = 35000; //https://github.com/stellar/stellar-core/blob/2b16c2599e9167c67032b402b71e37d2bf1b15e3/src/herder/Herder.cpp#L9C36-L9C36
+	private disconnectTimeout: DisconnectTimeout;
+
 	constructor(
 		config: CrawlerConfiguration,
 		node: NetworkNode,
@@ -72,6 +71,7 @@ export class Crawler {
 			this.performCrawlQueueTask.bind(this),
 			config.maxOpenConnections
 		);
+		this.disconnectTimeout = new DisconnectTimeout(logger);
 	}
 
 	/*
@@ -262,7 +262,13 @@ export class Crawler {
             this._connectionManager.sendGetPeers(connection);
         }*/
 
-		this.listen(peerNodeOrError, connection, 0, crawlState);
+		this.disconnectTimeout.start(
+			peerNodeOrError,
+			0,
+			crawlState,
+			() => this.disconnect(connection, crawlState),
+			this.readyWithNonTopTierPeers.bind(this)
+		);
 	}
 
 	protected onStellarMessage(
@@ -487,58 +493,6 @@ export class Crawler {
 		}
 
 		connection.destroy();
-	}
-
-	protected listen(
-		peer: PeerNode,
-		connection: Connection,
-		timeoutCounter = 0,
-		crawlState: CrawlState
-	): void {
-		if (
-			!listenFurther(
-				peer,
-				timeoutCounter,
-				//we wait max twice CONSENSUS_STUCK_TIMEOUT to ensure we receive al externalizing messages from straggling nodes;
-				Math.ceil(
-					(2 * Crawler.CONSENSUS_STUCK_TIMEOUT) / Crawler.SCP_LISTEN_TIMEOUT
-				),
-				crawlState.topTierNodes,
-				this.readyWithNonTopTierPeers(),
-				crawlState.peerNodes
-			)
-		) {
-			this.logger.debug(
-				{
-					pk: truncate(peer.publicKey),
-					counter: timeoutCounter,
-					validating: peer.isValidating,
-					validatingIncorrectly: peer.isValidatingIncorrectValues,
-					scp: peer.participatingInSCP
-				},
-				'Disconnect'
-			);
-			this.disconnect(connection, crawlState);
-			return;
-		}
-		this.logger.debug(
-			{
-				pk: truncate(peer.publicKey),
-				latestActiveSlotIndex: peer.latestActiveSlotIndex
-			},
-			'Listening for externalize msg'
-		);
-		crawlState.listenTimeouts.set(
-			peer.publicKey,
-			setTimeout(() => {
-				this.logger.debug(
-					{ pk: truncate(peer.publicKey) },
-					'SCP Listen timeout reached'
-				);
-				timeoutCounter++;
-				this.listen(peer, connection, timeoutCounter, crawlState);
-			}, Crawler.SCP_LISTEN_TIMEOUT)
-		);
 	}
 
 	private readyWithNonTopTierPeers(): boolean {

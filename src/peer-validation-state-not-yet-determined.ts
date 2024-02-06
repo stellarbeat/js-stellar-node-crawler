@@ -1,7 +1,7 @@
 import { PeerNode } from './peer-node';
 import { PeerNodeCollection } from './peer-node-collection';
 
-export function listenFurther(
+export function peerValidationStateNotYetDetermined(
 	peer: PeerNode,
 	timeoutCounter: number,
 	maxTimeoutCounter: number,
