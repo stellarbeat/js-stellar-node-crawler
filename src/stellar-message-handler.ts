@@ -5,7 +5,6 @@ import {
 import { hash, xdr } from '@stellar/stellar-base';
 import { CrawlState } from './crawl-state';
 import { P } from 'pino';
-import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { EventEmitter } from 'events';
 import { ScpManager } from './scp-manager';
 import { NodeAddress } from './crawler';
@@ -13,7 +12,11 @@ import { truncate } from './truncate';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { QuorumSetManager } from './quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
-import { PeerNode } from './peer-node';
+import { PeerNodeCollection } from './peer-node-collection';
+
+export interface PeerAddressesReceivedEvent {
+	peerAddresses: Array<NodeAddress>;
+}
 
 type PublicKey = string;
 
@@ -27,23 +30,20 @@ export class StellarMessageHandler extends EventEmitter {
 	}
 
 	handleStellarMessage(
-		sender: PeerNode,
-		stellarMessageWork: StellarMessageWork,
+		sender: PublicKey,
+		stellarMessage: xdr.StellarMessage,
 		crawlState: CrawlState
 	): Result<void, Error> {
-		const stellarMessage = stellarMessageWork.stellarMessage;
-		const result = this.handleStellarMessageInternal(
+		return this.handleStellarMessageInternal(
 			stellarMessage,
 			sender,
 			crawlState
 		);
-		stellarMessageWork.done();
-		return result;
 	}
 
 	private handleStellarMessageInternal(
 		stellarMessage: xdr.StellarMessage,
-		sender: PeerNode,
+		sender: PublicKey,
 		crawlState: CrawlState
 	): Result<void, Error> {
 		switch (stellarMessage.switch()) {
@@ -56,26 +56,22 @@ export class StellarMessageHandler extends EventEmitter {
 				return this.handlePeersMessage(
 					sender,
 					stellarMessage.peers(),
-					crawlState
+					crawlState.peerNodes
 				);
 			case xdr.MessageType.scpQuorumset():
 				return this.handleScpQuorumSetMessage(
-					sender.publicKey,
+					sender,
 					stellarMessage.qSet(),
 					crawlState
 				);
 			case xdr.MessageType.dontHave():
 				return this.handleDontHaveMessage(
-					sender.publicKey,
+					sender,
 					stellarMessage.dontHave(),
 					crawlState
 				);
 			case xdr.MessageType.errorMsg():
-				return this.handleErrorMsg(
-					sender.publicKey,
-					stellarMessage.error(),
-					crawlState
-				);
+				return this.handleErrorMsg(sender, stellarMessage.error(), crawlState);
 			default:
 				this.logger.debug(
 					{ type: stellarMessage.switch().name },
@@ -86,9 +82,9 @@ export class StellarMessageHandler extends EventEmitter {
 	}
 
 	private handlePeersMessage(
-		sender: PeerNode,
+		sender: PublicKey,
 		peers: xdr.PeerAddress[],
-		crawlState: CrawlState
+		peerNodeCollection: PeerNodeCollection
 	): Result<void, Error> {
 		const peerAddresses: Array<NodeAddress> = [];
 		peers.forEach((peer) => {
@@ -96,15 +92,14 @@ export class StellarMessageHandler extends EventEmitter {
 			if (ipResult.isOk()) peerAddresses.push([ipResult.value, peer.port()]);
 		});
 
-		sender.suppliedPeerList = true;
+		peerNodeCollection.setPeerSuppliedPeerList(sender, true);
 
 		this.logger.debug(
-			{ peer: sender.publicKey },
+			{ peer: sender },
 			peerAddresses.length + ' peers received'
 		);
 
-		this.emit('peerAddresses', {
-			crawlState: crawlState,
+		this.emit('peerAddressesReceived', {
 			peerAddresses: peerAddresses
 		});
 
@@ -193,10 +188,7 @@ export class StellarMessageHandler extends EventEmitter {
 		crawlState: CrawlState
 	): Result<void, Error> {
 		this.logger.debug({ peer: sender }, 'Load too high message received');
-		const node = crawlState.peerNodes.get(sender);
-		if (node) {
-			node.overLoaded = true;
-		}
+		crawlState.peerNodes.setPeerOverloaded(sender, true);
 
 		return ok(undefined);
 	}

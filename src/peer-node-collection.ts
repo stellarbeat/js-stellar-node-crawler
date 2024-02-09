@@ -1,6 +1,8 @@
 import { PeerNode } from './peer-node';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 
+type PublicKey = string;
+
 export class PeerNodeCollection {
 	constructor(private peerNodes: Map<string, PeerNode> = new Map()) {}
 
@@ -52,5 +54,22 @@ export class PeerNodeCollection {
 
 	get size() {
 		return this.peerNodes.size;
+	}
+
+	setPeerOverloaded(publicKey: PublicKey, overloaded: boolean): void {
+		const peer = this.peerNodes.get(publicKey);
+		if (peer) {
+			peer.overLoaded = overloaded;
+		}
+	}
+
+	setPeerSuppliedPeerList(
+		publicKey: PublicKey,
+		suppliedPeerList: boolean
+	): void {
+		const peer = this.peerNodes.get(publicKey);
+		if (peer) {
+			peer.suppliedPeerList = suppliedPeerList;
+		}
 	}
 }

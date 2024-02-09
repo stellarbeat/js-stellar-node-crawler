@@ -57,16 +57,19 @@ async function main() {
 		nodes.forEach((node) => {
 			knownQuorumSets.set(node.quorumSetHashKey, node.quorumSet);
 		});
+		const addresses = nodes
+			.filter((node) => node.publicKey)
+			.map((node) => [node.ip, node.port]);
 
 		let result = await myCrawler.crawl(
-			nodes
-				.filter((node) => node.publicKey)
-				.map((node) => [node.ip, node.port]),
+			addresses,
+
 			trustedQSet,
 			{
 				sequence: BigInt(0),
 				closeTime: new Date(0)
-			}
+			},
+			knownQuorumSets
 		);
 		console.log(
 			'[MAIN] Writing results to file nodes.json in directory crawl_result'

@@ -10,7 +10,10 @@ import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlStateValidator } from './crawl-state-validator';
 import { CrawlLogger } from './crawl-logger';
 import { DisconnectTimeout } from './disconnect-timeout';
-import { StellarMessageHandler } from './stellar-message-handler';
+import {
+	PeerAddressesReceivedEvent,
+	StellarMessageHandler
+} from './stellar-message-handler';
 import {
 	ClosePayload,
 	ConnectedPayload,
@@ -84,9 +87,9 @@ export class Crawler {
 
 	private setupStellarMessageHandlerEvents() {
 		this.stellarMessageHandler.on(
-			'peerAddresses',
-			(data: { peerAddresses: NodeAddress[] }) => {
-				data.peerAddresses.forEach((peerAddress) =>
+			'peerAddressesReceived',
+			(event: PeerAddressesReceivedEvent) => {
+				event.peerAddresses.forEach((peerAddress) =>
 					this.crawlPeerNode(peerAddress)
 				);
 			}
@@ -207,19 +210,13 @@ export class Crawler {
 	}
 
 	private onStellarMessage(data: DataPayload) {
-		const sender = this.crawlState.peerNodes.get(data.publicKey);
-		if (!sender) {
-			this.logger.error(
-				{ peer: data.publicKey },
-				'Stellar Message received from peer not in peerNodes'
-			);
-			return;
-		}
 		const result = this.stellarMessageHandler.handleStellarMessage(
-			sender,
-			data.stellarMessageWork,
+			data.publicKey,
+			data.stellarMessageWork.stellarMessage,
 			this.crawlState
 		);
+
+		data.stellarMessageWork.done();
 
 		if (result.isErr()) {
 			this.logger.info({ peer: data.publicKey }, result.error.message);
