@@ -1,26 +1,25 @@
 import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
-import { Logger } from 'pino';
 import { xdr } from '@stellar/stellar-base';
 import { PeerNode } from './peer-node';
 import { CrawlState } from './crawl-state';
 import { err, ok, Result } from 'neverthrow';
 import { truncate } from './truncate';
+import { ConnectionManager } from './connection-manager';
 
 type QuorumSetHash = string;
 
 /**
  * Fetches quorumSets in a sequential way from connected nodes.
- * Makes sure every peerNode that sent an scp message with a hash, gets the correct quorumSet.
+ * Makes sure every peerNode that sent a scp message with a hash, gets the correct quorumSet.
  */
 export class QuorumSetManager {
-	protected logger: Logger;
-
 	static MS_TO_WAIT_FOR_REPLY = 1500;
 
-	constructor(logger: P.Logger) {
-		this.logger = logger;
-	}
+	constructor(
+		private connectionManager: ConnectionManager,
+		private logger: P.Logger
+	) {}
 
 	public onNodeDisconnected(
 		publicKey: PublicKey,
@@ -126,13 +125,19 @@ export class QuorumSetManager {
 			Buffer.from(quorumSetHash, 'base64')
 		);
 
-		const sendRequest = (to: PublicKey) => {
-			const connection = crawlState.openConnections.get(to);
-			if (!connection || !connection.remotePublicKey) return;
-			alreadyRequestedTo.add(connection.remotePublicKey);
+		const sendRequest = (to: string) => {
+			const connection = this.connectionManager.getActiveConnection(to); //todo: need more separation
+			if (!connection) {
+				this.logger.warn(
+					{ hash: quorumSetHash, address: to },
+					'No active connection to request quorumSet from'
+				);
+				return;
+			}
+			alreadyRequestedTo.add(to);
 			this.logger.info(
 				{ hash: quorumSetHash },
-				'Requesting quorumSet from ' + truncate(to)
+				'Requesting quorumSet from ' + to
 			);
 
 			connection.sendStellarMessage(quorumSetMessage);
@@ -155,18 +160,22 @@ export class QuorumSetManager {
 		};
 
 		//first try the owners of the hashes
-		const notYetRequestedOwnerWithActiveConnection = Array.from(owners.keys())
-			.filter((owner) => !alreadyRequestedTo.has(owner))
-			.find((owner) => crawlState.openConnections.has(owner));
+		const notYetRequestedOwnerWithActiveConnection = (
+			Array.from(owners.keys())
+				.map((owner) => crawlState.peerNodes.get(owner))
+				.filter((owner) => owner !== undefined) as PeerNode[]
+		)
+			.filter((owner) => !alreadyRequestedTo.has(owner.key))
+			.find((owner) => this.connectionManager.hasActiveConnectionTo(owner.key));
 		if (notYetRequestedOwnerWithActiveConnection) {
-			sendRequest(notYetRequestedOwnerWithActiveConnection);
+			sendRequest(notYetRequestedOwnerWithActiveConnection.key);
 			return;
 		}
 
 		//try other open connections
-		const notYetRequestedNonOwnerActiveConnection = Array.from(
-			crawlState.openConnections.keys()
-		).find((publicKey) => !alreadyRequestedTo.has(publicKey));
+		const notYetRequestedNonOwnerActiveConnection = this.connectionManager
+			.getActiveConnectionAddresses()
+			.find((address) => !alreadyRequestedTo.has(address));
 
 		if (notYetRequestedNonOwnerActiveConnection) {
 			sendRequest(notYetRequestedNonOwnerActiveConnection);

@@ -1,22 +1,22 @@
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { AsyncResultCallback, queue, QueueObject } from 'async';
-import {
-	Connection,
-	Node as NetworkNode
-} from '@stellarbeat/js-stellar-node-connector';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
 import { CrawlState } from './crawl-state';
 import { ScpManager } from './scp-manager';
-import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
-import { truncate } from './truncate';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlStateValidator } from './crawl-state-validator';
 import { CrawlLogger } from './crawl-logger';
 import { DisconnectTimeout } from './disconnect-timeout';
 import { StellarMessageHandler } from './stellar-message-handler';
+import {
+	ClosePayload,
+	ConnectedPayload,
+	ConnectionManager,
+	DataPayload
+} from './connection-manager';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -42,30 +42,20 @@ export interface Ledger {
  * The Crawler manages the connections to every discovered Node Address. If a node is participating in SCP, it keeps listening until it can determine if it is validating correctly.
  */
 export class Crawler {
-	protected quorumSetManager: QuorumSetManager;
-	protected scpManager: ScpManager;
-	protected crawlerNode: NetworkNode;
 	protected logger: P.Logger;
-	protected config: CrawlerConfiguration;
 	protected crawlQueue: QueueObject<CrawlQueueTask>;
-	protected blackList: Set<PublicKey>;
-
 	private stellarMessageHandler: StellarMessageHandler;
 	private disconnectTimeout: DisconnectTimeout;
+	private _crawlState: CrawlState | null = null;
 
 	constructor(
-		config: CrawlerConfiguration,
-		node: NetworkNode,
-		quorumSetManager: QuorumSetManager,
-		scpManager: ScpManager,
+		private config: CrawlerConfiguration,
+		private quorumSetManager: QuorumSetManager,
+		private scpManager: ScpManager,
+		private readonly connectionManager: ConnectionManager,
 		logger: P.Logger
 	) {
-		this.scpManager = scpManager;
-		this.config = config;
 		this.logger = logger.child({ mod: 'Crawler' });
-		this.quorumSetManager = quorumSetManager;
-		this.crawlerNode = node;
-		this.blackList = config.blackList;
 		this.crawlQueue = queue(
 			this.performCrawlQueueTask.bind(this),
 			config.maxOpenConnections
@@ -77,28 +67,54 @@ export class Crawler {
 			this.logger
 		);
 		this.setupStellarMessageHandlerEvents();
+		this.setupConnectionManagerEvents();
+	}
+
+	private setupConnectionManagerEvents() {
+		this.connectionManager.on('connected', (data: ConnectedPayload) => {
+			this.onConnected(data.ip, data.port, data.publicKey, data.nodeInfo);
+		});
+		this.connectionManager.on('data', (data: DataPayload) => {
+			this.onStellarMessage(data);
+		});
+		this.connectionManager.on('close', (data: ClosePayload) => {
+			this.onConnectionClose(data.address, data.publicKey);
+		});
 	}
 
 	private setupStellarMessageHandlerEvents() {
 		this.stellarMessageHandler.on(
 			'peerAddresses',
-			(data: {
-				from: PublicKey | undefined;
-				peerAddresses: NodeAddress[];
-				crawlState: CrawlState;
-			}) => {
-				if (data.from) {
-					const peer = data.crawlState.peerNodes.get(data.from);
-					if (peer) peer.suppliedPeerList = true;
-				}
+			(data: { peerAddresses: NodeAddress[] }) => {
 				data.peerAddresses.forEach((peerAddress) =>
-					this.crawlPeerNode(peerAddress, data.crawlState)
+					this.crawlPeerNode(peerAddress)
 				);
 			}
 		);
-		this.stellarMessageHandler.on('disconnect', (connection: Connection) => {
-			this.disconnect(connection);
-		});
+	}
+
+	get crawlState(): CrawlState {
+		if (!this._crawlState) throw new Error('crawlState not set');
+		return this._crawlState;
+	}
+
+	initCrawlState(
+		topTierQuorumSet: QuorumSet,
+		latestClosedLedger: Ledger = {
+			sequence: BigInt(0),
+			closeTime: new Date(0)
+		},
+		quorumSets: Map<QuorumSetHash, QuorumSet> = new Map<
+			QuorumSetHash,
+			QuorumSet
+		>()
+	) {
+		this._crawlState = new CrawlState(
+			topTierQuorumSet,
+			quorumSets,
+			latestClosedLedger,
+			this.logger
+		);
 	}
 
 	/*
@@ -117,67 +133,57 @@ export class Crawler {
 			QuorumSet
 		>()
 	): Promise<CrawlResult> {
-		const crawlState = new CrawlState(
-			topTierQuorumSet,
-			quorumSets,
-			latestClosedLedger,
-			this.logger
-		); //todo dependency inversion?
+		this.initCrawlState(topTierQuorumSet, latestClosedLedger, quorumSets);
 
 		return await new Promise<CrawlResult>((resolve, reject) => {
 			const errorOrNull = CrawlStateValidator.validateCrawlState(
-				crawlState,
+				//todo move to initCrawlState
+				this.crawlState,
 				this.config
 			);
 			if (errorOrNull) return reject(errorOrNull);
 
 			const crawlLogger = new CrawlLogger(
-				crawlState,
+				this.crawlState,
+				this.connectionManager,
 				this.crawlQueue,
 				this.logger
 			);
 			crawlLogger.start(nodeAddresses.length);
 
-			const maxCrawlTimeout = this.startMaxCrawlTimeout(crawlState);
+			const maxCrawlTimeout = this.startMaxCrawlTimeout(this.crawlState);
 
 			this.crawlQueue.drain(() => {
 				clearTimeout(maxCrawlTimeout);
-				this.wrapUp(resolve, reject, crawlState, crawlLogger);
+				this.wrapUp(resolve, reject, this.crawlState, crawlLogger);
 			});
 
-			nodeAddresses.forEach((address) =>
-				this.crawlPeerNode(address, crawlState)
-			);
+			nodeAddresses.forEach((address) => this.crawlPeerNode(address));
 		});
 	}
 
 	private startMaxCrawlTimeout(crawlState: CrawlState) {
 		return setTimeout(() => {
 			this.logger.fatal('Max crawl time hit, closing all connections');
-			crawlState.openConnections.forEach((connection) =>
-				this.disconnect(connection)
-			);
+			this.connectionManager.shutdown();
 			crawlState.maxCrawlTimeHit = true;
 		}, this.config.maxCrawlTime);
 	}
 
-	protected crawlPeerNode(
-		nodeAddress: NodeAddress,
-		crawlState: CrawlState
-	): void {
+	protected crawlPeerNode(nodeAddress: NodeAddress): void {
 		const peerKey = nodeAddressToPeerKey(nodeAddress);
-		if (crawlState.crawledNodeAddresses.has(peerKey)) {
+		if (this.crawlState.crawledNodeAddresses.has(peerKey)) {
 			this.logger.debug({ peer: peerKey }, 'Address already crawled');
 			return;
 		}
 
 		this.logger.debug({ peer: peerKey }, 'Adding address to crawl queue');
-		crawlState.crawledNodeAddresses.add(peerKey);
+		this.crawlState.crawledNodeAddresses.add(peerKey);
 		this.crawlQueue.push(
 			[
 				{
 					nodeAddress: nodeAddress,
-					crawlState: crawlState
+					crawlState: this.crawlState
 				}
 			],
 			(error) => {
@@ -190,170 +196,106 @@ export class Crawler {
 		crawlQueueTask: CrawlQueueTask,
 		crawlQueueTaskDone: AsyncResultCallback<void>
 	): void {
-		const connection = this.crawlerNode.connectTo(
+		this.crawlState.crawlQueueTaskDoneCallbacks.set(
+			crawlQueueTask.nodeAddress.join(':'),
+			crawlQueueTaskDone
+		);
+		this.connectionManager.connectToNode(
 			crawlQueueTask.nodeAddress[0],
 			crawlQueueTask.nodeAddress[1]
 		);
-		this.logger.debug({ peer: connection.remoteAddress }, 'Connecting');
-
-		connection
-			.on('error', (error: Error) => {
-				this.logger.debug(
-					{ peer: connection.remoteAddress },
-					'error: ' + error.message
-				);
-				this.disconnect(connection, error);
-			})
-			.on('connect', (publicKey: string, nodeInfo: NodeInfo) => {
-				crawlQueueTask.topTier =
-					crawlQueueTask.crawlState.topTierNodes.has(publicKey);
-				this.onConnected(
-					connection,
-					publicKey,
-					nodeInfo,
-					crawlQueueTask.crawlState
-				);
-			})
-			.on('data', (stellarMessageWork: StellarMessageWork) => {
-				this.stellarMessageHandler.handleStellarMessage(
-					connection,
-					stellarMessageWork,
-					crawlQueueTask.crawlState
-				);
-			})
-			.on('timeout', () => this.onTimeout(connection))
-			.on('close', () =>
-				this.onConnectionClose(
-					connection,
-					crawlQueueTask.crawlState,
-					crawlQueueTaskDone
-				)
-			);
 	}
 
-	protected onTimeout(connection: Connection): void {
-		this.logger.debug({ peer: connection.remoteAddress }, 'Connection timeout');
-		this.disconnect(connection);
-	}
-
-	protected onConnected(
-		connection: Connection,
-		publicKey: PublicKey,
-		nodeInfo: NodeInfo,
-		crawlState: CrawlState
-	): void {
-		this.logger.debug(
-			{ peer: connection.remoteAddress, pk: truncate(publicKey) },
-			'Connected'
-		);
-
-		if (this.blackList.has(publicKey)) {
-			this.logger.info(
-				{
-					peer: connection.remoteAddress,
-					pk: truncate(publicKey)
-				},
-				'PeerNode on blacklist' + publicKey
+	private onStellarMessage(data: DataPayload) {
+		const sender = this.crawlState.peerNodes.get(data.publicKey);
+		if (!sender) {
+			this.logger.error(
+				{ peer: data.publicKey },
+				'Stellar Message received from peer not in peerNodes'
 			);
-
-			this.disconnect(connection);
-
 			return;
 		}
+		const result = this.stellarMessageHandler.handleStellarMessage(
+			sender,
+			data.stellarMessageWork,
+			this.crawlState
+		);
 
-		const peerNodeOrError = crawlState.peerNodes.addSuccessfullyConnected(
+		if (result.isErr()) {
+			this.logger.info({ peer: data.publicKey }, result.error.message);
+			this.connectionManager.disconnectByAddress(data.address, result.error);
+		}
+	}
+
+	private onConnected(
+		ip: string,
+		port: number,
+		publicKey: PublicKey,
+		nodeInfo: NodeInfo
+	): void {
+		const peerNodeOrError = this.crawlState.peerNodes.addSuccessfullyConnected(
 			publicKey,
-			connection.remoteIp,
-			connection.remotePort,
+			ip,
+			port,
 			nodeInfo
 		);
 
 		if (peerNodeOrError instanceof Error) {
-			this.disconnect(
-				connection,
-				new Error(
-					'PeerNode reusing publicKey on address ' + connection.remoteAddress
-				)
+			this.connectionManager.disconnectByAddress(
+				ip + ':' + port,
+				peerNodeOrError
 			);
 			return; //we don't return this peerNode to consumer of this library
 		}
 
-		crawlState.openConnections.set(publicKey, connection);
+		this.crawlQueue.workersList().forEach((worker) => {
+			if (
+				worker.data.nodeAddress[0] === ip &&
+				worker.data.nodeAddress[1] === port
+			) {
+				worker.data.topTier = this.crawlState.topTierNodes.has(publicKey);
+			}
+		});
 
 		/*if (!this._nodesThatSuppliedPeerList.has(connection.peer)) { //Most nodes send their peers automatically on successful handshake, better handled with timer.
             this._connectionManager.sendGetPeers(connection);
         }*/
 
+		//todo: split out timers!
 		this.disconnectTimeout.start(
 			peerNodeOrError,
 			0,
-			crawlState,
-			() => this.disconnect(connection),
+			this.crawlState,
+			() => this.connectionManager.disconnectByAddress(peerNodeOrError.key),
 			this.readyWithNonTopTierPeers.bind(this)
 		);
 	}
 
 	protected onConnectionClose(
-		connection: Connection,
-		crawlState: CrawlState,
-		crawlQueueTaskDone: AsyncResultCallback<void>
+		nodeAddress: string,
+		publicKey: PublicKey | undefined
 	): void {
-		this.logger.debug(
-			{
-				pk: truncate(connection.remotePublicKey),
-				peer: connection.remoteAddress
-			},
-			'Node disconnected'
-		);
-
-		if (connection.remotePublicKey) {
-			this.quorumSetManager.onNodeDisconnected(
-				connection.remotePublicKey,
-				crawlState
-			);
-			const peer = crawlState.peerNodes.get(connection.remotePublicKey);
-			if (peer && peer.key === connection.remoteAddress) {
-				const timeout = crawlState.listenTimeouts.get(
-					connection.remotePublicKey
-				);
+		if (publicKey) {
+			this.quorumSetManager.onNodeDisconnected(publicKey, this.crawlState);
+			const peer = this.crawlState.peerNodes.get(publicKey);
+			if (peer && peer.key === nodeAddress) {
+				const timeout = this.crawlState.listenTimeouts.get(publicKey);
 				if (timeout) clearTimeout(timeout);
-				crawlState.openConnections.delete(connection.remotePublicKey);
 			} //if peer.key differs from remoteAddress,then this is a connection to an ip that reuses a publicKey. These connections are ignored, and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.
 		} else {
-			crawlState.failedConnections.push(connection.remoteAddress);
-			this.logger.debug(
-				{
-					ip: connection.remoteAddress,
-					leftInQueue: this.crawlQueue.length()
-				},
-				'handshake failed'
-			);
+			this.crawlState.failedConnections.push(nodeAddress);
 		}
 
-		crawlQueueTaskDone();
-	}
-
-	protected disconnect(connection: Connection, error?: Error): void {
-		if (error) {
-			this.logger.debug(
-				{
-					peer: connection.remoteAddress,
-					pk: truncate(connection.remotePublicKey),
-					error: error.message
-				},
-				'Disconnecting'
+		const crawlQueueTaskDoneCallback =
+			this.crawlState.crawlQueueTaskDoneCallbacks.get(nodeAddress);
+		if (!crawlQueueTaskDoneCallback) {
+			this.logger.error(
+				{ peer: nodeAddress },
+				'No crawlQueueTaskDoneCallback found'
 			);
-		} else {
-			this.logger.trace(
-				{
-					peer: connection.remoteAddress,
-					pk: truncate(connection.remotePublicKey)
-				},
-				'Disconnecting'
-			);
+			return;
 		}
-
-		connection.destroy();
+		crawlQueueTaskDoneCallback();
 	}
 
 	private readyWithNonTopTierPeers(): boolean {
@@ -374,6 +316,7 @@ export class Crawler {
 		crawlState: CrawlState,
 		crawlLogger: CrawlLogger
 	): void {
+		this.logger.info('Crawler shutting down');
 		crawlLogger.stop();
 
 		if (crawlState.maxCrawlTimeHit)

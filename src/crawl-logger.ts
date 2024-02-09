@@ -1,12 +1,14 @@
 import { CrawlState } from './crawl-state';
 import { P } from 'pino';
 import { QueueObject } from 'async';
+import { ConnectionManager } from './connection-manager';
 
 export class CrawlLogger {
 	loggingTimer?: NodeJS.Timeout;
 
 	constructor(
 		private crawlState: CrawlState,
+		private connectionManager: ConnectionManager,
 		private crawlQueue: QueueObject<any>,
 		private logger: P.Logger
 	) {}
@@ -21,7 +23,7 @@ export class CrawlLogger {
 				'nodes left in queue: ' +
 					this.crawlQueue.length() +
 					'. open connections: ' +
-					this.crawlState.openConnections.size
+					this.connectionManager.getNumberOfActiveConnections()
 			);
 		}, 10000);
 	}

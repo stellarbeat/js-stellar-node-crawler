@@ -4,6 +4,7 @@ import { QuorumSetManager } from './quorum-set-manager';
 import { ScpManager } from './scp-manager';
 import { createNode } from '@stellarbeat/js-stellar-node-connector';
 import { CrawlerConfiguration } from './crawler-configuration';
+import { ConnectionManager } from './connection-manager';
 
 export { Crawler } from './crawler';
 export { PeerNode } from './peer-node';
@@ -20,14 +21,20 @@ export function createCrawler(
 		});
 	}
 
-	const quorumSetManager = new QuorumSetManager(logger);
-
 	const node = createNode(config.nodeConfig, logger);
+
+	const connectionManager = new ConnectionManager(
+		node,
+		config.blackList,
+		logger
+	);
+	const quorumSetManager = new QuorumSetManager(connectionManager, logger);
+
 	return new Crawler(
 		config,
-		node,
 		quorumSetManager,
 		new ScpManager(quorumSetManager, logger),
+		connectionManager,
 		logger
 	);
 }

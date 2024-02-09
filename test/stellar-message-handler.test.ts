@@ -2,7 +2,6 @@ import { StellarMessageHandler } from '../src/stellar-message-handler';
 import { ScpManager } from '../src/scp-manager';
 import { QuorumSetManager } from '../src/quorum-set-manager';
 import { P } from 'pino';
-import { Connection } from '@stellarbeat/js-stellar-node-connector';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { CrawlState } from '../src/crawl-state';
 import { Keypair } from '@stellar/stellar-base';
@@ -14,23 +13,25 @@ import { createDummyQuorumSetMessage } from '../fixtures/createDummyQuorumSetMes
 import { createDummyDontHaveMessage } from '../fixtures/createDummyDontHaveMessage';
 import { createDummyErrLoadMessage } from '../fixtures/createDummyErrLoadMessage';
 import { PeerNodeCollection } from '../src/peer-node-collection';
+import { PeerNode } from '../src';
 
 describe('StellarMessageHandler', () => {
 	let scpManager: MockProxy<ScpManager>;
 	let quorumSetManager: MockProxy<QuorumSetManager>;
 	let logger: MockProxy<P.Logger>;
 	let handler: StellarMessageHandler;
+	let peerNode: PeerNode;
 
 	beforeEach(() => {
 		scpManager = mock<ScpManager>();
 		quorumSetManager = mock<QuorumSetManager>();
 		logger = mock<P.Logger>();
 		handler = new StellarMessageHandler(scpManager, quorumSetManager, logger);
+		peerNode = new PeerNode('A');
 	});
 
 	describe('handleStellarMessage', () => {
 		it('should handle SCP message', () => {
-			const connection = mock<Connection>();
 			const keyPair = Keypair.random();
 			const stellarMessageWork = {
 				stellarMessage: createDummyExternalizeMessage(keyPair),
@@ -38,14 +39,13 @@ describe('StellarMessageHandler', () => {
 			} as StellarMessageWork;
 			const crawlState = mock<CrawlState>();
 			scpManager.processScpEnvelope.mockReturnValueOnce(ok(undefined));
-			handler.handleStellarMessage(connection, stellarMessageWork, crawlState);
+			handler.handleStellarMessage(peerNode, stellarMessageWork, crawlState);
 
 			expect(scpManager.processScpEnvelope).toHaveBeenCalledTimes(1);
 			expect(stellarMessageWork.done).toHaveBeenCalled();
 		});
 
 		it('should handle peers message', () => {
-			const connection = mock<Connection>();
 			const stellarMessageWork = {
 				stellarMessage: createDummyPeersMessage(),
 				done: jest.fn()
@@ -54,31 +54,29 @@ describe('StellarMessageHandler', () => {
 			const peerAddressesListener = jest.fn();
 			handler.on('peerAddresses', peerAddressesListener);
 
-			handler.handleStellarMessage(connection, stellarMessageWork, crawlState);
+			handler.handleStellarMessage(peerNode, stellarMessageWork, crawlState);
 			expect(peerAddressesListener).toHaveBeenCalledTimes(1);
 			expect(stellarMessageWork.done).toHaveBeenCalled();
 		});
 
 		it('should handle SCP quorum set message', () => {
-			const connection = mock<Connection>();
 			const stellarMessageWork = {
 				stellarMessage: createDummyQuorumSetMessage(),
 				done: jest.fn()
 			} as StellarMessageWork;
 			const crawlState = mock<CrawlState>();
-			handler.handleStellarMessage(connection, stellarMessageWork, crawlState);
+			handler.handleStellarMessage(peerNode, stellarMessageWork, crawlState);
 			expect(quorumSetManager.processQuorumSet).toHaveBeenCalledTimes(1);
 			expect(stellarMessageWork.done).toHaveBeenCalled();
 		});
 
 		it('should handle dont have message', () => {
-			const connection = mock<Connection>();
 			const stellarMessageWork = {
 				stellarMessage: createDummyDontHaveMessage(),
 				done: jest.fn()
 			} as StellarMessageWork;
 			const crawlState = mock<CrawlState>();
-			handler.handleStellarMessage(connection, stellarMessageWork, crawlState);
+			handler.handleStellarMessage(peerNode, stellarMessageWork, crawlState);
 			expect(
 				quorumSetManager.peerNodeDoesNotHaveQuorumSet
 			).toHaveBeenCalledTimes(1);
@@ -86,14 +84,13 @@ describe('StellarMessageHandler', () => {
 		});
 
 		it('should handle errLoad message', () => {
-			const connection = mock<Connection>();
 			const stellarMessageWork = {
 				stellarMessage: createDummyErrLoadMessage(),
 				done: jest.fn()
 			} as StellarMessageWork;
 			const crawlState = mock<CrawlState>();
 			crawlState.peerNodes = new PeerNodeCollection();
-			handler.handleStellarMessage(connection, stellarMessageWork, crawlState);
+			handler.handleStellarMessage(peerNode, stellarMessageWork, crawlState);
 			expect(stellarMessageWork.done).toHaveBeenCalled();
 		});
 	});

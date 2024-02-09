@@ -1,12 +1,11 @@
-import { Connection } from '@stellarbeat/js-stellar-node-connector';
 import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
-import { PeerNode } from './peer-node';
 import { Ledger } from './crawler';
 import { Slots } from './slots';
 import * as LRUCache from 'lru-cache';
 import * as P from 'pino';
 import { truncate } from './truncate';
 import { PeerNodeCollection } from './peer-node-collection';
+import { AsyncResultCallback } from 'async';
 
 type QuorumSetHash = string;
 type PeerKey = string; //ip:port
@@ -26,10 +25,9 @@ export class QuorumSetState {
 
 export class CrawlState {
 	maxCrawlTimeHit = false;
-	openConnections: Map<PublicKey, Connection> = new Map<
-		PublicKey,
-		Connection
-	>();
+	crawlQueueTaskDoneCallbacks: Map<string, AsyncResultCallback<void>> =
+		new Map();
+
 	peerNodes: PeerNodeCollection;
 	quorumSets: Map<string, QuorumSet>;
 	crawledNodeAddresses: Set<PeerKey> = new Set();

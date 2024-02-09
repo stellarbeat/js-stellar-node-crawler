@@ -154,6 +154,4 @@ export class ScpManager {
 
 		return ok(undefined);
 	}
-
-	listen() {}
 }
