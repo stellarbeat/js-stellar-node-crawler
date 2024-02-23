@@ -143,13 +143,13 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 	]);
 
 	const nodeConfig: NodeConfig = {
-		network: 'test',
+		network: Networks.TESTNET,
 		nodeInfo: {
 			ledgerVersion: 1,
 			overlayVersion: 1,
 			overlayMinVersion: 1,
 			versionString: '1.0.0',
-			networkId: 'testnet'
+			networkId: Networks.TESTNET
 		},
 		listeningPort: 11026,
 		receiveTransactionMessages: false,
@@ -198,7 +198,7 @@ it('should hit the max crawl limit', async function () {
 	]);
 
 	const nodeConfig = getConfigFromEnv();
-	nodeConfig.network = 'test';
+	nodeConfig.network = Networks.TESTNET;
 
 	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig, 25, 1000));
 
@@ -234,7 +234,7 @@ function createExternalizeMessage(
 		statement,
 		node.keyPair.rawPublicKey(),
 		node.keyPair.rawSecretKey(),
-		hash(Buffer.from(Networks.PUBLIC))
+		hash(Buffer.from(Networks.TESTNET))
 	);
 	if (signatureResult.isOk()) {
 		const envelope = new xdr.ScpEnvelope({
@@ -249,7 +249,7 @@ function createExternalizeMessage(
 
 function getListeningPeerNode(address: NodeAddress, privateKey?: string) {
 	const peerNodeConfig: NodeConfig = {
-		network: 'test',
+		network: Networks.TESTNET,
 		nodeInfo: {
 			ledgerVersion: 1,
 			overlayMinVersion: 1,

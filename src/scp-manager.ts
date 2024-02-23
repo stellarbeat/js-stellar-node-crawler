@@ -38,9 +38,12 @@ export class ScpManager {
 
 		const verifiedResult = verifySCPEnvelopeSignature(
 			scpEnvelope,
-			hash(Buffer.from(Networks.PUBLIC))
+			hash(Buffer.from(crawlState.network))
 		);
-		if (verifiedResult.isErr()) return err(new Error('Invalid SCP Signature'));
+		if (verifiedResult.isErr())
+			return err(new Error('Error verifying SCP Signature'));
+
+		if (!verifiedResult.value) return err(new Error('Invalid SCP Signature'));
 
 		return this.processScpStatement(scpEnvelope.statement(), crawlState);
 	}

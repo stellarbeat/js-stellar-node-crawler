@@ -123,6 +123,7 @@ export class Crawler {
 			topTierQuorumSet,
 			quorumSets,
 			latestClosedLedger,
+			this.config.nodeConfig.network,
 			this.logger
 		);
 	}

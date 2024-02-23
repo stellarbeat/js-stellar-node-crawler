@@ -24,6 +24,7 @@ export class QuorumSetState {
 }
 
 export class CrawlState {
+	network: string;
 	maxCrawlTimeHit = false;
 	crawlQueueTaskDoneCallbacks: Map<string, AsyncResultCallback<void>> =
 		new Map();
@@ -46,6 +47,7 @@ export class CrawlState {
 		topTierQuorumSet: QuorumSet,
 		quorumSets: Map<string, QuorumSet>,
 		latestClosedLedger: Ledger,
+		network: string,
 		protected logger: P.Logger
 	) {
 		this.quorumSets = quorumSets;
@@ -56,6 +58,7 @@ export class CrawlState {
 			topTierQuorumSet.validators.map((validator) => validator.toString())
 		);
 		this.peerNodes = new PeerNodeCollection();
+		this.network = network;
 	}
 
 	log() {

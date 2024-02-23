@@ -1,7 +1,10 @@
 import { hash, Keypair, Networks, xdr } from '@stellar/stellar-base';
 import { createSCPEnvelopeSignature } from '@stellarbeat/js-stellar-node-connector';
 
-export function createDummyExternalizeMessage(keyPair: Keypair) {
+export function createDummyExternalizeMessage(
+	keyPair: Keypair = Keypair.random(),
+	networkHash = hash(Buffer.from(Networks.PUBLIC))
+) {
 	const commit = new xdr.ScpBallot({ counter: 1, value: Buffer.alloc(32) });
 	const externalize = new xdr.ScpStatementExternalize({
 		commit: commit,
@@ -20,7 +23,7 @@ export function createDummyExternalizeMessage(keyPair: Keypair) {
 		statement,
 		keyPair.rawPublicKey(),
 		keyPair.rawSecretKey(),
-		hash(Buffer.from(Networks.PUBLIC))
+		networkHash
 	);
 
 	if (signatureResult.isErr()) {

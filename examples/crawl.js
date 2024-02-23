@@ -61,9 +61,13 @@ async function main() {
 			.filter((node) => node.publicKey)
 			.map((node) => [node.ip, node.port]);
 
+		const topTierAddresses = nodes
+			.filter((node) => trustedQSet.validators.includes(node.publicKey))
+			.map((node) => [node.ip, node.port]);
+
 		let result = await myCrawler.crawl(
 			addresses,
-
+			topTierAddresses,
 			trustedQSet,
 			{
 				sequence: BigInt(0),
