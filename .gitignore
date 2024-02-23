@@ -6,3 +6,4 @@ flow-typed/
 lib/
 .clinic/
 crawl_result/
+coverage/
