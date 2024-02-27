@@ -11,6 +11,7 @@ import { LedgerCloseDetector } from './ledger-close-detector/ledger-close-detect
 import { LedgerCloseScpEnvelopeHandler } from './ledger-close-detector/ledger-close-scp-envelope-handler';
 import { SlotCloser } from './ledger-close-detector/slot-closer';
 import { CachedLedgerCloseScpEnvelopeHandler } from './ledger-close-detector/cached-ledger-close-scp-envelope-handler';
+import { ExternalizeStatementHandler } from './externalize-statement-handler';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -51,7 +52,11 @@ export function createCrawler(
 	return new Crawler(
 		config,
 		quorumSetManager,
-		new ScpEnvelopeHandler(quorumSetManager, logger),
+		new ScpEnvelopeHandler(
+			quorumSetManager,
+			new ExternalizeStatementHandler(logger),
+			logger
+		),
 		connectionManager,
 		/*new LedgerCloseDetector(
 			ledgerCLoseConnectionManager,

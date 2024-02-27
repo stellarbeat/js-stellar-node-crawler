@@ -46,6 +46,19 @@ export class PeerNode {
 		return this.externalizedValues.get(slotIndex)?.value === value;
 	}
 
+	externalizedValueIsValidated(ledger: Ledger) {
+		if (!this.hasExternalizedLedger(ledger.sequence)) {
+			throw new Error(
+				'PeerNode.externalizedMessageIsValid called for a ledger that was not externalized by this peer'
+			);
+		}
+		if (this.successfullyConnected && !this.disconnected) {
+			this.observedLedgerCloses++;
+		}
+		this.isValidating = true;
+		this.updateLag(ledger);
+	}
+
 	updateLag(closedLedger: Ledger): void {
 		if (this.hasExternalizedLedger(closedLedger.sequence)) {
 			const lag = this.determineLag(

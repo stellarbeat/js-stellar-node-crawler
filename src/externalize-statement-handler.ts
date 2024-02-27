@@ -2,8 +2,9 @@ import * as P from 'pino';
 import { PeerNode } from './peer-node';
 import { xdr } from '@stellar/stellar-base';
 import { CrawlState } from './crawl-state';
-import { err, ok, Result } from 'neverthrow';
+import { ok, Result } from 'neverthrow';
 import { extractCloseTimeFromValue } from './ledger-close-detector/extract-close-time-from-value';
+import { Slot } from './slots';
 import { Ledger } from './crawler';
 
 export class ExternalizeStatementHandler {
@@ -19,7 +20,116 @@ export class ExternalizeStatementHandler {
 		statementExternalize: xdr.ScpStatementExternalize,
 		crawlState: CrawlState
 	): Result<undefined, Error> {
-		const value = statementExternalize.commit().value().toString('base64');
+		const value = this.getCommitValue(statementExternalize);
+		this.logExternalizeMessage(peer, slotIndex, value);
+
+		this.registerExternalizedValueForPeer(peer, slotIndex, value);
+
+		const slot = crawlState.slots.getSlot(slotIndex);
+
+		if (slot.closed()) {
+			this.validateExternalizedValueForPeer(value, slot, peer);
+			return ok(undefined);
+		}
+
+		return this.attemptSlotClose(slot, peer, value, slotIndex, crawlState);
+	}
+
+	private attemptSlotClose(
+		slot: Slot,
+		peer: PeerNode,
+		value: string,
+		slotIndex: bigint,
+		crawlState: CrawlState
+	) {
+		slot.addExternalizeValue(peer.publicKey, value);
+
+		const closedLedger = slot.getClosedLedger();
+		if (!slot.closed() || !closedLedger) return ok(undefined);
+
+		this.onSlotClose(closedLedger, slotIndex, crawlState, value, slot);
+
+		return ok(undefined);
+	}
+
+	private validateExternalizedValueForPeer(
+		value: string,
+		slot: Slot,
+		peer: PeerNode
+	) {
+		if (value === slot.externalizedValue && slot.getClosedLedger())
+			peer.externalizedValueIsValidated(slot.getClosedLedger()!);
+		else peer.isValidatingIncorrectValues = true;
+	}
+
+	private onSlotClose(
+		closedLedger: Ledger,
+		slotIndex: bigint,
+		crawlState: CrawlState,
+		value: string,
+		slot: Slot
+	) {
+		this.logLedgerClose(closedLedger);
+		if (slotIndex > crawlState.latestClosedLedger.sequence) {
+			crawlState.latestClosedLedger = {
+				sequence: slotIndex,
+				closeTime: extractCloseTimeFromValue(Buffer.from(value, 'base64')),
+				value: value,
+				localCloseTime: new Date()
+			};
+		}
+		this.processAgreeingNodes(slot, crawlState, closedLedger);
+		this.processDisagreeingNodes(slot, crawlState);
+	}
+
+	private logLedgerClose(closedLedger: Ledger) {
+		this.logger.info(
+			{
+				sequence: closedLedger.sequence,
+				closeTime: closedLedger.closeTime,
+				localCloseTime: closedLedger.localCloseTime
+			},
+			'Ledger closed!'
+		);
+	}
+
+	private processDisagreeingNodes(slot: Slot, crawlState: CrawlState) {
+		slot.getNodesDisagreeingOnExternalizedValue().forEach((nodeId) => {
+			const badPeer = crawlState.peerNodes.get(nodeId);
+			if (badPeer) badPeer.isValidatingIncorrectValues = true;
+		});
+	}
+
+	private processAgreeingNodes(
+		slot: Slot,
+		crawlState: CrawlState,
+		closedLedger: Ledger
+	) {
+		slot
+			.getNodesAgreeingOnExternalizedValue()
+			.forEach((validatingPublicKey) => {
+				const validatingPeer = crawlState.peerNodes.get(validatingPublicKey);
+				if (validatingPeer)
+					validatingPeer.externalizedValueIsValidated(closedLedger);
+			});
+	}
+
+	private registerExternalizedValueForPeer(
+		peer: PeerNode,
+		slotIndex: bigint,
+		value: string
+	) {
+		peer.externalizedValues.set(slotIndex, {
+			localTime: new Date(),
+			value: value
+		});
+	}
+
+	private logExternalizeMessage(
+		peer: PeerNode,
+		slotIndex: bigint,
+		value: string
+	) {
 		this.logger.debug(
 			{
 				publicKey: peer.publicKey,
@@ -27,73 +137,9 @@ export class ExternalizeStatementHandler {
 			},
 			'externalize msg with value: ' + value
 		);
+	}
 
-		peer.externalizedValues.set(slotIndex, {
-			localTime: new Date(),
-			value: value
-		});
-
-		const markNodeAsValidating = (peer: PeerNode, ledger: Ledger) => {
-			if (peer.successfullyConnected && !peer.disconnected) {
-				peer.observedLedgerCloses++;
-			}
-			if (!peer.isValidating) {
-				this.logger.debug(
-					{
-						pk: peer.publicKey
-					},
-					'Validating'
-				);
-			}
-			peer.isValidating = true;
-			peer.updateLag(ledger);
-		};
-
-		const slot = crawlState.slots.getSlot(slotIndex);
-		const slotWasClosedBefore = slot.closed();
-		slot.addExternalizeValue(peer.publicKey, value);
-
-		if (slot.closed()) {
-			const closedLedger = slot.getClosedLedger();
-			if (!closedLedger) return err(new Error('Closed ledger is undefined'));
-			if (!slotWasClosedBefore) {
-				//we just closed the slot, lets mark all nodes as validating!
-				this.logger.info(
-					{
-						sequence: closedLedger.sequence,
-						closeTime: closedLedger.closeTime,
-						localCloseTime: closedLedger.localCloseTime
-					},
-					'Ledger closed!'
-				);
-				if (slotIndex > crawlState.latestClosedLedger.sequence) {
-					crawlState.latestClosedLedger = {
-						sequence: slotIndex,
-						closeTime: extractCloseTimeFromValue(Buffer.from(value, 'base64')),
-						value: value,
-						localCloseTime: new Date()
-					};
-				}
-				slot
-					.getNodesAgreeingOnExternalizedValue()
-					.forEach((validatingPublicKey) => {
-						const validatingPeer =
-							crawlState.peerNodes.get(validatingPublicKey);
-						if (validatingPeer)
-							markNodeAsValidating(validatingPeer, closedLedger);
-					});
-				slot.getNodesDisagreeingOnExternalizedValue().forEach((nodeId) => {
-					const badPeer = crawlState.peerNodes.get(nodeId);
-					if (badPeer) badPeer.isValidatingIncorrectValues = true;
-				});
-			} else {
-				//if the slot was already closed, we check if this new (?) node should be marked as validating
-				if (value === slot.externalizedValue)
-					markNodeAsValidating(peer, closedLedger);
-				else peer.isValidatingIncorrectValues = true;
-			}
-		}
-
-		return ok(undefined);
+	private getCommitValue(statementExternalize: xdr.ScpStatementExternalize) {
+		return statementExternalize.commit().value().toString('base64');
 	}
 }

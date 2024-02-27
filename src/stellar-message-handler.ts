@@ -22,7 +22,7 @@ type PublicKey = string;
 
 export class StellarMessageHandler extends EventEmitter {
 	constructor(
-		private scpManager: ScpEnvelopeHandler,
+		private scpEnvelopeHandler: ScpEnvelopeHandler,
 		private quorumSetManager: QuorumSetManager,
 		private logger: P.Logger
 	) {
@@ -48,7 +48,7 @@ export class StellarMessageHandler extends EventEmitter {
 	): Result<void, Error> {
 		switch (stellarMessage.switch()) {
 			case xdr.MessageType.scpMessage():
-				return this.scpManager.processScpEnvelope(
+				return this.scpEnvelopeHandler.processScpEnvelope(
 					stellarMessage.envelope(),
 					crawlState
 				);
