@@ -6,7 +6,7 @@ import { hash, xdr } from '@stellar/stellar-base';
 import { CrawlState } from './crawl-state';
 import { P } from 'pino';
 import { EventEmitter } from 'events';
-import { ScpManager } from './scp-manager';
+import { ScpEnvelopeHandler } from './scp-envelope-handler';
 import { NodeAddress } from './crawler';
 import { truncate } from './truncate';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
@@ -22,7 +22,7 @@ type PublicKey = string;
 
 export class StellarMessageHandler extends EventEmitter {
 	constructor(
-		private scpManager: ScpManager,
+		private scpManager: ScpEnvelopeHandler,
 		private quorumSetManager: QuorumSetManager,
 		private logger: P.Logger
 	) {

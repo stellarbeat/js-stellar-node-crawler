@@ -1,19 +1,18 @@
 import * as P from 'pino';
-import { hash, Networks, xdr } from '@stellar/stellar-base';
-import {
-	getPublicKeyStringFromBuffer,
-	verifySCPEnvelopeSignature
-} from '@stellarbeat/js-stellar-node-connector';
+import { xdr } from '@stellar/stellar-base';
+import { verifySCPEnvelopeSignature } from '@stellarbeat/js-stellar-node-connector';
 import { err, ok, Result } from 'neverthrow';
 import { Ledger } from '../crawler';
 import { PublicKey } from '@stellarbeat/js-stellarbeat-shared';
 import { SlotCloser } from './slot-closer';
 import { mapExternalizeStatement } from './map-externalize-statement';
+import { Slots } from '../slots';
 
 export class LedgerCloseScpEnvelopeHandler {
 	constructor(private slotCloser: SlotCloser, private logger: P.Logger) {}
 
 	public handleScpEnvelope(
+		slots: Slots,
 		scpEnvelope: xdr.ScpEnvelope,
 		networkHash: Buffer
 	): Result<undefined | Ledger, Error> {
@@ -29,6 +28,7 @@ export class LedgerCloseScpEnvelopeHandler {
 		if (mapResult.isErr()) return err(mapResult.error);
 
 		return this.attemptSlotClose(
+			slots,
 			mapResult.value.publicKey,
 			mapResult.value.slotIndex,
 			mapResult.value.value
@@ -43,6 +43,7 @@ export class LedgerCloseScpEnvelopeHandler {
 	}
 
 	private attemptSlotClose(
+		slots: Slots,
 		publicKey: PublicKey,
 		slotIndex: bigint,
 		value: string
@@ -52,6 +53,7 @@ export class LedgerCloseScpEnvelopeHandler {
 			'Attempting to close ledger'
 		);
 		const newClosedSlotOrUndefined = this.slotCloser.attemptSlotClose(
+			slots,
 			publicKey,
 			slotIndex,
 			value
@@ -61,7 +63,9 @@ export class LedgerCloseScpEnvelopeHandler {
 
 		return ok({
 			sequence: slotIndex,
-			closeTime: newClosedSlotOrUndefined.closeTime
+			closeTime: newClosedSlotOrUndefined.closeTime,
+			value: value.toString(),
+			localCloseTime: newClosedSlotOrUndefined.localCloseTime
 		});
 	}
 }

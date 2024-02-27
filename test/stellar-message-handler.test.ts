@@ -1,5 +1,5 @@
 import { StellarMessageHandler } from '../src/stellar-message-handler';
-import { ScpManager } from '../src/scp-manager';
+import { ScpEnvelopeHandler } from '../src/scp-envelope-handler';
 import { QuorumSetManager } from '../src/quorum-set-manager';
 import { P } from 'pino';
 import { CrawlState } from '../src/crawl-state';
@@ -15,14 +15,14 @@ import { PeerNode } from '../src';
 import { PeerNodeCollection } from '../src/peer-node-collection';
 
 describe('StellarMessageHandler', () => {
-	let scpManager: MockProxy<ScpManager>;
+	let scpManager: MockProxy<ScpEnvelopeHandler>;
 	let quorumSetManager: MockProxy<QuorumSetManager>;
 	let logger: MockProxy<P.Logger>;
 	let handler: StellarMessageHandler;
 	let senderPublicKey: string;
 
 	beforeEach(() => {
-		scpManager = mock<ScpManager>();
+		scpManager = mock<ScpEnvelopeHandler>();
 		quorumSetManager = mock<QuorumSetManager>();
 		logger = mock<P.Logger>();
 		handler = new StellarMessageHandler(scpManager, quorumSetManager, logger);
@@ -48,7 +48,7 @@ describe('StellarMessageHandler', () => {
 			const stellarMessage = createDummyPeersMessage();
 			const crawlState = mock<CrawlState>();
 			const peerNodes = new PeerNodeCollection();
-			peerNodes.add(senderPublicKey);
+			peerNodes.addIfNotExists(senderPublicKey);
 			crawlState.peerNodes = peerNodes;
 			const peerAddressesListener = jest.fn();
 			handler.on('peerAddressesReceived', peerAddressesListener);
@@ -88,7 +88,7 @@ describe('StellarMessageHandler', () => {
 			const stellarMessage = createDummyErrLoadMessage();
 			const crawlState = mock<CrawlState>();
 			const peerNodes = new PeerNodeCollection();
-			peerNodes.add(senderPublicKey);
+			peerNodes.addIfNotExists(senderPublicKey);
 			crawlState.peerNodes = peerNodes;
 			const result = handler.handleStellarMessage(
 				senderPublicKey,

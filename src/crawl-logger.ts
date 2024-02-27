@@ -19,12 +19,11 @@ export class CrawlLogger {
 			'Starting crawl with seed of ' + nodeAddressesLength + 'addresses.'
 		);
 		this.loggingTimer = setInterval(() => {
-			this.logger.info(
-				'nodes left in queue: ' +
-					this.crawlQueue.length() +
-					'. open connections: ' +
-					this.connectionManager.getNumberOfActiveConnections()
-			);
+			this.logger.info({
+				queueLength: this.crawlQueue.length(),
+				activeConnections: this.connectionManager.getNumberOfActiveConnections()
+				//topTierConnections: this.ledgerCloseDetector.getConnectedNodesCount()
+			});
 		}, 10000);
 	}
 

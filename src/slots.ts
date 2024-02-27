@@ -1,6 +1,8 @@
 import containsSlice from '@stellarbeat/js-stellarbeat-shared/lib/quorum/containsSlice';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
+import { Ledger } from './crawler';
+import { extractCloseTimeFromValue } from './ledger-close-detector/extract-close-time-from-value';
 
 type SlotIndex = bigint;
 type NodeId = string;
@@ -10,7 +12,11 @@ export class Slot {
 	public index: SlotIndex;
 	public externalizedValue?: SlotValue;
 	protected valuesMap: Map<SlotValue, Set<NodeId>> = new Map();
+	protected localCloseTimeMap: Map<SlotValue, Date> = new Map(); //we store the first time we observed a close time for a value
+	//we can't wait until we validated the value, because slow nodes could influence this time.
 	protected trustedQuorumSet: QuorumSet;
+	protected closeTime?: Date;
+	protected localCloseTime?: Date;
 
 	constructor(
 		index: SlotIndex,
@@ -51,6 +57,10 @@ export class Slot {
 			this.valuesMap.set(value, nodesThatExternalizedValue);
 		}
 
+		if (this.localCloseTimeMap.get(value) === undefined) {
+			this.localCloseTimeMap.set(value, new Date()); //the first observed close time
+		}
+
 		if (nodesThatExternalizedValue.has(nodeId))
 			//already recorded, no need to check if closed
 			return;
@@ -66,10 +76,25 @@ export class Slot {
 					{ node: nodeId }
 				);
 			}
-			if (containsSlice(this.trustedQuorumSet, nodesThatExternalizedValue))
+			if (containsSlice(this.trustedQuorumSet, nodesThatExternalizedValue)) {
 				//try to close slot
 				this.externalizedValue = value;
+				this.closeTime = extractCloseTimeFromValue(
+					Buffer.from(value, 'base64')
+				);
+				this.localCloseTime = this.localCloseTimeMap.get(value)!;
+			}
 		}
+	}
+
+	getClosedLedger(): Ledger | undefined {
+		if (!this.closed()) return undefined;
+		return {
+			sequence: this.index,
+			closeTime: this.closeTime!,
+			value: this.externalizedValue!,
+			localCloseTime: this.localCloseTime!
+		};
 	}
 
 	closed(): boolean {

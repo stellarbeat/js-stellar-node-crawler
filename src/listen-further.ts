@@ -1,7 +1,7 @@
 import { PeerNode } from './peer-node';
 import { PeerNodeCollection } from './peer-node-collection';
 
-export function peerValidationStateNotYetDetermined(
+export function listenFurther(
 	peer: PeerNode,
 	timeoutCounter: number,
 	maxTimeoutCounter: number,
@@ -15,8 +15,14 @@ export function peerValidationStateNotYetDetermined(
 	if (peer.isValidatingIncorrectValues) return false;
 	if (!peer.participatingInSCP && !topTierNodes.has(peer.publicKey))
 		return false; //watcher node
-	if (peer.isValidating && peer.quorumSet && !topTierNodes.has(peer.publicKey))
+	if (
+		peer.isValidating &&
+		peer.observedLedgerCloses >= 1 &&
+		peer.quorumSet &&
+		!topTierNodes.has(peer.publicKey)
+	)
 		//todo: a peer that is validating but doesnt have it's own quorumSet, could keep listening until max.
+		//observed higher or equal to one to make sure lag timings are coming from it's own externalize messages
 		return false; //we have all the needed information
 
 	return !queueIsEmptyAndTopTierNodesParticipatingInSCPAreAllValidating(

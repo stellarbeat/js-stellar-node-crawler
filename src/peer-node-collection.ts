@@ -6,7 +6,7 @@ type PublicKey = string;
 export class PeerNodeCollection {
 	constructor(private peerNodes: Map<string, PeerNode> = new Map()) {}
 
-	add(publicKey: string) {
+	addIfNotExists(publicKey: string) {
 		let peerNode = this.peerNodes.get(publicKey);
 		if (peerNode) return peerNode;
 

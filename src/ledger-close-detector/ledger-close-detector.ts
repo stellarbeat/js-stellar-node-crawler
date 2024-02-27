@@ -11,14 +11,16 @@ import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { NodeAddress } from '../crawler';
 import { xdr } from '@stellar/stellar-base';
 import { truncate } from '../truncate';
-import { LedgerCloseScpEnvelopeHandler } from './ledger-close-scp-envelope-handler';
+import { Slots } from '../slots';
+import { CachedLedgerCloseScpEnvelopeHandler } from './cached-ledger-close-scp-envelope-handler';
 
 export class LedgerCloseDetector extends EventEmitter {
 	private trustedPublicKeys: Set<PublicKey> = new Set();
+	private _slots: Slots | null = null;
 
 	constructor(
 		private connectionManager: ConnectionManager,
-		private scpMessageHandler: LedgerCloseScpEnvelopeHandler,
+		private scpMessageHandler: CachedLedgerCloseScpEnvelopeHandler, //todo: interface
 		private networkHash: Buffer,
 		private logger: Logger
 	) {
@@ -33,18 +35,24 @@ export class LedgerCloseDetector extends EventEmitter {
 	) {
 		this.logger.info('Starting ledger close detector.');
 		this.setTrustedPublicKeys(trustedQuorumSet);
+		this._slots = new Slots(trustedQuorumSet, this.logger);
 
 		addresses.forEach((address) => {
 			this.connectionManager.connectToNode(address[0], address[1]);
 		});
 	}
 
+	get slots(): Slots {
+		if (!this._slots) throw new Error('Slots not initialized yet.');
+		return this._slots;
+	}
+
 	//other nodes can help in determining consensus.
 	//this is needed in scenarios where all top tier nodes are overloaded,
 	// but some nodes are still connected and receiving/relaying scp messages from top tier.
-	//however lag detection will be flakey then, should indicate with a warning!
-	public processStellarMessage(data: DataPayload) {
-		this.onStellarMessage(data);
+	//however lag detection will be flaky then, should indicate with a warning!
+	public processScpEnvelope(sender: PublicKey, scpEnvelope: xdr.ScpEnvelope) {
+		this.handleScpEnvelope(sender, scpEnvelope);
 	}
 
 	//public getValidationStateOfTrustedNodes(): Map<PublicKey, Record<>, any> {}
@@ -88,7 +96,7 @@ export class LedgerCloseDetector extends EventEmitter {
 		);
 		switch (stellarMessage.switch()) {
 			case xdr.MessageType.scpMessage():
-				this.handleScpEnvelope(data, stellarMessage.envelope());
+				this.handleScpEnvelope(data.publicKey, stellarMessage.envelope());
 				break;
 			case xdr.MessageType.errorMsg():
 				this.logger.info(
@@ -111,15 +119,16 @@ export class LedgerCloseDetector extends EventEmitter {
 		data.stellarMessageWork.done();
 	}
 
-	private handleScpEnvelope(data: DataPayload, scpEnvelope: xdr.ScpEnvelope) {
+	private handleScpEnvelope(sender: PublicKey, scpEnvelope: xdr.ScpEnvelope) {
 		const ledgerOrUndefined = this.scpMessageHandler.handleScpEnvelope(
+			this.slots,
 			scpEnvelope,
 			this.networkHash
 		);
 		if (ledgerOrUndefined.isErr()) {
 			this.logger.info(
 				{
-					pk: truncate(data.publicKey),
+					sender: truncate(sender),
 					error: ledgerOrUndefined.error.message
 				},
 				'Error processing SCP envelope'
@@ -128,12 +137,25 @@ export class LedgerCloseDetector extends EventEmitter {
 		}
 
 		if (ledgerOrUndefined.value !== undefined) {
-			this.emit('ledgerClose', ledgerOrUndefined.value);
+			this.logger.info(
+				{
+					ledger: ledgerOrUndefined.value.sequence,
+					closeTime: ledgerOrUndefined.value.closeTime,
+					localCloseTime: ledgerOrUndefined.value.localCloseTime,
+					value: truncate(ledgerOrUndefined.value.value)
+				},
+				'Ledger closed'
+			);
+			this.emit('ledgerClosed', ledgerOrUndefined.value);
 		}
 	}
 
 	private onConnectionClose(address: string, publicKey: string) {
-		this.logger.info(`Connection to ${publicKey} at ${address} closed.`);
+		this.logger.debug(`Connection to ${publicKey} at ${address} closed.`);
+	}
+
+	public getConnectedNodesCount(): number {
+		return this.connectionManager.getNumberOfActiveConnections();
 	}
 
 	stop() {

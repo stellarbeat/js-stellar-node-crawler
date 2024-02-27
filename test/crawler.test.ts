@@ -164,7 +164,8 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 
 	const result = await crawler.crawl(
 		[peerNodeAddress, publicKeyReusingPeerNodeAddress],
-		trustedQSet
+		trustedQSet,
+		[]
 	);
 	const peerNode = result.peers.get(peerNetworkNode.keyPair.publicKey());
 	expect(peerNode).toBeDefined();
@@ -206,7 +207,8 @@ it('should hit the max crawl limit', async function () {
 		expect(
 			await crawler.crawl(
 				[peerNodeAddress, publicKeyReusingPeerNodeAddress],
-				trustedQSet
+				trustedQSet,
+				[]
 			)
 		).toThrowError();
 	} catch (e) {

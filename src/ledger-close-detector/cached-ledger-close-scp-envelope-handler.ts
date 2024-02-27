@@ -1,8 +1,9 @@
 import { xdr } from '@stellar/stellar-base';
-import { err, ok, Result } from 'neverthrow';
+import { ok, Result } from 'neverthrow';
 import * as LRUCache from 'lru-cache';
 import { Ledger } from '../crawler';
 import { LedgerCloseScpEnvelopeHandler } from './ledger-close-scp-envelope-handler';
+import { Slots } from '../slots';
 
 export class CachedLedgerCloseScpEnvelopeHandler {
 	private envelopeCache: LRUCache<string, number> = new LRUCache<
@@ -16,6 +17,7 @@ export class CachedLedgerCloseScpEnvelopeHandler {
 
 	//returns a ledger if a ledger was closed, undefined if not
 	public handleScpEnvelope(
+		slots: Slots,
 		scpEnvelope: xdr.ScpEnvelope,
 		networkHash: Buffer
 	): Result<undefined | Ledger, Error> {
@@ -25,6 +27,7 @@ export class CachedLedgerCloseScpEnvelopeHandler {
 		this.envelopeCache.set(scpEnvelope.signature().toString(), 1);
 
 		return this.ledgerCloseScpEnvelopeHandler.handleScpEnvelope(
+			slots,
 			scpEnvelope,
 			networkHash
 		);

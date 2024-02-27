@@ -1,6 +1,6 @@
 import { PeerNode } from './peer-node';
 import { CrawlState } from './crawl-state';
-import { peerValidationStateNotYetDetermined } from './peer-validation-state-not-yet-determined';
+import { listenFurther } from './listen-further';
 import { truncate } from './truncate';
 import { P } from 'pino';
 
@@ -18,7 +18,7 @@ export class DisconnectTimeout {
 		readyWithNonTopTierPeers: () => boolean
 	): void {
 		if (
-			!peerValidationStateNotYetDetermined(
+			!listenFurther(
 				peer,
 				timeoutCounter,
 				//we wait max twice CONSENSUS_STUCK_TIMEOUT to ensure we receive al externalizing messages from straggling nodes;
@@ -39,7 +39,7 @@ export class DisconnectTimeout {
 					validatingIncorrectly: peer.isValidatingIncorrectValues,
 					scp: peer.participatingInSCP
 				},
-				'Disconnect'
+				'Peer validation state determined, disconnecting'
 			);
 			disconnectCallback();
 			return;

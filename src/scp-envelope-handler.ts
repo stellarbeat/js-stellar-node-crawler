@@ -1,6 +1,6 @@
 import * as P from 'pino';
 import { PeerNode } from './peer-node';
-import { hash, Networks, xdr } from '@stellar/stellar-base';
+import { hash, xdr } from '@stellar/stellar-base';
 import { CrawlState } from './crawl-state';
 import {
 	getPublicKeyStringFromBuffer,
@@ -9,15 +9,14 @@ import {
 import { QuorumSetManager } from './quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
 import { isLedgerSequenceValid } from './ledger-validator';
+import { extractCloseTimeFromValue } from './ledger-close-detector/extract-close-time-from-value';
+import { Ledger } from './crawler';
 
-export class ScpManager {
-	protected logger: P.Logger;
-	protected quorumSetManager: QuorumSetManager;
-
-	constructor(quorumSetManager: QuorumSetManager, logger: P.Logger) {
-		this.logger = logger;
-		this.quorumSetManager = quorumSetManager;
-	}
+export class ScpEnvelopeHandler {
+	constructor(
+		private quorumSetManager: QuorumSetManager,
+		private logger: P.Logger
+	) {}
 
 	public processScpEnvelope(
 		scpEnvelope: xdr.ScpEnvelope,
@@ -70,8 +69,8 @@ export class ScpManager {
 			'processing new scp statement: ' + scpStatement.pledges().switch().name
 		);
 
-		const peer = crawlState.peerNodes.add(publicKey);
-
+		const peer = crawlState.peerNodes.addIfNotExists(publicKey);
+		peer.participatingInSCP = true;
 		peer.latestActiveSlotIndex = slotIndex.toString();
 
 		this.quorumSetManager.processQuorumSetHashFromStatement(
@@ -111,7 +110,15 @@ export class ScpManager {
 			'externalize msg with value: ' + value
 		);
 
-		const markNodeAsValidating = (peer: PeerNode) => {
+		peer.externalizedValues.set(slotIndex, {
+			localTime: new Date(),
+			value: value
+		});
+
+		const markNodeAsValidating = (peer: PeerNode, ledger: Ledger) => {
+			if (peer.successfullyConnected && !peer.disconnected) {
+				peer.observedLedgerCloses++;
+			}
 			if (!peer.isValidating) {
 				this.logger.debug(
 					{
@@ -121,6 +128,7 @@ export class ScpManager {
 				);
 			}
 			peer.isValidating = true;
+			peer.updateLag(ledger);
 		};
 
 		const slot = crawlState.slots.getSlot(slotIndex);
@@ -128,13 +136,24 @@ export class ScpManager {
 		slot.addExternalizeValue(peer.publicKey, value);
 
 		if (slot.closed()) {
+			const closedLedger = slot.getClosedLedger();
+			if (!closedLedger) return err(new Error('Closed ledger is undefined'));
 			if (!slotWasClosedBefore) {
 				//we just closed the slot, lets mark all nodes as validating!
-				this.logger.info({ ledger: slotIndex.toString() }, 'Ledger closed!');
+				this.logger.info(
+					{
+						sequence: closedLedger.sequence,
+						closeTime: closedLedger.closeTime,
+						localCloseTime: closedLedger.localCloseTime
+					},
+					'Ledger closed!'
+				);
 				if (slotIndex > crawlState.latestClosedLedger.sequence) {
 					crawlState.latestClosedLedger = {
 						sequence: slotIndex,
-						closeTime: new Date()
+						closeTime: extractCloseTimeFromValue(Buffer.from(value, 'base64')),
+						value: value,
+						localCloseTime: new Date()
 					};
 				}
 				slot
@@ -142,7 +161,8 @@ export class ScpManager {
 					.forEach((validatingPublicKey) => {
 						const validatingPeer =
 							crawlState.peerNodes.get(validatingPublicKey);
-						if (validatingPeer) markNodeAsValidating(validatingPeer);
+						if (validatingPeer)
+							markNodeAsValidating(validatingPeer, closedLedger);
 					});
 				slot.getNodesDisagreeingOnExternalizedValue().forEach((nodeId) => {
 					const badPeer = crawlState.peerNodes.get(nodeId);
@@ -150,7 +170,8 @@ export class ScpManager {
 				});
 			} else {
 				//if the slot was already closed, we check if this new (?) node should be marked as validating
-				if (value === slot.externalizedValue) markNodeAsValidating(peer);
+				if (value === slot.externalizedValue)
+					markNodeAsValidating(peer, closedLedger);
 				else peer.isValidatingIncorrectValues = true;
 			}
 		}

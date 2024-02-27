@@ -1,17 +1,19 @@
 import { Slots } from '../slots';
-import { P } from 'pino';
 import { PublicKey } from '@stellarbeat/js-stellarbeat-shared';
 import { Ledger } from '../crawler';
+import { xdr } from '@stellar/stellar-base';
+import { extractCloseTimeFromValue } from './extract-close-time-from-value';
 
 export class SlotCloser {
-	constructor(private slots: Slots, private logger: P.Logger) {}
+	constructor() {}
 
 	public attemptSlotClose(
+		slots: Slots,
 		publicKey: PublicKey,
 		slotIndex: bigint,
 		value: string
 	): Ledger | undefined {
-		const slot = this.slots.getSlot(slotIndex);
+		const slot = slots.getSlot(slotIndex);
 		if (slot.closed()) return; //nothing to do here
 
 		slot.addExternalizeValue(publicKey, value);
@@ -20,7 +22,9 @@ export class SlotCloser {
 
 		return {
 			sequence: slotIndex,
-			closeTime: new Date()
+			localCloseTime: new Date(),
+			closeTime: extractCloseTimeFromValue(Buffer.from(value, 'base64')),
+			value: value
 		};
 	}
 }

@@ -34,7 +34,9 @@ export class CrawlState {
 	crawledNodeAddresses: Set<PeerKey> = new Set();
 	latestClosedLedger: Ledger = {
 		sequence: BigInt(0),
-		closeTime: new Date(0)
+		closeTime: new Date(0),
+		value: '',
+		localCloseTime: new Date(0)
 	};
 	listenTimeouts: Map<PublicKey, NodeJS.Timeout> = new Map();
 	slots: Slots;
@@ -62,7 +64,7 @@ export class CrawlState {
 	}
 
 	log() {
-		this.logger.info({ peers: this.failedConnections }, 'Failed connections');
+		this.logger.debug({ peers: this.failedConnections }, 'Failed connections');
 		this.peerNodes.getAll().forEach((peer) => {
 			this.logger.info({
 				ip: peer.key,
@@ -70,7 +72,10 @@ export class CrawlState {
 				connected: peer.successfullyConnected,
 				scp: peer.participatingInSCP,
 				validating: peer.isValidating,
-				overLoaded: peer.overLoaded
+				overLoaded: peer.overLoaded,
+				lagMS: peer.lagInMS,
+				observedLedgerCloses: peer.observedLedgerCloses, //not correct because after disconnect...
+				incorrect: peer.isValidatingIncorrectValues
 			});
 		});
 		this.logger.info('Connection attempts: ' + this.crawledNodeAddresses.size);
@@ -92,9 +97,6 @@ export class CrawlState {
 					.length
 		);
 
-		this.logger.info(
-			'Closed ledgers: ' + this.slots.getClosedSlotIndexes().length
-		);
 		this.logger.info(
 			Array.from(this.peerNodes.values()).filter(
 				(node) => node.suppliedPeerList

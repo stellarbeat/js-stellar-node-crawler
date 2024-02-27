@@ -7,7 +7,6 @@ import { P } from 'pino';
 import { truncate } from './truncate';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
-import { xdr } from '@stellar/stellar-base';
 
 type PublicKey = string;
 type Address = string;
@@ -63,7 +62,8 @@ export class ConnectionManager extends EventEmitter {
 			this.logger.debug(
 				{
 					pk: truncate(publicKey),
-					peer: connection.remoteAddress
+					peer: connection.remoteAddress,
+					local: connection.localAddress
 				},
 				'Connected'
 			);
@@ -82,11 +82,13 @@ export class ConnectionManager extends EventEmitter {
 			this.disconnect(connection);
 		});
 
-		connection.on('close', () => {
+		connection.on('close', (hadError: boolean) => {
 			this.logger.debug(
 				{
 					pk: truncate(connection.remotePublicKey),
-					peer: connection.remoteAddress
+					peer: connection.remoteAddress,
+					hadError: hadError,
+					local: connection.localAddress
 				},
 				'Node connection closed'
 			);

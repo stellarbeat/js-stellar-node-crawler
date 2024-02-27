@@ -2,7 +2,6 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { PublicKey } from '@stellarbeat/js-stellarbeat-shared';
 import { Slot, Slots } from '../../src/slots';
 import { SlotCloser } from '../../src/ledger-close-detector/slot-closer';
-import { Ledger } from '../../src/crawler';
 import { P } from 'pino';
 
 let mockSlots: MockProxy<Slots>;
@@ -14,7 +13,7 @@ let logger: P.Logger;
 beforeEach(() => {
 	logger = mock<P.Logger>();
 	mockSlots = mock<Slots>();
-	slotCloser = new SlotCloser(mockSlots, logger);
+	slotCloser = new SlotCloser();
 	publicKey = 'GABC...XYZ';
 	value = 'test value';
 });
@@ -27,6 +26,7 @@ test('should attempt to close slot and return ledger', () => {
 	mockSlots.getSlot.mockReturnValue(slot);
 
 	const ledger = slotCloser.attemptSlotClose(
+		mockSlots,
 		publicKey,
 		newlyClosedSlotIndex,
 		value
@@ -48,6 +48,7 @@ test('should attempt to close slot and return undefined if slot was closed befor
 	mockSlots.getSlot.mockReturnValue(slot);
 
 	const ledger = slotCloser.attemptSlotClose(
+		mockSlots,
 		publicKey,
 		attemptedSlotIndex,
 		value

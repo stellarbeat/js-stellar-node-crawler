@@ -4,7 +4,7 @@ import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
 import { CrawlState } from './crawl-state';
-import { ScpManager } from './scp-manager';
+import { ScpEnvelopeHandler } from './scp-envelope-handler';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlStateValidator } from './crawl-state-validator';
@@ -40,6 +40,8 @@ interface CrawlQueueTask {
 export interface Ledger {
 	sequence: bigint;
 	closeTime: Date;
+	localCloseTime: Date;
+	value: string;
 }
 
 /**
@@ -57,7 +59,7 @@ export class Crawler {
 	constructor(
 		private config: CrawlerConfiguration,
 		private quorumSetManager: QuorumSetManager,
-		private scpManager: ScpManager,
+		private scpManager: ScpEnvelopeHandler,
 		private readonly connectionManager: ConnectionManager,
 		logger: P.Logger
 	) {
@@ -112,7 +114,9 @@ export class Crawler {
 		topTierQuorumSet: QuorumSet,
 		latestClosedLedger: Ledger = {
 			sequence: BigInt(0),
-			closeTime: new Date(0)
+			closeTime: new Date(0),
+			value: '', //todo: store and return value
+			localCloseTime: new Date(0)
 		},
 		quorumSets: Map<QuorumSetHash, QuorumSet> = new Map<
 			QuorumSetHash,
@@ -135,9 +139,12 @@ export class Crawler {
 	async crawl(
 		nodeAddresses: NodeAddress[],
 		topTierQuorumSet: QuorumSet,
+		topTierNodeAddresses: NodeAddress[],
 		latestClosedLedger: Ledger = {
 			sequence: BigInt(0),
-			closeTime: new Date(0)
+			closeTime: new Date(0),
+			localCloseTime: new Date(0),
+			value: '' //todo: cleaner solution
 		},
 		quorumSets: Map<QuorumSetHash, QuorumSet> = new Map<
 			QuorumSetHash,
@@ -156,7 +163,16 @@ export class Crawler {
 
 			const crawlLogger = this.initializeCrawlLogger(nodeAddresses);
 
-			this.startCrawlProcess(resolve, reject, crawlLogger, nodeAddresses);
+			setTimeout(
+				() =>
+					this.startCrawlProcess(
+						resolve,
+						reject,
+						crawlLogger,
+						topTierNodeAddresses.concat(nodeAddresses) //top tier first
+					),
+				5000
+			);
 		});
 	}
 
@@ -392,6 +408,7 @@ export class Crawler {
 		const peer = this.crawlState.peerNodes.get(publicKey);
 		if (peer && peer.key === nodeAddress) {
 			const timeout = this.crawlState.listenTimeouts.get(publicKey);
+			peer.disconnected = true;
 			if (timeout) clearTimeout(timeout);
 			this.crawlState.listenTimeouts.delete(publicKey);
 		} //if peer.key differs from remoteAddress,then this is a connection to an ip that reuses a publicKey. These connections are ignored, and we should make sure we don't interfere with a possible connection to the other ip that uses the public key.

@@ -4,13 +4,17 @@ import { LedgerCloseScpEnvelopeHandler } from '../../src/ledger-close-detector/l
 import { P } from 'pino';
 import { SlotCloser } from '../../src/ledger-close-detector/slot-closer';
 import { createDummyExternalizeMessage } from '../../fixtures/createDummyExternalizeMessage';
+import { Ledger } from '../../src/crawler';
+import { Slots } from '../../src/slots';
 
 let slotCloser: SlotCloser & MockProxy<SlotCloser>;
+let slots: Slots & MockProxy<Slots>;
 let ledgerCloseSCPEnvelopeHandler: LedgerCloseScpEnvelopeHandler;
 
 describe('LedgerCloseScpEnvelopeHandler', () => {
 	beforeEach(() => {
 		slotCloser = mock<SlotCloser>();
+		slots = mock<Slots>();
 		ledgerCloseSCPEnvelopeHandler = new LedgerCloseScpEnvelopeHandler(
 			slotCloser,
 			mock<P.Logger>()
@@ -21,13 +25,23 @@ describe('LedgerCloseScpEnvelopeHandler', () => {
 	test('should return new ledger on valid externalize ledger that closes slot', () => {
 		const stellarMessage = createDummyExternalizeMessage();
 
-		const ledger = {
+		const ledger: Ledger = {
 			sequence: BigInt(1),
-			closeTime: new Date()
+			closeTime: new Date(),
+			value: stellarMessage
+				.envelope()
+				.statement()
+				.pledges()
+				.externalize()
+				.commit()
+				.value()
+				.toString('base64'),
+			localCloseTime: new Date()
 		};
 		slotCloser.attemptSlotClose.mockReturnValueOnce(ledger);
 
 		const result = ledgerCloseSCPEnvelopeHandler.handleScpEnvelope(
+			slots,
 			stellarMessage.envelope(),
 			hash(Buffer.from(Networks.PUBLIC))
 		);
@@ -46,6 +60,7 @@ describe('LedgerCloseScpEnvelopeHandler', () => {
 		slotCloser.attemptSlotClose.mockReturnValueOnce(undefined);
 
 		const result = ledgerCloseSCPEnvelopeHandler.handleScpEnvelope(
+			slots,
 			stellarMessage.envelope(),
 			hash(Buffer.from(Networks.PUBLIC))
 		);
@@ -63,6 +78,7 @@ describe('LedgerCloseScpEnvelopeHandler', () => {
 		stellarMessage.envelope().signature(Buffer.alloc(64));
 
 		const result = ledgerCloseSCPEnvelopeHandler.handleScpEnvelope(
+			slots,
 			stellarMessage.envelope(),
 			hash(Buffer.from(Networks.PUBLIC))
 		);
@@ -81,6 +97,7 @@ describe('LedgerCloseScpEnvelopeHandler', () => {
 		stellarMessage.envelope().signature(Buffer.alloc(3));
 
 		const result = ledgerCloseSCPEnvelopeHandler.handleScpEnvelope(
+			slots,
 			stellarMessage.envelope(),
 			hash(Buffer.from(Networks.PUBLIC))
 		);

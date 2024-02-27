@@ -19,7 +19,7 @@ async function main() {
 	let nodes = await jsonStorage.getNodesFromFile(nodesJsonPath);
 
 	console.log('[MAIN] Crawl!');
-	let trustedQSet = new QuorumSet(15, [
+	let topTierQSet = new QuorumSet(15, [
 		'GCVJ4Z6TI6Z2SOGENSPXDQ2U4RKH3CNQKYUHNSSPYFPNWTLGS6EBH7I2',
 		'GCIXVKNFPKWVMKJKVK2V4NK7D4TC6W3BUMXSIJ365QUAXWBRPPJXIR2Z',
 		'GBLJNN3AVZZPG2FYAYTYQKECNWTQYYUUY2KVFN2OUKZKBULXIXBZ4FCT',
@@ -62,13 +62,13 @@ async function main() {
 			.map((node) => [node.ip, node.port]);
 
 		const topTierAddresses = nodes
-			.filter((node) => trustedQSet.validators.includes(node.publicKey))
+			.filter((node) => topTierQSet.validators.includes(node.publicKey))
 			.map((node) => [node.ip, node.port]);
 
 		let result = await myCrawler.crawl(
 			addresses,
+			topTierQSet,
 			topTierAddresses,
-			trustedQSet,
 			{
 				sequence: BigInt(0),
 				closeTime: new Date(0)

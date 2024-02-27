@@ -5,7 +5,13 @@ export function createDummyExternalizeMessage(
 	keyPair: Keypair = Keypair.random(),
 	networkHash = hash(Buffer.from(Networks.PUBLIC))
 ) {
-	const commit = new xdr.ScpBallot({ counter: 1, value: Buffer.alloc(32) });
+	const commit = new xdr.ScpBallot({
+		counter: 1,
+		value: Buffer.from(
+			'    Bdej9XkMRNa5mYeecoR8W1+E10N8cje2irYfmzNh/eIAAAAAZd2fCAAAAAAAAAABAAAAAIwdS0o2ARfVAN/PjN6xZrGaEuD0t7zToaDF6Z5B9peZAAAAQIRy/bWclKwWkxF4qTOg0pBncXfpJhczLQP5D60JlqhgR5Vzcn1KOHTSavxBS8+mZCaXNIe4iJFFfGPnxmRgBQI=',
+			'base64'
+		)
+	});
 	const externalize = new xdr.ScpStatementExternalize({
 		commit: commit,
 		nH: 1,
