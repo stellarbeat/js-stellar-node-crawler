@@ -66,7 +66,7 @@ describe('PeerNodeCollection', () => {
 
 		it('should update an existing peer node', () => {
 			const publicKey = 'publicKey';
-			peerNodeCollection.addIfNotExists(publicKey);
+			peerNodeCollection.getOrAdd(publicKey);
 			const newIp = 'newIp';
 			const newPort = 11626;
 			const newNodeInfo: NodeInfo = {
@@ -87,8 +87,8 @@ describe('PeerNodeCollection', () => {
 
 		it('should return an existing peer node', () => {
 			const publicKey = 'publicKey';
-			peerNodeCollection.addIfNotExists(publicKey);
-			const peerNode = peerNodeCollection.addIfNotExists(publicKey);
+			peerNodeCollection.getOrAdd(publicKey);
+			const peerNode = peerNodeCollection.getOrAdd(publicKey);
 			expect(peerNode).toBeInstanceOf(PeerNode);
 		});
 	});

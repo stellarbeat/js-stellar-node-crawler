@@ -9,6 +9,7 @@ import { QuorumSetManager } from './quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
 import { isLedgerSequenceValid } from './ledger-validator';
 import { ExternalizeStatementHandler } from './externalize-statement-handler';
+import { mapExternalizeStatement } from './map-externalize-statement';
 
 export class ScpEnvelopeHandler {
 	constructor(
@@ -68,7 +69,7 @@ export class ScpEnvelopeHandler {
 			'processing new scp statement: ' + scpStatement.pledges().switch().name
 		);
 
-		const peer = crawlState.peerNodes.addIfNotExists(publicKey);
+		const peer = crawlState.peerNodes.getOrAdd(publicKey); //maybe we got a relayed message from a peer that we have not crawled yet
 		peer.participatingInSCP = true;
 		peer.latestActiveSlotIndex = slotIndex.toString();
 
@@ -86,11 +87,30 @@ export class ScpEnvelopeHandler {
 			return ok(undefined);
 		}
 
-		return this.externalizeStatementHandler.handle(
-			peer,
-			slotIndex,
-			scpStatement.pledges().externalize(),
-			crawlState
+		const externalizeData = mapExternalizeStatement(scpStatement);
+		if (!externalizeData.isOk()) {
+			return err(externalizeData.error);
+		}
+
+		const closedLedgerResult = this.externalizeStatementHandler.handle(
+			crawlState.peerNodes,
+			crawlState.slots.getSlot(slotIndex),
+			externalizeData.value,
+			new Date() //todo: move up
 		);
+
+		if (!closedLedgerResult.isOk()) {
+			return err(closedLedgerResult.error);
+		}
+
+		if (closedLedgerResult.value === null) {
+			return ok(undefined);
+		}
+
+		if (slotIndex > crawlState.latestClosedLedger.sequence) {
+			crawlState.latestClosedLedger = closedLedgerResult.value;
+		} //todo: crawlstate should be higher up, eventEmitter bus?
+
+		return ok(undefined);
 	}
 }

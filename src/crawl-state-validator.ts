@@ -1,18 +1,20 @@
 import { MaxOpenConnectionsConfigError } from './error/max-open-connections-config-error';
 import { CrawlState } from './crawl-state';
 import { CrawlerConfiguration } from './crawler-configuration';
+import { err, ok, Result } from 'neverthrow';
 
 export class CrawlStateValidator {
 	static validateCrawlState(
 		crawlState: CrawlState,
 		config: CrawlerConfiguration
-	): Error | null {
+	): Result<void, Error> {
 		if (config.maxOpenConnections <= crawlState.topTierNodes.size)
-			return new MaxOpenConnectionsConfigError(
-				crawlState.topTierNodes.size,
-				config.maxOpenConnections
+			return err(
+				new MaxOpenConnectionsConfigError(
+					crawlState.topTierNodes.size,
+					config.maxOpenConnections
+				)
 			);
-
-		return null;
+		return ok(undefined);
 	}
 }

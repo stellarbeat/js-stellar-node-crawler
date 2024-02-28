@@ -48,7 +48,7 @@ describe('StellarMessageHandler', () => {
 			const stellarMessage = createDummyPeersMessage();
 			const crawlState = mock<CrawlState>();
 			const peerNodes = new PeerNodeCollection();
-			peerNodes.addIfNotExists(senderPublicKey);
+			peerNodes.getOrAdd(senderPublicKey);
 			crawlState.peerNodes = peerNodes;
 			const peerAddressesListener = jest.fn();
 			handler.on('peerAddressesReceived', peerAddressesListener);
@@ -88,7 +88,7 @@ describe('StellarMessageHandler', () => {
 			const stellarMessage = createDummyErrLoadMessage();
 			const crawlState = mock<CrawlState>();
 			const peerNodes = new PeerNodeCollection();
-			peerNodes.addIfNotExists(senderPublicKey);
+			peerNodes.getOrAdd(senderPublicKey);
 			crawlState.peerNodes = peerNodes;
 			const result = handler.handleStellarMessage(
 				senderPublicKey,

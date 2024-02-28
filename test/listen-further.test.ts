@@ -4,8 +4,8 @@ import { listenFurther } from '../src/listen-further';
 describe('listen-further', () => {
 	function setupSUT() {
 		const peerNodes = new PeerNodeCollection();
-		const peer = peerNodes.addIfNotExists('A');
-		const otherPeer = peerNodes.addIfNotExists('B');
+		const peer = peerNodes.getOrAdd('A');
+		const otherPeer = peerNodes.getOrAdd('B');
 		const topTierNodes = new Set<string>();
 		topTierNodes.add('A');
 		return { peer, otherPeer, peerNodes, topTierNodes };
@@ -85,7 +85,7 @@ describe('listen-further', () => {
 		const { peer, otherPeer, peerNodes, topTierNodes } = setupSUT();
 		peer.isValidating = true;
 		peer.participatingInSCP = true;
-		const otherTopTierNode = peerNodes.addIfNotExists('C');
+		const otherTopTierNode = peerNodes.getOrAdd('C');
 		otherTopTierNode.isValidating = true;
 		otherTopTierNode.participatingInSCP = true;
 		topTierNodes.add('C');
@@ -98,7 +98,7 @@ describe('listen-further', () => {
 		const { peer, otherPeer, peerNodes, topTierNodes } = setupSUT();
 		peer.isValidating = false;
 		peer.latestActiveSlotIndex = '1';
-		const otherTopTierNode = peerNodes.addIfNotExists('C');
+		const otherTopTierNode = peerNodes.getOrAdd('C');
 		otherTopTierNode.isValidating = true;
 		otherTopTierNode.latestActiveSlotIndex = '1';
 		topTierNodes.add('C');

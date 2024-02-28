@@ -1,5 +1,5 @@
 import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
-import { Ledger } from './crawler';
+import { Ledger, NodeAddress } from './crawler';
 import { Slots } from './slots';
 import * as LRUCache from 'lru-cache';
 import * as P from 'pino';
@@ -9,6 +9,12 @@ import { AsyncResultCallback } from 'async';
 
 type QuorumSetHash = string;
 type PeerKey = string; //ip:port
+
+export enum CrawlProcessState {
+	IDLE,
+	TOP_TIER_SYNC,
+	CRAWLING
+}
 
 export class QuorumSetState {
 	quorumSetOwners: Map<QuorumSetHash, Set<PublicKey>> = new Map();
@@ -24,6 +30,7 @@ export class QuorumSetState {
 }
 
 export class CrawlState {
+	state: CrawlProcessState = CrawlProcessState.IDLE;
 	network: string;
 	maxCrawlTimeHit = false;
 	crawlQueueTaskDoneCallbacks: Map<string, AsyncResultCallback<void>> =
@@ -44,6 +51,7 @@ export class CrawlState {
 	quorumSetState: QuorumSetState = new QuorumSetState();
 	failedConnections: string[] = [];
 	topTierNodes: Set<PublicKey>;
+	peerAddressesReceivedDuringSync: NodeAddress[] = [];
 
 	constructor(
 		topTierQuorumSet: QuorumSet,

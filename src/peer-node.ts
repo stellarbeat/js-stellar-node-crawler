@@ -46,11 +46,13 @@ export class PeerNode {
 		return this.externalizedValues.get(slotIndex)?.value === value;
 	}
 
-	externalizedValueIsValidated(ledger: Ledger) {
+	processConfirmedLedgerClose(ledger: Ledger) {
 		if (!this.hasExternalizedLedger(ledger.sequence)) {
-			throw new Error(
-				'PeerNode.externalizedMessageIsValid called for a ledger that was not externalized by this peer'
-			);
+			return;
+		}
+		if (!this.externalizedLedgerValueIsCorrect(ledger.sequence, ledger.value)) {
+			this.isValidatingIncorrectValues = true;
+			return;
 		}
 		if (this.successfullyConnected && !this.disconnected) {
 			this.observedLedgerCloses++;

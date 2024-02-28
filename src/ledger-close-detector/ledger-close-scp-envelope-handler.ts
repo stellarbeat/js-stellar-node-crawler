@@ -5,7 +5,7 @@ import { err, ok, Result } from 'neverthrow';
 import { Ledger } from '../crawler';
 import { PublicKey } from '@stellarbeat/js-stellarbeat-shared';
 import { SlotCloser } from './slot-closer';
-import { mapExternalizeStatement } from './map-externalize-statement';
+import { mapExternalizeStatement } from '../map-externalize-statement';
 import { Slots } from '../slots';
 
 export class LedgerCloseScpEnvelopeHandler {

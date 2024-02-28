@@ -3,7 +3,7 @@ import { AsyncResultCallback, queue, QueueObject } from 'async';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
-import { CrawlState } from './crawl-state';
+import { CrawlProcessState, CrawlState } from './crawl-state';
 import { ScpEnvelopeHandler } from './scp-envelope-handler';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
@@ -21,6 +21,7 @@ import {
 	DataPayload
 } from './connection-manager';
 import { PeerNode } from './peer-node';
+import { err } from 'neverthrow';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];
@@ -97,12 +98,17 @@ export class Crawler {
 	private setupStellarMessageHandlerEvents() {
 		this.stellarMessageHandler.on(
 			'peerAddressesReceived',
-			(event: PeerAddressesReceivedEvent) => {
-				event.peerAddresses.forEach((peerAddress) =>
-					this.crawlPeerNode(peerAddress)
-				);
-			}
+			(peerAddresses: PeerAddressesReceivedEvent) =>
+				this.onPeerAddressesReceived(peerAddresses.peerAddresses)
 		);
+	}
+
+	private onPeerAddressesReceived(peerAddresses: NodeAddress[]) {
+		if (this.crawlState.state === CrawlProcessState.TOP_TIER_SYNC) {
+			this.crawlState.peerAddressesReceivedDuringSync.concat(peerAddresses);
+		} else {
+			peerAddresses.forEach((peerAddress) => this.crawlPeerNode(peerAddress));
+		}
 	}
 
 	private get crawlState(): CrawlState {
@@ -123,6 +129,10 @@ export class Crawler {
 			QuorumSet
 		>()
 	) {
+		if (this._crawlState && this.crawlState.state !== CrawlProcessState.IDLE) {
+			return err(new Error('Crawl process already running'));
+		}
+
 		this._crawlState = new CrawlState(
 			topTierQuorumSet,
 			quorumSets,
@@ -130,6 +140,8 @@ export class Crawler {
 			this.config.nodeConfig.network,
 			this.logger
 		);
+
+		return CrawlStateValidator.validateCrawlState(this.crawlState, this.config);
 	}
 
 	/*
@@ -151,29 +163,53 @@ export class Crawler {
 			QuorumSet
 		>()
 	): Promise<CrawlResult> {
-		this.initializeCrawlState(topTierQuorumSet, latestClosedLedger, quorumSets);
-
-		return await new Promise<CrawlResult>((resolve, reject) => {
-			const errorOrNull = CrawlStateValidator.validateCrawlState(
-				//todo move to initCrawlState
-				this.crawlState,
-				this.config
-			);
-			if (errorOrNull) return reject(errorOrNull);
-
-			const crawlLogger = this.initializeCrawlLogger(nodeAddresses);
-
-			setTimeout(
-				() =>
-					this.startCrawlProcess(
-						resolve,
-						reject,
-						crawlLogger,
-						topTierNodeAddresses.concat(nodeAddresses) //top tier first
-					),
-				5000
+		return new Promise<CrawlResult>((resolve, reject) => {
+			this.initializeAndStartCrawl(
+				topTierQuorumSet,
+				latestClosedLedger,
+				quorumSets,
+				resolve,
+				reject,
+				nodeAddresses,
+				topTierNodeAddresses
 			);
 		});
+	}
+
+	private initializeAndStartCrawl(
+		topTierQuorumSet: QuorumSet,
+		latestClosedLedger: Ledger,
+		quorumSets: Map<QuorumSetHash, QuorumSet>,
+		resolve: (value: PromiseLike<CrawlResult> | CrawlResult) => void,
+		reject: (reason?: any) => void,
+		nodeAddresses: NodeAddress[],
+		topTierNodeAddresses: NodeAddress[]
+	) {
+		this.initializeCrawlState(topTierQuorumSet, latestClosedLedger, quorumSets)
+			.mapErr((error) => reject(error))
+			.map(() =>
+				this.syncTopTierAndCrawl(
+					resolve,
+					reject,
+					this.initializeCrawlLogger(nodeAddresses),
+					topTierNodeAddresses,
+					nodeAddresses
+				)
+			);
+	}
+
+	private syncTopTierAndCrawl(
+		resolve: (value: PromiseLike<CrawlResult> | CrawlResult) => void,
+		reject: (reason?: any) => void,
+		crawlLogger: CrawlLogger,
+		topTierAddresses: NodeAddress[] = [],
+		nodeAddresses: NodeAddress[]
+	) {
+		this.startTopTierSync(topTierAddresses);
+
+		setTimeout(() => {
+			this.startCrawlProcess(resolve, reject, crawlLogger, nodeAddresses);
+		}, 5000); //todo: after all top tier nodes have connected, not just timer
 	}
 
 	private startCrawlProcess(
@@ -182,8 +218,31 @@ export class Crawler {
 		crawlLogger: CrawlLogger,
 		nodeAddresses: NodeAddress[]
 	) {
+		this.logger.info('Starting crawl process');
+		this.crawlState.state = CrawlProcessState.CRAWLING;
 		this.setupCrawlCompletionHandlers(resolve, reject, crawlLogger);
-		nodeAddresses.forEach((address) => this.crawlPeerNode(address));
+		if (
+			nodeAddresses.concat(this.crawlState.peerAddressesReceivedDuringSync)
+				.length === 0 &&
+			this.connectionManager.getNumberOfActiveConnections() === 0
+		) {
+			this.crawlState.state = CrawlProcessState.IDLE;
+			this.logger.warn(
+				'No nodes to crawl and top tier connections closed, crawl failed'
+			);
+			reject(new Error('No nodes to crawl and top tier connections failed'));
+			return;
+		}
+
+		nodeAddresses
+			.concat(this.crawlState.peerAddressesReceivedDuringSync)
+			.forEach((address) => this.crawlPeerNode(address));
+	}
+
+	private startTopTierSync(topTierAddresses: NodeAddress[]) {
+		this.logger.info('Starting Top Tier sync');
+		this.crawlState.state = CrawlProcessState.TOP_TIER_SYNC;
+		topTierAddresses.forEach((address) => this.crawlPeerNode(address));
 	}
 
 	private setupCrawlCompletionHandlers(
@@ -224,6 +283,7 @@ export class Crawler {
 	): void {
 		this.logger.info('Crawl process complete');
 		crawlLogger.stop();
+		this.crawlState.state = CrawlProcessState.IDLE;
 
 		if (this.hasCrawlTimedOut()) {
 			//todo clean crawl-queue and connections
