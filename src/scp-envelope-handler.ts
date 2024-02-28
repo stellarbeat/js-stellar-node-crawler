@@ -92,23 +92,19 @@ export class ScpEnvelopeHandler {
 			return err(externalizeData.error);
 		}
 
-		const closedLedgerResult = this.externalizeStatementHandler.handle(
+		const closedLedgerOrNull = this.externalizeStatementHandler.handle(
 			crawlState.peerNodes,
 			crawlState.slots.getSlot(slotIndex),
 			externalizeData.value,
 			new Date() //todo: move up
 		);
 
-		if (!closedLedgerResult.isOk()) {
-			return err(closedLedgerResult.error);
-		}
-
-		if (closedLedgerResult.value === null) {
+		if (closedLedgerOrNull === null) {
 			return ok(undefined);
 		}
 
 		if (slotIndex > crawlState.latestClosedLedger.sequence) {
-			crawlState.latestClosedLedger = closedLedgerResult.value;
+			crawlState.latestClosedLedger = closedLedgerOrNull;
 		} //todo: crawlstate should be higher up, eventEmitter bus?
 
 		return ok(undefined);
