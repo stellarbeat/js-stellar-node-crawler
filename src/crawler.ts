@@ -301,7 +301,7 @@ export class Crawler {
 	private constructCrawlResult(): CrawlResult {
 		return {
 			peers: this.crawlState.peerNodes.getAll(),
-			closedLedgers: this.crawlState.slots.getClosedSlotIndexes(),
+			closedLedgers: this.crawlState.slots.getConfirmedClosedSlotIndexes(),
 			latestClosedLedger: this.crawlState.latestClosedLedger
 		};
 	}

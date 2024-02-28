@@ -1,8 +1,8 @@
 import * as P from 'pino';
-import { Slot } from './slots';
 import { Ledger } from './crawler';
 import { PeerNodeCollection } from './peer-node-collection';
 import { ExternalizeData } from './map-externalize-statement';
+import { Slot } from './slot';
 
 //attempts slot close confirmation and updates peer statuses accordingly
 export class ExternalizeStatementHandler {
@@ -28,7 +28,7 @@ export class ExternalizeStatementHandler {
 			localCloseTime
 		);
 
-		const closedLedger = slot.getClosedLedger();
+		const closedLedger = slot.getConfirmedClosedLedger();
 		if (closedLedger) {
 			peerNodes.confirmLedgerClose(externalizeData.publicKey, closedLedger);
 			return null;
@@ -58,7 +58,7 @@ export class ExternalizeStatementHandler {
 	): null | Ledger {
 		slot.addExternalizeValue(publicKey, value);
 
-		const closedLedger = slot.getClosedLedger();
+		const closedLedger = slot.getConfirmedClosedLedger();
 		if (!closedLedger) return null;
 
 		return closedLedger;

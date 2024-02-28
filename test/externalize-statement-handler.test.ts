@@ -1,10 +1,10 @@
 import { mock } from 'jest-mock-extended';
 import * as P from 'pino';
 import { PeerNodeCollection } from '../src/peer-node-collection';
-import { Slot } from '../src/slots';
 import { ExternalizeStatementHandler } from '../src/externalize-statement-handler';
 import { ExternalizeData } from '../src/map-externalize-statement';
 import { Ledger } from '../src/crawler';
+import { Slot } from '../src/slot';
 
 const mockLogger = mock<P.Logger>();
 
@@ -32,7 +32,7 @@ describe('ExternalizeStatementHandler', () => {
 			value: 'test value',
 			localCloseTime: localSlotCloseTime
 		};
-		mockSlot.getClosedLedger.mockReturnValueOnce(closedLedger);
+		mockSlot.getConfirmedClosedLedger.mockReturnValueOnce(closedLedger);
 
 		const result = handler.handle(
 			mockPeerNodes,
@@ -64,7 +64,7 @@ describe('ExternalizeStatementHandler', () => {
 		};
 
 		const handler = new ExternalizeStatementHandler(mockLogger);
-		mockSlot.getClosedLedger.mockReturnValueOnce(undefined);
+		mockSlot.getConfirmedClosedLedger.mockReturnValueOnce(undefined);
 
 		const result = handler.handle(
 			mockPeerNodes,
@@ -100,8 +100,8 @@ describe('ExternalizeStatementHandler', () => {
 			localCloseTime: localSlotCloseTime
 		};
 
-		mockSlot.getClosedLedger.mockReturnValueOnce(undefined);
-		mockSlot.getClosedLedger.mockReturnValueOnce(closedLedger);
+		mockSlot.getConfirmedClosedLedger.mockReturnValueOnce(undefined);
+		mockSlot.getConfirmedClosedLedger.mockReturnValueOnce(closedLedger);
 
 		const result = handler.handle(
 			mockPeerNodes,

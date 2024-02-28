@@ -14,11 +14,11 @@ export class SlotCloser {
 		value: string
 	): Ledger | undefined {
 		const slot = slots.getSlot(slotIndex);
-		if (slot.closed()) return; //nothing to do here
+		if (slot.confirmedClosed()) return; //nothing to do here
 
 		slot.addExternalizeValue(publicKey, value);
 
-		if (!slot.closed()) return undefined;
+		if (!slot.confirmedClosed()) return undefined;
 
 		return {
 			sequence: slotIndex,
