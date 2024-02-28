@@ -16,7 +16,7 @@ export class SlotCloser {
 		const slot = slots.getSlot(slotIndex);
 		if (slot.confirmedClosed()) return; //nothing to do here
 
-		slot.addExternalizeValue(publicKey, value);
+		slot.addExternalizeValue(publicKey, value, new Date());
 
 		if (!slot.confirmedClosed()) return undefined;
 

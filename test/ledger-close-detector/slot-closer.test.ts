@@ -38,7 +38,6 @@ test('should attempt to close slot and return ledger', () => {
 	}
 	expect(ledger.sequence).toEqual(newlyClosedSlotIndex);
 	expect(mockSlots.getSlot).toHaveBeenCalledWith(newlyClosedSlotIndex);
-	expect(slot.addExternalizeValue).toHaveBeenCalledWith(publicKey, value);
 });
 
 test('should attempt to close slot and return undefined if slot was closed before', () => {

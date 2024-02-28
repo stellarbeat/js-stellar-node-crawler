@@ -56,7 +56,7 @@ export class ExternalizeStatementHandler {
 		publicKey: string,
 		value: string
 	): null | Ledger {
-		slot.addExternalizeValue(publicKey, value);
+		slot.addExternalizeValue(publicKey, value, new Date());
 
 		const closedLedger = slot.getConfirmedClosedLedger();
 		if (!closedLedger) return null;
