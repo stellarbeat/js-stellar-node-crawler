@@ -1,11 +1,10 @@
 import * as P from 'pino';
-import { ok, Result } from 'neverthrow';
 import { Slot } from './slots';
 import { Ledger } from './crawler';
 import { PeerNodeCollection } from './peer-node-collection';
 import { ExternalizeData } from './map-externalize-statement';
 
-//attempts slot closing and updates peer statuses accordingly
+//attempts slot close confirmation and updates peer statuses accordingly
 export class ExternalizeStatementHandler {
 	constructor(private logger: P.Logger) {}
 
@@ -15,7 +14,7 @@ export class ExternalizeStatementHandler {
 		slot: Slot,
 		externalizeData: ExternalizeData,
 		localCloseTime: Date
-	): Result<Ledger | null, Error> {
+	): Ledger | null {
 		this.logExternalizeMessage(
 			externalizeData.publicKey,
 			slot.index,
@@ -29,43 +28,40 @@ export class ExternalizeStatementHandler {
 			localCloseTime
 		);
 
-		if (slot.closed()) {
-			peerNodes.confirmLedgerClose(
-				externalizeData.publicKey,
-				slot.getClosedLedger()!
-			);
-			return ok(null);
+		const closedLedger = slot.getClosedLedger();
+		if (closedLedger) {
+			peerNodes.confirmLedgerClose(externalizeData.publicKey, closedLedger);
+			return null;
 		}
 
-		const confirmationResult = this.attemptSlotCloseConfirmation(
+		const confirmedClosedSlotOrNull = this.attemptSlotCloseConfirmation(
 			slot,
 			externalizeData.publicKey,
 			externalizeData.value
 		);
-		if (confirmationResult.isErr()) return confirmationResult;
 
-		if (confirmationResult.value === null) return ok(null);
+		if (confirmedClosedSlotOrNull === null) return null;
 
 		this.confirmLedgerCloseForPeersThatHaveExternalized(
-			confirmationResult.value,
+			confirmedClosedSlotOrNull,
 			slot,
 			peerNodes
 		);
 
-		return ok(confirmationResult.value);
+		return confirmedClosedSlotOrNull;
 	}
 
 	private attemptSlotCloseConfirmation(
 		slot: Slot,
 		publicKey: string,
 		value: string
-	): Result<Ledger | null, Error> {
+	): null | Ledger {
 		slot.addExternalizeValue(publicKey, value);
 
 		const closedLedger = slot.getClosedLedger();
-		if (!closedLedger) return ok(null);
+		if (!closedLedger) return null;
 
-		return ok(closedLedger);
+		return closedLedger;
 	}
 
 	private confirmLedgerCloseForPeersThatHaveExternalized(

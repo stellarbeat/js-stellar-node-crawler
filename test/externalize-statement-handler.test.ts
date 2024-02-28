@@ -26,7 +26,6 @@ describe('ExternalizeStatementHandler', () => {
 		};
 
 		const handler = new ExternalizeStatementHandler(mockLogger);
-		mockSlot.closed.mockReturnValueOnce(true);
 		const closedLedger: Ledger = {
 			sequence: BigInt(1),
 			closeTime: slotCloseTime,
@@ -42,11 +41,7 @@ describe('ExternalizeStatementHandler', () => {
 			localSlotCloseTime
 		);
 
-		expect(result.isOk()).toBe(true);
-		if (!result.isOk()) {
-			throw new Error('result is not ok');
-		}
-		expect(result.value).toBe(null);
+		expect(result).toBe(null);
 		expect(mockPeerNodes.confirmLedgerClose).toHaveBeenCalledWith(
 			externalizeData.publicKey,
 			closedLedger
@@ -69,7 +64,6 @@ describe('ExternalizeStatementHandler', () => {
 		};
 
 		const handler = new ExternalizeStatementHandler(mockLogger);
-		mockSlot.closed.mockReturnValue(false);
 		mockSlot.getClosedLedger.mockReturnValueOnce(undefined);
 
 		const result = handler.handle(
@@ -79,11 +73,7 @@ describe('ExternalizeStatementHandler', () => {
 			localSlotCloseTime
 		);
 
-		expect(result.isOk()).toBe(true);
-		if (!result.isOk()) {
-			throw new Error('result is not ok');
-		}
-		expect(result.value).toBe(null);
+		expect(result).toBe(null);
 		expect(mockPeerNodes.confirmLedgerClose).not.toHaveBeenCalled();
 		expect(mockPeerNodes.addExternalizedValueForPeerNode).toHaveBeenCalledTimes(
 			1
@@ -103,13 +93,14 @@ describe('ExternalizeStatementHandler', () => {
 		};
 
 		const handler = new ExternalizeStatementHandler(mockLogger);
-		mockSlot.closed.mockReturnValue(false);
 		const closedLedger: Ledger = {
 			sequence: BigInt(1),
 			closeTime: slotCloseTime,
 			value: 'test value',
 			localCloseTime: localSlotCloseTime
 		};
+
+		mockSlot.getClosedLedger.mockReturnValueOnce(undefined);
 		mockSlot.getClosedLedger.mockReturnValueOnce(closedLedger);
 
 		const result = handler.handle(
@@ -119,11 +110,7 @@ describe('ExternalizeStatementHandler', () => {
 			localSlotCloseTime
 		);
 
-		expect(result.isOk()).toBe(true);
-		if (!result.isOk()) {
-			throw new Error('result is not ok');
-		}
-		expect(result.value).toBe(closedLedger);
+		expect(result).toBe(closedLedger);
 		expect(
 			mockPeerNodes.confirmLedgerCloseForValidatingNodes
 		).toHaveBeenCalledTimes(1);
