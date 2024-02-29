@@ -66,11 +66,10 @@ export class ScpStatementHandler {
 			new Date() //todo: move up
 		);
 
-		if (closedLedgerOrNull === null) {
-			return ok(undefined);
-		}
-
-		if (slotIndex > crawlState.latestClosedLedger.sequence) {
+		if (
+			closedLedgerOrNull !== null &&
+			closedLedgerOrNull.sequence > crawlState.latestClosedLedger.sequence
+		) {
 			crawlState.latestClosedLedger = closedLedgerOrNull;
 		} //todo: crawlstate should be higher up, eventEmitter bus?
 
