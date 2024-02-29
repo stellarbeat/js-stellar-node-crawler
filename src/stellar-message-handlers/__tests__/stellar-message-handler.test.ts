@@ -11,7 +11,6 @@ import { createDummyPeersMessage } from '../../../fixtures/createDummyPeersMessa
 import { createDummyQuorumSetMessage } from '../../../fixtures/createDummyQuorumSetMessage';
 import { createDummyDontHaveMessage } from '../../../fixtures/createDummyDontHaveMessage';
 import { createDummyErrLoadMessage } from '../../../fixtures/createDummyErrLoadMessage';
-import { PeerNode } from '../../index';
 import { PeerNodeCollection } from '../../peer-node-collection';
 
 describe('StellarMessageHandler', () => {
