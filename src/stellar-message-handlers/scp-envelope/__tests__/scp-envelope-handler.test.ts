@@ -4,22 +4,14 @@ import { ScpEnvelopeHandler } from '../scp-envelope-handler';
 import { createDummyExternalizeScpEnvelope } from '../../../../fixtures/createDummyExternalizeMessage';
 import { CrawlState } from '../../../crawl-state';
 import LRUCache = require('lru-cache');
-import { Keypair, Networks, xdr } from '@stellar/stellar-base';
+import { Keypair, Networks } from '@stellar/stellar-base';
 
 describe('scp-envelope-handler', () => {
 	it('should process valid scp envelope', () => {
 		const scpStatementHandler = mock<ScpStatementHandler>();
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
-		const crawlState = mock<CrawlState>();
-		crawlState.latestClosedLedger = {
-			sequence: BigInt(1),
-			closeTime: new Date(),
-			value: '',
-			localCloseTime: new Date()
-		};
-		crawlState.network = Networks.PUBLIC;
-		crawlState.envelopeCache = new LRUCache<string, number>({ max: 1000 });
+		const crawlState = createMockCrawlState();
 		handler.processScpEnvelope(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(1);
 	});
@@ -28,15 +20,7 @@ describe('scp-envelope-handler', () => {
 		const scpStatementHandler = mock<ScpStatementHandler>();
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
-		const crawlState = mock<CrawlState>();
-		crawlState.latestClosedLedger = {
-			sequence: BigInt(1),
-			closeTime: new Date(),
-			value: '',
-			localCloseTime: new Date()
-		};
-		crawlState.network = Networks.PUBLIC;
-		crawlState.envelopeCache = new LRUCache<string, number>({ max: 1000 });
+		const crawlState = createMockCrawlState();
 		handler.processScpEnvelope(scpEnvelope, crawlState);
 		handler.processScpEnvelope(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(1);
@@ -46,15 +30,7 @@ describe('scp-envelope-handler', () => {
 		const scpStatementHandler = mock<ScpStatementHandler>();
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
-		const crawlState = mock<CrawlState>();
-		crawlState.latestClosedLedger = {
-			sequence: BigInt(100),
-			closeTime: new Date(),
-			value: '',
-			localCloseTime: new Date()
-		};
-		crawlState.network = Networks.PUBLIC;
-		crawlState.envelopeCache = new LRUCache<string, number>({ max: 1000 });
+		const crawlState = createMockCrawlState(BigInt(100));
 		handler.processScpEnvelope(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
 	});
@@ -66,19 +42,37 @@ describe('scp-envelope-handler', () => {
 			Keypair.random(),
 			Buffer.from('wrong network')
 		);
+		const crawlState = createMockCrawlState();
+		const result = handler.processScpEnvelope(scpEnvelope, crawlState);
+		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
+		expect(result.isErr()).toBeTruthy();
+		if (!result.isErr()) throw new Error('Expected error but got ok');
+		expect(result.error.message).toEqual('Invalid SCP Signature');
+	});
+
+	function createMockCrawlState(sequence = BigInt(1)) {
 		const crawlState = mock<CrawlState>();
 		crawlState.latestClosedLedger = {
-			sequence: BigInt(1),
+			sequence: sequence,
 			closeTime: new Date(),
 			value: '',
 			localCloseTime: new Date()
 		};
 		crawlState.network = Networks.PUBLIC;
 		crawlState.envelopeCache = new LRUCache<string, number>({ max: 1000 });
+		return crawlState;
+	}
+
+	it('should not process scp envelope when processing SCP signature fails', () => {
+		const scpStatementHandler = mock<ScpStatementHandler>();
+		const handler = new ScpEnvelopeHandler(scpStatementHandler);
+		const scpEnvelope = createDummyExternalizeScpEnvelope();
+		scpEnvelope.signature(Buffer.alloc(20)); // invalid signature
+		const crawlState = createMockCrawlState();
 		const result = handler.processScpEnvelope(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
 		expect(result.isErr()).toBeTruthy();
 		if (!result.isErr()) throw new Error('Expected error but got ok');
-		expect(result.error.message).toEqual('Invalid SCP Signature');
+		expect(result.error.message).toEqual('Error verifying SCP Signature');
 	});
 });
