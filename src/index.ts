@@ -5,8 +5,6 @@ import { ScpEnvelopeHandler } from './message-handlers/scp-envelope-handler';
 import { createNode } from '@stellarbeat/js-stellar-node-connector';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { ConnectionManager } from './connection-manager';
-import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
-import { Keypair } from '@stellar/stellar-base';
 import { ExternalizeStatementHandler } from './message-handlers/externalize/externalize-statement-handler';
 
 export { Crawler } from './crawler';
@@ -26,12 +24,6 @@ export function createCrawler(
 	}
 
 	const node = createNode(config.nodeConfig, logger);
-	const ledgerCloseDetectorNodeConfig: NodeConfig = JSON.parse(
-		JSON.stringify(config.nodeConfig)
-	);
-	//ledgerCloseDetectorNodeConfig.listeningPort++;
-	ledgerCloseDetectorNodeConfig.privateKey = Keypair.random().secret(); //todo: this should be the fixed public key
-
 	const connectionManager = new ConnectionManager(
 		node,
 		config.blackList,
@@ -48,14 +40,6 @@ export function createCrawler(
 			logger
 		),
 		connectionManager,
-		/*new LedgerCloseDetector(
-			ledgerCLoseConnectionManager,
-			new CachedLedgerCloseScpEnvelopeHandler(
-				new LedgerCloseScpEnvelopeHandler(new SlotCloser(), logger)
-			),
-			hash(Buffer.from(ledgerCloseDetectorNodeConfig.network)),
-			logger
-		),*/
 		logger
 	);
 }
