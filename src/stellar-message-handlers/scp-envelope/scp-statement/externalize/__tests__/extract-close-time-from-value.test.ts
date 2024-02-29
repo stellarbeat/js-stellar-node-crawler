@@ -1,5 +1,5 @@
 import { extractCloseTimeFromValue } from '../extract-close-time-from-value';
-import { createDummyExternalizeMessage } from '../../../../fixtures/createDummyExternalizeMessage';
+import { createDummyExternalizeMessage } from '../../../../../../fixtures/createDummyExternalizeMessage';
 
 describe('extract-close-time-from-value', () => {
 	it('should extract close time from value', () => {

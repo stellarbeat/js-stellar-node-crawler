@@ -8,7 +8,7 @@ export function createDummyValue() {
 	);
 }
 
-export function createDummyExternalizeMessage(
+export function createDummyExternalizeScpEnvelope(
 	keyPair: Keypair = Keypair.random(),
 	networkHash = hash(Buffer.from(Networks.PUBLIC))
 ) {
@@ -40,10 +40,17 @@ export function createDummyExternalizeMessage(
 		throw signatureResult.error;
 	}
 
-	const envelope = new xdr.ScpEnvelope({
+	return new xdr.ScpEnvelope({
 		statement: statement,
 		signature: signatureResult.value
 	});
+}
 
-	return xdr.StellarMessage.scpMessage(envelope);
+export function createDummyExternalizeMessage(
+	keyPair: Keypair = Keypair.random(),
+	networkHash = hash(Buffer.from(Networks.PUBLIC))
+) {
+	return xdr.StellarMessage.scpMessage(
+		createDummyExternalizeScpEnvelope(keyPair, networkHash)
+	);
 }

@@ -1,4 +1,4 @@
-import { isLedgerSequenceValid } from '../ledger-validator';
+import { isLedgerSequenceValid } from '../scp-envelope/ledger-validator';
 import { Ledger } from '../../crawler';
 
 it('should let valid ledger sequences pass', function () {

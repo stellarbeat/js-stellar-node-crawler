@@ -1,56 +1,23 @@
 import * as P from 'pino';
-import { hash, xdr } from '@stellar/stellar-base';
-import { CrawlState } from '../crawl-state';
-import {
-	getPublicKeyStringFromBuffer,
-	verifySCPEnvelopeSignature
-} from '@stellarbeat/js-stellar-node-connector';
-import { QuorumSetManager } from '../quorum-set-manager';
+import { xdr } from '@stellar/stellar-base';
+import { CrawlState } from '../../../crawl-state';
+import { getPublicKeyStringFromBuffer } from '@stellarbeat/js-stellar-node-connector';
+import { QuorumSetManager } from '../../../quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
-import { isLedgerSequenceValid } from './ledger-validator';
 import { ExternalizeStatementHandler } from './externalize/externalize-statement-handler';
 import { mapExternalizeStatement } from './externalize/map-externalize-statement';
 
-export class ScpEnvelopeHandler {
+export class ScpStatementHandler {
 	constructor(
 		private quorumSetManager: QuorumSetManager,
 		private externalizeStatementHandler: ExternalizeStatementHandler,
 		private logger: P.Logger
 	) {}
 
-	public processScpEnvelope(
-		scpEnvelope: xdr.ScpEnvelope,
-		crawlState: CrawlState
-	): Result<undefined, Error> {
-		if (crawlState.envelopeCache.has(scpEnvelope.signature().toString())) {
-			return ok(undefined);
-		}
-		crawlState.envelopeCache.set(scpEnvelope.signature().toString(), 1);
-
-		if (
-			!isLedgerSequenceValid(
-				crawlState.latestClosedLedger,
-				BigInt(scpEnvelope.statement().slotIndex().toString())
-			)
-		)
-			return ok(undefined);
-
-		const verifiedResult = verifySCPEnvelopeSignature(
-			scpEnvelope,
-			hash(Buffer.from(crawlState.network))
-		);
-		if (verifiedResult.isErr())
-			return err(new Error('Error verifying SCP Signature'));
-
-		if (!verifiedResult.value) return err(new Error('Invalid SCP Signature'));
-
-		return this.processScpStatement(scpEnvelope.statement(), crawlState);
-	}
-
-	protected processScpStatement(
+	public handle(
 		scpStatement: xdr.ScpStatement,
 		crawlState: CrawlState
-	): Result<undefined, Error> {
+	): Result<void, Error> {
 		const publicKeyResult = getPublicKeyStringFromBuffer(
 			scpStatement.nodeId().value()
 		);

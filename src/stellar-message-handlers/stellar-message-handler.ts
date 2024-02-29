@@ -6,7 +6,7 @@ import { hash, xdr } from '@stellar/stellar-base';
 import { CrawlState } from '../crawl-state';
 import { P } from 'pino';
 import { EventEmitter } from 'events';
-import { ScpEnvelopeHandler } from './scp-envelope-handler';
+import { ScpEnvelopeHandler } from './scp-envelope/scp-envelope-handler';
 import { NodeAddress } from '../crawler';
 import { truncate } from '../utilities/truncate';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
