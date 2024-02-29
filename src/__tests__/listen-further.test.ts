@@ -1,5 +1,5 @@
-import { PeerNodeCollection } from '../src/peer-node-collection';
-import { listenFurther } from '../src/listen-further';
+import { PeerNodeCollection } from '../peer-node-collection';
+import { listenFurther } from '../listen-further';
 
 describe('listen-further', () => {
 	function setupSUT() {

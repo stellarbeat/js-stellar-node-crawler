@@ -5,7 +5,7 @@ import {
 	Node as NetworkNode,
 	Connection
 } from '@stellarbeat/js-stellar-node-connector';
-import { ConnectionManager } from '../src/connection-manager';
+import { ConnectionManager } from '../connection-manager';
 import { P } from 'pino';
 import { EventEmitter } from 'events';
 

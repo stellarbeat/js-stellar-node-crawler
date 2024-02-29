@@ -1,10 +1,10 @@
 import { mock } from 'jest-mock-extended';
 import * as P from 'pino';
-import { PeerNodeCollection } from '../src/peer-node-collection';
-import { ExternalizeStatementHandler } from '../src/message-handlers/externalize/externalize-statement-handler';
-import { ExternalizeData } from '../src/message-handlers/externalize/map-externalize-statement';
-import { Ledger } from '../src/crawler';
-import { Slot } from '../src/message-handlers/externalize/slot';
+import { PeerNodeCollection } from '../../../peer-node-collection';
+import { ExternalizeStatementHandler } from '../externalize-statement-handler';
+import { ExternalizeData } from '../map-externalize-statement';
+import { Ledger } from '../../../crawler';
+import { Slot } from '../slot';
 
 const mockLogger = mock<P.Logger>();
 

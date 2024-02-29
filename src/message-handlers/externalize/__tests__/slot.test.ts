@@ -1,8 +1,8 @@
-import { Slot } from '../src/message-handlers/externalize/slot';
+import { Slot } from '../slot';
 import { mock } from 'jest-mock-extended';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { P } from 'pino';
-import { createDummyValue } from '../fixtures/createDummyExternalizeMessage';
+import { createDummyValue } from '../../../../fixtures/createDummyExternalizeMessage';
 
 const mockLogger = mock<P.Logger>();
 let quorumSet: QuorumSet;
