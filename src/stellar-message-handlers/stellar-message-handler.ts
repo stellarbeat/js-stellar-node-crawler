@@ -48,7 +48,7 @@ export class StellarMessageHandler extends EventEmitter {
 	): Result<void, Error> {
 		switch (stellarMessage.switch()) {
 			case xdr.MessageType.scpMessage():
-				return this.scpEnvelopeHandler.processScpEnvelope(
+				return this.scpEnvelopeHandler.handle(
 					stellarMessage.envelope(),
 					crawlState
 				);

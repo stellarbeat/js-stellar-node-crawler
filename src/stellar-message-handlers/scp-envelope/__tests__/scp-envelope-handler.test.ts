@@ -12,7 +12,7 @@ describe('scp-envelope-handler', () => {
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
 		const crawlState = createMockCrawlState();
-		handler.processScpEnvelope(scpEnvelope, crawlState);
+		handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(1);
 	});
 
@@ -21,8 +21,8 @@ describe('scp-envelope-handler', () => {
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
 		const crawlState = createMockCrawlState();
-		handler.processScpEnvelope(scpEnvelope, crawlState);
-		handler.processScpEnvelope(scpEnvelope, crawlState);
+		handler.handle(scpEnvelope, crawlState);
+		handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(1);
 	});
 
@@ -31,7 +31,7 @@ describe('scp-envelope-handler', () => {
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
 		const crawlState = createMockCrawlState(BigInt(100));
-		handler.processScpEnvelope(scpEnvelope, crawlState);
+		handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
 	});
 
@@ -43,7 +43,7 @@ describe('scp-envelope-handler', () => {
 			Buffer.from('wrong network')
 		);
 		const crawlState = createMockCrawlState();
-		const result = handler.processScpEnvelope(scpEnvelope, crawlState);
+		const result = handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
 		expect(result.isErr()).toBeTruthy();
 		if (!result.isErr()) throw new Error('Expected error but got ok');
@@ -69,7 +69,7 @@ describe('scp-envelope-handler', () => {
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
 		scpEnvelope.signature(Buffer.alloc(20)); // invalid signature
 		const crawlState = createMockCrawlState();
-		const result = handler.processScpEnvelope(scpEnvelope, crawlState);
+		const result = handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
 		expect(result.isErr()).toBeTruthy();
 		if (!result.isErr()) throw new Error('Expected error but got ok');

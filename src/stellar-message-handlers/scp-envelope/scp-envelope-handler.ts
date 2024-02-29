@@ -12,7 +12,7 @@ import { ScpStatementHandler } from './scp-statement/scp-statement-handler';
 export class ScpEnvelopeHandler {
 	constructor(private scpStatementHandler: ScpStatementHandler) {}
 
-	public processScpEnvelope(
+	public handle(
 		scpEnvelope: xdr.ScpEnvelope,
 		crawlState: CrawlState
 	): Result<void, Error> {

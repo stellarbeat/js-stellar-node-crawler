@@ -33,13 +33,13 @@ describe('StellarMessageHandler', () => {
 			const keyPair = Keypair.random();
 			const stellarMessage = createDummyExternalizeMessage(keyPair);
 			const crawlState = mock<CrawlState>();
-			scpManager.processScpEnvelope.mockReturnValueOnce(ok(undefined));
+			scpManager.handle.mockReturnValueOnce(ok(undefined));
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
 				crawlState
 			);
-			expect(scpManager.processScpEnvelope).toHaveBeenCalledTimes(1);
+			expect(scpManager.handle).toHaveBeenCalledTimes(1);
 			expect(result.isOk()).toBeTruthy();
 		});
 
