@@ -4,16 +4,11 @@ import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
 import { CrawlProcessState, CrawlState } from './crawl-state';
-import { ScpEnvelopeHandler } from './message-handlers/scp-envelope-handler';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlStateValidator } from './crawl-state-validator';
 import { CrawlLogger } from './crawl-logger';
 import { DisconnectTimeout } from './disconnect-timeout';
-import {
-	PeerAddressesReceivedEvent,
-	StellarMessageHandler
-} from './message-handlers/stellar-message-handler';
 import {
 	ClosePayload,
 	ConnectedPayload,
@@ -22,6 +17,11 @@ import {
 } from './connection-manager';
 import { PeerNode } from './peer-node';
 import { err } from 'neverthrow';
+import {
+	PeerAddressesReceivedEvent,
+	StellarMessageHandler
+} from './stellar-message-handlers/stellar-message-handler';
+import { ScpEnvelopeHandler } from './stellar-message-handlers/scp-envelope/scp-envelope-handler';
 
 type PublicKey = string;
 export type NodeAddress = [ip: string, port: number];

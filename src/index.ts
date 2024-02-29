@@ -1,11 +1,12 @@
 import { Crawler } from './crawler';
 import { pino } from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
-import { ScpEnvelopeHandler } from './message-handlers/scp-envelope-handler';
 import { createNode } from '@stellarbeat/js-stellar-node-connector';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { ConnectionManager } from './connection-manager';
-import { ExternalizeStatementHandler } from './message-handlers/externalize/externalize-statement-handler';
+import { ExternalizeStatementHandler } from './stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
+import { ScpEnvelopeHandler } from './stellar-message-handlers/scp-envelope/scp-envelope-handler';
+import { ScpStatementHandler } from './stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -35,9 +36,11 @@ export function createCrawler(
 		config,
 		quorumSetManager,
 		new ScpEnvelopeHandler(
-			quorumSetManager,
-			new ExternalizeStatementHandler(logger),
-			logger
+			new ScpStatementHandler(
+				quorumSetManager,
+				new ExternalizeStatementHandler(logger),
+				logger
+			)
 		),
 		connectionManager,
 		logger
