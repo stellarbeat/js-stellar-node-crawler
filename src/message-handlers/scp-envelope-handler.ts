@@ -1,15 +1,15 @@
 import * as P from 'pino';
 import { hash, xdr } from '@stellar/stellar-base';
-import { CrawlState } from './crawl-state';
+import { CrawlState } from '../crawl-state';
 import {
 	getPublicKeyStringFromBuffer,
 	verifySCPEnvelopeSignature
 } from '@stellarbeat/js-stellar-node-connector';
-import { QuorumSetManager } from './quorum-set-manager';
+import { QuorumSetManager } from '../quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
 import { isLedgerSequenceValid } from './ledger-validator';
-import { ExternalizeStatementHandler } from './externalize-statement-handler';
-import { mapExternalizeStatement } from './map-externalize-statement';
+import { ExternalizeStatementHandler } from './externalize/externalize-statement-handler';
+import { mapExternalizeStatement } from './externalize/map-externalize-statement';
 
 export class ScpEnvelopeHandler {
 	constructor(

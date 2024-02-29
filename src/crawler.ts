@@ -4,7 +4,7 @@ import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 import * as P from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
 import { CrawlProcessState, CrawlState } from './crawl-state';
-import { ScpEnvelopeHandler } from './scp-envelope-handler';
+import { ScpEnvelopeHandler } from './message-handlers/scp-envelope-handler';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlStateValidator } from './crawl-state-validator';
@@ -13,7 +13,7 @@ import { DisconnectTimeout } from './disconnect-timeout';
 import {
 	PeerAddressesReceivedEvent,
 	StellarMessageHandler
-} from './stellar-message-handler';
+} from './message-handlers/stellar-message-handler';
 import {
 	ClosePayload,
 	ConnectedPayload,

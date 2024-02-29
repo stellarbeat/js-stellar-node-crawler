@@ -1,4 +1,4 @@
-import { Slot } from '../src/slot';
+import { Slot } from '../src/message-handlers/externalize/slot';
 import { mock } from 'jest-mock-extended';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { P } from 'pino';

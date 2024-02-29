@@ -3,16 +3,16 @@ import {
 	getQuorumSetFromMessage
 } from '@stellarbeat/js-stellar-node-connector';
 import { hash, xdr } from '@stellar/stellar-base';
-import { CrawlState } from './crawl-state';
+import { CrawlState } from '../crawl-state';
 import { P } from 'pino';
 import { EventEmitter } from 'events';
 import { ScpEnvelopeHandler } from './scp-envelope-handler';
-import { NodeAddress } from './crawler';
-import { truncate } from './truncate';
+import { NodeAddress } from '../crawler';
+import { truncate } from '../utilities/truncate';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
-import { QuorumSetManager } from './quorum-set-manager';
+import { QuorumSetManager } from '../quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
-import { PeerNodeCollection } from './peer-node-collection';
+import { PeerNodeCollection } from '../peer-node-collection';
 
 export interface PeerAddressesReceivedEvent {
 	peerAddresses: Array<NodeAddress>;

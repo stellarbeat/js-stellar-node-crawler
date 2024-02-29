@@ -1,7 +1,7 @@
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { mock } from 'jest-mock-extended';
 import { P } from 'pino';
-import { Slots } from '../src/slots';
+import { Slots } from '../src/message-handlers/externalize/slots';
 
 describe('slots', () => {
 	it('should create new slot', () => {

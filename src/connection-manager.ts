@@ -4,7 +4,7 @@ import {
 	Node as NetworkNode
 } from '@stellarbeat/js-stellar-node-connector';
 import { P } from 'pino';
-import { truncate } from './truncate';
+import { truncate } from './utilities/truncate';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { NodeInfo } from '@stellarbeat/js-stellar-node-connector/lib/node';
 

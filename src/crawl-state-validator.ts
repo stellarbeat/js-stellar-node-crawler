@@ -1,7 +1,7 @@
-import { MaxOpenConnectionsConfigError } from './error/max-open-connections-config-error';
 import { CrawlState } from './crawl-state';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { err, ok, Result } from 'neverthrow';
+import { MaxOpenConnectionsConfigError } from './errors/max-open-connections-config-error';
 
 export class CrawlStateValidator {
 	static validateCrawlState(

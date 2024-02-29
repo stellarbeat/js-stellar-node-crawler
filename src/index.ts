@@ -1,22 +1,18 @@
 import { Crawler } from './crawler';
 import { pino } from 'pino';
 import { QuorumSetManager } from './quorum-set-manager';
-import { ScpEnvelopeHandler } from './scp-envelope-handler';
+import { ScpEnvelopeHandler } from './message-handlers/scp-envelope-handler';
 import { createNode } from '@stellarbeat/js-stellar-node-connector';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { ConnectionManager } from './connection-manager';
 import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
-import { hash, Keypair } from '@stellar/stellar-base';
-import { LedgerCloseDetector } from './ledger-close-detector/ledger-close-detector';
-import { LedgerCloseScpEnvelopeHandler } from './ledger-close-detector/ledger-close-scp-envelope-handler';
-import { SlotCloser } from './ledger-close-detector/slot-closer';
-import { CachedLedgerCloseScpEnvelopeHandler } from './ledger-close-detector/cached-ledger-close-scp-envelope-handler';
-import { ExternalizeStatementHandler } from './externalize-statement-handler';
+import { Keypair } from '@stellar/stellar-base';
+import { ExternalizeStatementHandler } from './message-handlers/externalize/externalize-statement-handler';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
 export { PeerNode } from './peer-node';
-export { default as jsonStorage } from './json-storage';
+export { default as jsonStorage } from './utilities/json-storage';
 
 export function createCrawler(
 	config: CrawlerConfiguration,
@@ -35,12 +31,6 @@ export function createCrawler(
 	);
 	//ledgerCloseDetectorNodeConfig.listeningPort++;
 	ledgerCloseDetectorNodeConfig.privateKey = Keypair.random().secret(); //todo: this should be the fixed public key
-	const ledgerCloseNode = createNode(ledgerCloseDetectorNodeConfig, logger);
-	const ledgerCLoseConnectionManager = new ConnectionManager(
-		ledgerCloseNode,
-		config.blackList,
-		logger
-	);
 
 	const connectionManager = new ConnectionManager(
 		node,

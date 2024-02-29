@@ -1,5 +1,5 @@
-import { StellarMessageHandler } from '../src/stellar-message-handler';
-import { ScpEnvelopeHandler } from '../src/scp-envelope-handler';
+import { StellarMessageHandler } from '../src/message-handlers/stellar-message-handler';
+import { ScpEnvelopeHandler } from '../src/message-handlers/scp-envelope-handler';
 import { QuorumSetManager } from '../src/quorum-set-manager';
 import { P } from 'pino';
 import { CrawlState } from '../src/crawl-state';

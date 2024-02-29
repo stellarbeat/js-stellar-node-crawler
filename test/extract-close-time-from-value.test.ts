@@ -1,5 +1,5 @@
-import { extractCloseTimeFromValue } from '../../src/ledger-close-detector/extract-close-time-from-value';
-import { createDummyExternalizeMessage } from '../../fixtures/createDummyExternalizeMessage';
+import { extractCloseTimeFromValue } from '../src/message-handlers/externalize/extract-close-time-from-value';
+import { createDummyExternalizeMessage } from '../fixtures/createDummyExternalizeMessage';
 
 describe('extract-close-time-from-value', () => {
 	it('should extract close time from value', () => {

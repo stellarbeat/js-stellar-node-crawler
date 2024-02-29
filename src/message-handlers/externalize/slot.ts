@@ -1,8 +1,8 @@
-import { Ledger } from './crawler';
+import { Ledger } from '../../crawler';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
 import containsSlice from '@stellarbeat/js-stellarbeat-shared/lib/quorum/containsSlice';
-import { extractCloseTimeFromValue } from './ledger-close-detector/extract-close-time-from-value';
+import { extractCloseTimeFromValue } from './extract-close-time-from-value';
 
 export type SlotIndex = bigint;
 type NodeId = string;

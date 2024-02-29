@@ -1,7 +1,7 @@
 import { PeerNode } from './peer-node';
 import { CrawlState } from './crawl-state';
 import { listenFurther } from './listen-further';
-import { truncate } from './truncate';
+import { truncate } from './utilities/truncate';
 import { P } from 'pino';
 
 export class DisconnectTimeout {

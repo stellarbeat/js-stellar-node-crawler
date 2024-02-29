@@ -1,9 +1,9 @@
 import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { Ledger, NodeAddress } from './crawler';
-import { Slots } from './slots';
+import { Slots } from './message-handlers/externalize/slots';
 import * as LRUCache from 'lru-cache';
 import * as P from 'pino';
-import { truncate } from './truncate';
+import { truncate } from './utilities/truncate';
 import { PeerNodeCollection } from './peer-node-collection';
 import { AsyncResultCallback } from 'async';
 
