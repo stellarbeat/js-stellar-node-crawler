@@ -8,10 +8,10 @@ import {
 import { xdr, Keypair, hash, Networks } from '@stellar/stellar-base';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
-import { NodeAddress } from '../crawler';
 import { ok, Result, err } from 'neverthrow';
 import { CrawlerConfiguration, createCrawler } from '../index';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
+import { NodeAddress } from '../node-address';
 
 jest.setTimeout(20000);
 

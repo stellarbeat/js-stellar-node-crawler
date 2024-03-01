@@ -1,11 +1,12 @@
 import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
-import { Ledger, NodeAddress } from './crawler';
+import { Ledger } from './crawler';
 import * as LRUCache from 'lru-cache';
 import * as P from 'pino';
 import { truncate } from './utilities/truncate';
 import { PeerNodeCollection } from './peer-node-collection';
 import { AsyncResultCallback } from 'async';
 import { Slots } from './stellar-message-handlers/scp-envelope/scp-statement/externalize/slots';
+import { NodeAddress } from './node-address';
 
 type QuorumSetHash = string;
 type PeerKey = string; //ip:port

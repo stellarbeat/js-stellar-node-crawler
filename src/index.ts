@@ -7,6 +7,8 @@ import { ConnectionManager } from './connection-manager';
 import { ExternalizeStatementHandler } from './stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
 import { ScpEnvelopeHandler } from './stellar-message-handlers/scp-envelope/scp-envelope-handler';
 import { ScpStatementHandler } from './stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
+import { CrawlQueueManager } from './crawl-queue-manager';
+import { AsyncCrawlQueue } from './crawl-queue';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -43,6 +45,10 @@ export function createCrawler(
 			)
 		),
 		connectionManager,
+		new CrawlQueueManager(
+			new AsyncCrawlQueue(config.maxOpenConnections),
+			logger
+		),
 		logger
 	);
 }

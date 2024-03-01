@@ -5,12 +5,12 @@ import { P } from 'pino';
 import { CrawlState } from '../../crawl-state';
 import { Keypair } from '@stellar/stellar-base';
 import { mock, MockProxy } from 'jest-mock-extended';
-import { createDummyExternalizeMessage } from '../../../fixtures/createDummyExternalizeMessage';
+import { createDummyExternalizeMessage } from '../../__fixtures__/createDummyExternalizeMessage';
 import { ok } from 'neverthrow';
-import { createDummyPeersMessage } from '../../../fixtures/createDummyPeersMessage';
-import { createDummyQuorumSetMessage } from '../../../fixtures/createDummyQuorumSetMessage';
-import { createDummyDontHaveMessage } from '../../../fixtures/createDummyDontHaveMessage';
-import { createDummyErrLoadMessage } from '../../../fixtures/createDummyErrLoadMessage';
+import { createDummyPeersMessage } from '../../__fixtures__/createDummyPeersMessage';
+import { createDummyQuorumSetMessage } from '../../__fixtures__/createDummyQuorumSetMessage';
+import { createDummyDontHaveMessage } from '../../__fixtures__/createDummyDontHaveMessage';
+import { createDummyErrLoadMessage } from '../../__fixtures__/createDummyErrLoadMessage';
 import { PeerNodeCollection } from '../../peer-node-collection';
 
 describe('StellarMessageHandler', () => {

@@ -7,12 +7,12 @@ import { CrawlState } from '../crawl-state';
 import { P } from 'pino';
 import { EventEmitter } from 'events';
 import { ScpEnvelopeHandler } from './scp-envelope/scp-envelope-handler';
-import { NodeAddress } from '../crawler';
 import { truncate } from '../utilities/truncate';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { QuorumSetManager } from '../quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
 import { PeerNodeCollection } from '../peer-node-collection';
+import { NodeAddress } from '../node-address';
 
 export interface PeerAddressesReceivedEvent {
 	peerAddresses: Array<NodeAddress>;

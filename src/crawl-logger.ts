@@ -1,7 +1,7 @@
 import { CrawlState } from './crawl-state';
 import { P } from 'pino';
-import { QueueObject } from 'async';
 import { ConnectionManager } from './connection-manager';
+import { CrawlQueueManager } from './crawl-queue-manager';
 
 export class CrawlLogger {
 	loggingTimer?: NodeJS.Timeout;
@@ -9,7 +9,7 @@ export class CrawlLogger {
 	constructor(
 		private crawlState: CrawlState,
 		private connectionManager: ConnectionManager,
-		private crawlQueue: QueueObject<any>,
+		private crawlQueueManager: CrawlQueueManager,
 		private logger: P.Logger
 	) {}
 
@@ -20,7 +20,7 @@ export class CrawlLogger {
 		);
 		this.loggingTimer = setInterval(() => {
 			this.logger.info({
-				queueLength: this.crawlQueue.length(),
+				queueLength: this.crawlQueueManager.queueLength(),
 				activeConnections: this.connectionManager.getNumberOfActiveConnections()
 				//topTierConnections: this.ledgerCloseDetector.getConnectedNodesCount()
 			});

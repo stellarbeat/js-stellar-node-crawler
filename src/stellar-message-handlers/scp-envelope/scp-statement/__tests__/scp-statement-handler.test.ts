@@ -6,7 +6,7 @@ import { ExternalizeStatementHandler } from '../externalize/externalize-statemen
 import {
 	createDummyExternalizeStatement,
 	createDummyNominationMessage
-} from '../../../../../fixtures/createDummyExternalizeMessage';
+} from '../../../../__fixtures__/createDummyExternalizeMessage';
 import { Keypair } from '@stellar/stellar-base';
 import { CrawlState } from '../../../../crawl-state';
 import { PeerNodeCollection } from '../../../../peer-node-collection';
