@@ -14,7 +14,7 @@ export class PeerNodeCollection {
 		localTime: Date
 	): void {
 		const peerNode = this.getOrAdd(publicKey);
-		peerNode.externalizedValues.set(slotIndex, { localTime, value });
+		peerNode.addExternalizedValue(slotIndex, localTime, value);
 	}
 
 	getOrAdd(publicKey: string) {
@@ -35,7 +35,8 @@ export class PeerNodeCollection {
 		publicKey: string,
 		ip: string,
 		port: number,
-		nodeInfo: NodeInfo
+		nodeInfo: NodeInfo,
+		localTime: Date
 	): PeerNode | Error {
 		let peerNode = this.peerNodes.get(publicKey);
 		if (peerNode && peerNode.successfullyConnected) {
@@ -49,6 +50,7 @@ export class PeerNodeCollection {
 		peerNode.nodeInfo = nodeInfo;
 		peerNode.ip = ip;
 		peerNode.port = port;
+		peerNode.connectionTime = localTime;
 
 		this.peerNodes.set(publicKey, peerNode);
 

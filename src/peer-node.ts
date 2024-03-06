@@ -15,16 +15,18 @@ export class PeerNode {
 	public suppliedPeerList = false;
 	public latestActiveSlotIndex?: string;
 	public participatingInSCP = false;
-	public observedLedgerCloses: number = 0;
+	public connectionTime?: Date;
+	public disconnectionTime?: Date;
+	public connectedDuringLedgerClose = false;
 	public disconnected: boolean = false;
-	public externalizedValues: Map<
+	private externalizedValues: Map<
 		bigint,
 		{
 			localTime: Date;
 			value: string;
 		}
 	> = new Map();
-	public lagInMS: number | undefined;
+	private lagMSMeasurement: Map<bigint, number> = new Map();
 
 	constructor(publicKey: string) {
 		this.publicKey = publicKey;
@@ -35,64 +37,79 @@ export class PeerNode {
 	}
 
 	get successfullyConnected(): boolean {
-		return this.ip !== undefined;
+		return this.connectionTime !== undefined;
 	}
 
-	hasExternalizedLedger(slotIndex: bigint): boolean {
-		return this.externalizedValues.has(slotIndex);
-	}
+	processConfirmedLedgerClose(closedLedger: Ledger) {
+		const externalized = this.externalizedValues.get(closedLedger.sequence);
 
-	externalizedLedgerValueIsCorrect(slotIndex: bigint, value: string): boolean {
-		return this.externalizedValues.get(slotIndex)?.value === value;
-	}
-
-	processConfirmedLedgerClose(ledger: Ledger) {
-		if (!this.hasExternalizedLedger(ledger.sequence)) {
+		if (!externalized) {
 			return;
 		}
-		if (!this.externalizedLedgerValueIsCorrect(ledger.sequence, ledger.value)) {
+
+		if (externalized.value !== closedLedger.value) {
 			this.isValidatingIncorrectValues = true;
 			return;
 		}
-		if (this.successfullyConnected && !this.disconnected) {
-			this.observedLedgerCloses++;
-		}
+
 		this.isValidating = true;
-		this.updateLag(ledger);
+
+		let connectedDuringLedgerClose = false;
+		if (
+			this.connectionTime &&
+			closedLedger.localCloseTime.getTime() >= this.connectionTime.getTime() &&
+			(!this.disconnectionTime ||
+				(this.disconnectionTime &&
+					closedLedger.localCloseTime.getTime() <
+						this.disconnectionTime.getTime()))
+		) {
+			connectedDuringLedgerClose = true;
+		}
+		this.connectedDuringLedgerClose = connectedDuringLedgerClose;
+
+		this.updateLag(closedLedger, externalized);
+	}
+	private hasExternalizedLedger(slotIndex: bigint): boolean {
+		return this.externalizedValues.has(slotIndex);
 	}
 
-	updateLag(closedLedger: Ledger): void {
-		if (this.hasExternalizedLedger(closedLedger.sequence)) {
-			const lag = this.determineLag(
-				closedLedger.localCloseTime,
-				this.externalizedValues.get(closedLedger.sequence)!.localTime
-			);
-
-			if (!this.lagInMS || this.lagInMS > lag) {
-				this.lagInMS = lag; //we report the smallest lag, to discard slower relayed externalize messages
-			}
-		}
+	public addExternalizedValue(
+		slotIndex: bigint,
+		localTime: Date,
+		value: string
+	): void {
+		this.externalizedValues.set(slotIndex, {
+			localTime: localTime,
+			value: value
+		});
 	}
 
-	/*determineValidatingStatusAndLag(closedLedger: Ledger): void {
-		if (this.hasExternalizedLedger(closedLedger.sequence)) {
-			this.isValidating = true;
-			this.isValidatingIncorrectValues = !this.externalizedLedgerValueIsCorrect(
-				closedLedger.sequence,
-				closedLedger.value
-			);
-			const lag = this.determineLag(
-				closedLedger.localCloseTime,
-				this.externalizedValues.get(closedLedger.sequence)!.localTime
-			);
-
-			if (!this.lagInMS || this.lagInMS < lag) {
-				this.lagInMS = lag; //we report the biggest lag
-			}
+	private updateLag(
+		closedLedger: Ledger,
+		externalized: {
+			localTime: Date;
+			value: string;
 		}
-	}*/
+	): void {
+		this.lagMSMeasurement.set(
+			closedLedger.sequence,
+			this.determineLag(closedLedger.localCloseTime, externalized.localTime)
+		);
+	}
 
 	private determineLag(localLedgerCloseTime: Date, externalizeTime: Date) {
 		return externalizeTime.getTime() - localLedgerCloseTime.getTime();
+	}
+
+	public getMinLagMS(): number | undefined {
+		//implement without using spread operator
+		let minLag: number | undefined;
+		for (const lag of this.lagMSMeasurement.values()) {
+			if (minLag === undefined || lag < minLag) {
+				minLag = lag;
+			}
+		}
+
+		return minLag;
 	}
 }

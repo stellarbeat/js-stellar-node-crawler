@@ -9,6 +9,11 @@ import { ScpEnvelopeHandler } from './stellar-message-handlers/scp-envelope/scp-
 import { ScpStatementHandler } from './stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { AsyncCrawlQueue } from './crawl-queue';
+import { DisconnectTimeout } from './disconnect-timeout';
+import { OnConnectedHandler } from './crawl-connection-event-handlers/on-connected-handler';
+import { OnDataHandler } from './crawl-connection-event-handlers/on-data-handler';
+import { StellarMessageHandler } from './stellar-message-handlers/stellar-message-handler';
+import { OnConnectionCloseHandler } from './crawl-connection-event-handlers/on-connection-close-handler';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -33,22 +38,47 @@ export function createCrawler(
 		logger
 	);
 	const quorumSetManager = new QuorumSetManager(connectionManager, logger);
+	const crawlQueueManager = new CrawlQueueManager(
+		new AsyncCrawlQueue(config.maxOpenConnections),
+		logger
+	);
+	const onConnectedHandler = new OnConnectedHandler(
+		connectionManager,
+		crawlQueueManager,
+		new DisconnectTimeout(logger)
+	);
+	const scpEnvelopeHandler = new ScpEnvelopeHandler(
+		new ScpStatementHandler(
+			quorumSetManager,
+			new ExternalizeStatementHandler(logger),
+			logger
+		)
+	);
+	const stellarMessageHandler = new StellarMessageHandler(
+		scpEnvelopeHandler,
+		quorumSetManager,
+		logger
+	);
+
+	const onStellarMessageHandler = new OnDataHandler(
+		connectionManager,
+		stellarMessageHandler,
+		logger
+	);
+	const onConnectionCloseHandler = new OnConnectionCloseHandler(
+		quorumSetManager,
+		crawlQueueManager
+	);
 
 	return new Crawler(
 		config,
 		quorumSetManager,
-		new ScpEnvelopeHandler(
-			new ScpStatementHandler(
-				quorumSetManager,
-				new ExternalizeStatementHandler(logger),
-				logger
-			)
-		),
+		stellarMessageHandler,
 		connectionManager,
-		new CrawlQueueManager(
-			new AsyncCrawlQueue(config.maxOpenConnections),
-			logger
-		),
+		crawlQueueManager,
+		onConnectedHandler,
+		onStellarMessageHandler,
+		onConnectionCloseHandler,
 		logger
 	);
 }

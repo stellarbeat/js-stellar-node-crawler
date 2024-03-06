@@ -1,6 +1,6 @@
 import { AsyncCrawlQueue } from '../crawl-queue';
 import { CrawlQueueManager } from '../crawl-queue-manager';
-import { mock, MockProxy } from 'jest-mock-extended';
+import { mock } from 'jest-mock-extended';
 import { P } from 'pino';
 import { CrawlState } from '../crawl-state';
 import { CrawlTask } from '../crawl-task';
@@ -22,7 +22,8 @@ describe('CrawlQueueManager', () => {
 		crawlQueueManager.addCrawlTask({
 			connectCallback: () => {},
 			crawlState,
-			nodeAddress: ['localhost', 11625]
+			nodeAddress: ['localhost', 11625],
+			topTier: false
 		});
 
 		expect(crawlQueue.push).toHaveBeenCalled();
@@ -33,12 +34,14 @@ describe('CrawlQueueManager', () => {
 		crawlQueueManager.addCrawlTask({
 			connectCallback: () => {},
 			crawlState,
-			nodeAddress: ['localhost', 11625]
+			nodeAddress: ['localhost', 11625],
+			topTier: false
 		});
 		crawlQueueManager.addCrawlTask({
 			connectCallback: () => {},
 			crawlState,
-			nodeAddress: ['localhost', 11625]
+			nodeAddress: ['localhost', 11625],
+			topTier: false
 		});
 
 		expect(crawlQueue.push).toHaveBeenCalledTimes(1);
@@ -65,7 +68,8 @@ describe('CrawlQueueManager', () => {
 		const task: CrawlTask = {
 			connectCallback: jest.fn(),
 			crawlState,
-			nodeAddress: ['localhost', 11625]
+			nodeAddress: ['localhost', 11625],
+			topTier: false
 		};
 
 		crawlQueue.initialize.mockImplementation((callback) => {
@@ -73,6 +77,7 @@ describe('CrawlQueueManager', () => {
 		});
 
 		const crawlQueueManager = new CrawlQueueManager(crawlQueue, logger);
+		crawlQueueManager.queueLength();
 		expect(task.connectCallback).toHaveBeenCalled();
 	});
 
@@ -80,7 +85,8 @@ describe('CrawlQueueManager', () => {
 		const task: CrawlTask = {
 			connectCallback: jest.fn(),
 			crawlState,
-			nodeAddress: ['localhost', 11625]
+			nodeAddress: ['localhost', 11625],
+			topTier: false
 		};
 
 		crawlQueue.initialize.mockImplementation((callback) => {

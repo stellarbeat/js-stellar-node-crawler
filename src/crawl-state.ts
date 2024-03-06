@@ -82,8 +82,8 @@ export class CrawlState {
 				scp: peer.participatingInSCP,
 				validating: peer.isValidating,
 				overLoaded: peer.overLoaded,
-				lagMS: peer.lagInMS,
-				observedLedgerCloses: peer.observedLedgerCloses, //not correct because after disconnect...
+				lagMS: peer.getMinLagMS(),
+				connectedWhileExternalizing: peer.connectedDuringLedgerClose,
 				incorrect: peer.isValidatingIncorrectValues
 			});
 		});

@@ -34,18 +34,6 @@ export class StellarMessageHandler extends EventEmitter {
 		stellarMessage: xdr.StellarMessage,
 		crawlState: CrawlState
 	): Result<void, Error> {
-		return this.handleStellarMessageInternal(
-			stellarMessage,
-			sender,
-			crawlState
-		);
-	}
-
-	private handleStellarMessageInternal(
-		stellarMessage: xdr.StellarMessage,
-		sender: PublicKey,
-		crawlState: CrawlState
-	): Result<void, Error> {
 		switch (stellarMessage.switch()) {
 			case xdr.MessageType.scpMessage():
 				return this.scpEnvelopeHandler.handle(

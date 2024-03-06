@@ -17,7 +17,7 @@ export function listenFurther(
 		return false; //watcher node
 	if (
 		peer.isValidating &&
-		peer.observedLedgerCloses >= 1 &&
+		peer.connectedDuringLedgerClose &&
 		peer.quorumSet &&
 		!topTierNodes.has(peer.publicKey)
 	)

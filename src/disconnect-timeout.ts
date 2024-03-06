@@ -1,8 +1,8 @@
 import { PeerNode } from './peer-node';
-import { CrawlState } from './crawl-state';
 import { listenFurther } from './listen-further';
 import { truncate } from './utilities/truncate';
 import { P } from 'pino';
+import { PeerNodeCollection } from './peer-node-collection';
 
 export class DisconnectTimeout {
 	private static readonly SCP_LISTEN_TIMEOUT = 10000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
@@ -13,7 +13,9 @@ export class DisconnectTimeout {
 	start(
 		peer: PeerNode,
 		timeoutCounter = 0,
-		crawlState: CrawlState,
+		peerNodes: PeerNodeCollection,
+		topTierNodes: Set<string>,
+		listenTimeouts: Map<string, NodeJS.Timeout>,
 		disconnectCallback: () => void,
 		readyWithNonTopTierPeers: () => boolean
 	): void {
@@ -26,9 +28,9 @@ export class DisconnectTimeout {
 					(2 * DisconnectTimeout.CONSENSUS_STUCK_TIMEOUT) /
 						DisconnectTimeout.SCP_LISTEN_TIMEOUT
 				),
-				crawlState.topTierNodes,
+				topTierNodes,
 				readyWithNonTopTierPeers(),
-				crawlState.peerNodes
+				peerNodes
 			)
 		) {
 			this.logger.debug(
@@ -51,7 +53,7 @@ export class DisconnectTimeout {
 			},
 			'Listening for externalize msg'
 		);
-		crawlState.listenTimeouts.set(
+		listenTimeouts.set(
 			peer.publicKey,
 			setTimeout(() => {
 				this.logger.debug(
@@ -62,7 +64,9 @@ export class DisconnectTimeout {
 				this.start(
 					peer,
 					timeoutCounter,
-					crawlState,
+					peerNodes,
+					topTierNodes,
+					listenTimeouts,
 					disconnectCallback,
 					readyWithNonTopTierPeers
 				);

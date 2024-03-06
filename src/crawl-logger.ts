@@ -28,6 +28,7 @@ export class CrawlLogger {
 	}
 
 	stop() {
+		this.logger.info('Crawl process complete');
 		console.timeEnd('crawl');
 		clearInterval(this.loggingTimer);
 		this.crawlState.log();

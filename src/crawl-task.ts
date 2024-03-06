@@ -4,6 +4,6 @@ import { CrawlState } from './crawl-state';
 export interface CrawlTask {
 	nodeAddress: NodeAddress;
 	crawlState: CrawlState;
-	topTier?: boolean;
+	topTier: boolean;
 	connectCallback: () => void;
 }

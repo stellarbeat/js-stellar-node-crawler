@@ -75,19 +75,6 @@ export class CrawlQueueManager {
 		}
 	}
 
-	public determineWorkerTopTierStatus(
-		ip: string,
-		port: number,
-		publicKey: string,
-		topTierNodes: Set<string>
-	) {
-		this.crawlQueue.activeTasks().forEach((task) => {
-			if (task.nodeAddress[0] === ip && task.nodeAddress[1] === port) {
-				task.topTier = topTierNodes.has(publicKey);
-			}
-		});
-	}
-
 	public readyWithNonTopTierPeers(): boolean {
 		if (this.crawlQueue.length() !== 0) return false; //we don't know yet because there are still peers left to be crawled
 
@@ -96,7 +83,7 @@ export class CrawlQueueManager {
 
 	private workersListContainsNonTopTierPeers() {
 		return this.crawlQueue.activeTasks().some((worker) => {
-			return worker.topTier !== true;
+			return !worker.topTier;
 		});
 	}
 }
