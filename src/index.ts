@@ -45,7 +45,8 @@ export function createCrawler(
 	const onConnectedHandler = new OnConnectedHandler(
 		connectionManager,
 		crawlQueueManager,
-		new DisconnectTimeout(logger)
+		new DisconnectTimeout(logger),
+		logger
 	);
 	const scpEnvelopeHandler = new ScpEnvelopeHandler(
 		new ScpStatementHandler(

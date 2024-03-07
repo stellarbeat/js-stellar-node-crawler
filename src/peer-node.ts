@@ -57,7 +57,8 @@ export class PeerNode {
 		if (
 			this.connectedBeforeLocalLedgerClose(closedLedger) &&
 			!this.disconnectedBeforeLocalLedgerClose(closedLedger) &&
-			!this.externalizedAfterDisconnect(externalized)
+			!this.externalizedAfterDisconnect(externalized) &&
+			!this.overLoaded
 		) {
 			this.connectedDuringLedgerClose = true;
 		}

@@ -4,6 +4,7 @@ import { ConnectedPayload, ConnectionManager } from '../../connection-manager';
 import { CrawlQueueManager } from '../../crawl-queue-manager';
 import { DisconnectTimeout } from '../../disconnect-timeout';
 import { OnConnectedHandler } from '../on-connected-handler';
+import { P } from 'pino';
 
 describe('OnConnectedHandler', () => {
 	const connectionManager = mock<ConnectionManager>();
@@ -18,7 +19,8 @@ describe('OnConnectedHandler', () => {
 		const onConnectedHandler = new OnConnectedHandler(
 			connectionManager,
 			crawlQueueManager,
-			disconnectTimeout
+			disconnectTimeout,
+			mock<P.Logger>()
 		);
 		const data: ConnectedPayload = {
 			ip: 'localhost',
@@ -58,7 +60,8 @@ describe('OnConnectedHandler', () => {
 		const onConnectedHandler = new OnConnectedHandler(
 			connectionManager,
 			crawlQueueManager,
-			disconnectTimeout
+			disconnectTimeout,
+			mock<P.Logger>()
 		);
 		const data: ConnectedPayload = {
 			ip: 'localhost',

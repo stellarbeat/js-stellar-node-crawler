@@ -211,6 +211,30 @@ describe('PeerNode', () => {
 			expect(peerNode.isValidatingIncorrectValues).toBe(true);
 			expect(peerNode.getMinLagMS()).toBe(undefined);
 		});
+
+		test('an overloaded node does not send scp messages even when connected', () => {
+			const peerNode = new PeerNode('publicKey');
+			peerNode.connectionTime = new Date('2021-01-01');
+			peerNode.overLoaded = true;
+
+			const closeTime = new Date('2021-01-01');
+			const localCloseTime = new Date('2021-02-01');
+			const externalizeTime = new Date('2021-03-01');
+			peerNode.addExternalizedValue(BigInt(1), externalizeTime, 'value');
+
+			peerNode.processConfirmedLedgerClose({
+				sequence: BigInt(1),
+				localCloseTime: localCloseTime,
+				value: 'value',
+				closeTime: closeTime
+			});
+			expect(peerNode.isValidating).toBe(true);
+			expect(peerNode.connectedDuringLedgerClose).toBe(false);
+			expect(peerNode.isValidatingIncorrectValues).toBe(false);
+			expect(peerNode.getMinLagMS()).toBe(
+				externalizeTime.getTime() - localCloseTime.getTime()
+			);
+		});
 		test('when connected during ledger close, a later ledger close while not connected does not change connectedDuringLedgerClose to false', () => {
 			const peerNode = new PeerNode('publicKey');
 			peerNode.connectionTime = new Date('2021-01-02');
