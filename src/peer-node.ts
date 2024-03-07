@@ -56,12 +56,9 @@ export class PeerNode {
 
 		let connectedDuringLedgerClose = false;
 		if (
-			this.connectionTime &&
-			closedLedger.localCloseTime.getTime() >= this.connectionTime.getTime() &&
-			(!this.disconnectionTime ||
-				(this.disconnectionTime &&
-					closedLedger.localCloseTime.getTime() <
-						this.disconnectionTime.getTime()))
+			this.connectedBeforeLocalLedgerClose(closedLedger) &&
+			!this.disconnectedBeforeLocalLedgerClose(closedLedger) &&
+			!this.externalizedAfterDisconnect(externalized)
 		) {
 			connectedDuringLedgerClose = true;
 		}
@@ -69,8 +66,34 @@ export class PeerNode {
 
 		this.updateLag(closedLedger, externalized);
 	}
-	private hasExternalizedLedger(slotIndex: bigint): boolean {
-		return this.externalizedValues.has(slotIndex);
+
+	private externalizedAfterDisconnect(externalized: {
+		localTime: Date;
+		value: string;
+	}) {
+		if (!this.disconnectionTime) return false;
+		return externalized.localTime.getTime() > this.disconnectionTime.getTime();
+	}
+
+	private disconnectedBeforeLocalLedgerClose(closedLedger: Ledger) {
+		if (!this.disconnectionTime) {
+			return false;
+		}
+
+		if (
+			closedLedger.localCloseTime.getTime() < this.disconnectionTime.getTime()
+		) {
+			return false;
+		}
+
+		return true;
+	}
+
+	private connectedBeforeLocalLedgerClose(closedLedger: Ledger) {
+		return (
+			this.connectionTime &&
+			this.connectionTime.getTime() <= closedLedger.localCloseTime.getTime()
+		);
 	}
 
 	public addExternalizedValue(
