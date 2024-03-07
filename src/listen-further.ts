@@ -21,8 +21,6 @@ export function listenFurther(
 		peer.quorumSet &&
 		!topTierNodes.has(peer.publicKey)
 	)
-		//todo: a peer that is validating but doesnt have it's own quorumSet, could keep listening until max.
-		//observed higher or equal to one to make sure lag timings are coming from it's own externalize messages
 		return false; //we have all the needed information
 
 	return !queueIsEmptyAndTopTierNodesParticipatingInSCPAreAllValidating(

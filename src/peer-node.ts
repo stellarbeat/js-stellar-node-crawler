@@ -54,15 +54,13 @@ export class PeerNode {
 
 		this.isValidating = true;
 
-		let connectedDuringLedgerClose = false;
 		if (
 			this.connectedBeforeLocalLedgerClose(closedLedger) &&
 			!this.disconnectedBeforeLocalLedgerClose(closedLedger) &&
 			!this.externalizedAfterDisconnect(externalized)
 		) {
-			connectedDuringLedgerClose = true;
+			this.connectedDuringLedgerClose = true;
 		}
-		this.connectedDuringLedgerClose = connectedDuringLedgerClose;
 
 		this.updateLag(closedLedger, externalized);
 	}
@@ -80,13 +78,9 @@ export class PeerNode {
 			return false;
 		}
 
-		if (
-			closedLedger.localCloseTime.getTime() < this.disconnectionTime.getTime()
-		) {
-			return false;
-		}
-
-		return true;
+		return (
+			closedLedger.localCloseTime.getTime() >= this.disconnectionTime.getTime()
+		);
 	}
 
 	private connectedBeforeLocalLedgerClose(closedLedger: Ledger) {

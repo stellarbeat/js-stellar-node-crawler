@@ -211,5 +211,41 @@ describe('PeerNode', () => {
 			expect(peerNode.isValidatingIncorrectValues).toBe(true);
 			expect(peerNode.getMinLagMS()).toBe(undefined);
 		});
+		test('when connected during ledger close, a later ledger close while not connected does not change connectedDuringLedgerClose to false', () => {
+			const peerNode = new PeerNode('publicKey');
+			peerNode.connectionTime = new Date('2021-01-02');
+
+			const closeTime = new Date('2021-01-01');
+			const localCloseTime = new Date('2021-01-02');
+			const externalizeTime = new Date('2021-01-03');
+			peerNode.addExternalizedValue(BigInt(1), externalizeTime, 'value');
+
+			peerNode.processConfirmedLedgerClose({
+				sequence: BigInt(1),
+				localCloseTime: localCloseTime,
+				value: 'value',
+				closeTime: closeTime
+			});
+			expect(peerNode.isValidating).toBe(true);
+			expect(peerNode.connectedDuringLedgerClose).toBe(true);
+			expect(peerNode.isValidatingIncorrectValues).toBe(false);
+			expect(peerNode.getMinLagMS()).toBe(
+				externalizeTime.getTime() - localCloseTime.getTime()
+			);
+
+			peerNode.disconnectionTime = new Date('2021-01-04');
+			peerNode.disconnected = true;
+			peerNode.addExternalizedValue(BigInt(2), new Date('2021-01-06'), 'value');
+			peerNode.processConfirmedLedgerClose({
+				sequence: BigInt(2),
+				localCloseTime: new Date('2021-01-06'),
+				value: 'value',
+				closeTime: new Date('2021-01-05')
+			});
+			expect(peerNode.isValidating).toBe(true);
+			expect(peerNode.connectedDuringLedgerClose).toBe(true);
+			expect(peerNode.isValidatingIncorrectValues).toBe(false);
+			expect(peerNode.getMinLagMS()).toBe(0);
+		});
 	});
 });

@@ -1,11 +1,10 @@
 import { mock } from 'jest-mock-extended';
-import { ConnectionManager } from '../../connection-manager';
 import { CrawlQueueManager } from '../../crawl-queue-manager';
-import { DisconnectTimeout } from '../../disconnect-timeout';
 import { OnConnectionCloseHandler } from '../on-connection-close-handler';
 import { CrawlState } from '../../crawl-state';
 import { QuorumSetManager } from '../../quorum-set-manager';
 import { PeerNodeCollection } from '../../peer-node-collection';
+import { P } from 'pino';
 
 describe('OnConnectionCloseHandler', () => {
 	const queueManager = mock<CrawlQueueManager>();
@@ -18,12 +17,14 @@ describe('OnConnectionCloseHandler', () => {
 	it('should cleanup a closed connection', () => {
 		const onConnectionCloseHandler = new OnConnectionCloseHandler(
 			quorumSetManager,
-			queueManager
+			queueManager,
+			mock<P.Logger>()
 		);
 		const address = 'localhost:11625';
 		const publicKey: string = 'publicKey';
 		const crawlState = mock<CrawlState>();
 		crawlState.listenTimeouts = new Map();
+		crawlState.topTierNodes = new Set();
 		const spy = jest.spyOn(crawlState.listenTimeouts, 'delete');
 		crawlState.peerNodes = new PeerNodeCollection();
 		const peer = crawlState.peerNodes.addSuccessfullyConnected(
@@ -68,10 +69,12 @@ describe('OnConnectionCloseHandler', () => {
 	it('should update failed connections', () => {
 		const onConnectionCloseHandler = new OnConnectionCloseHandler(
 			quorumSetManager,
-			queueManager
+			queueManager,
+			mock<P.Logger>()
 		);
 		const address = 'localhost:11625';
 		const crawlState = mock<CrawlState>();
+		crawlState.topTierNodes = new Set();
 		crawlState.failedConnections = [];
 		onConnectionCloseHandler.onConnectionClose(
 			address,

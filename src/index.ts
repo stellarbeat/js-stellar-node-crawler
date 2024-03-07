@@ -67,7 +67,8 @@ export function createCrawler(
 	);
 	const onConnectionCloseHandler = new OnConnectionCloseHandler(
 		quorumSetManager,
-		crawlQueueManager
+		crawlQueueManager,
+		logger
 	);
 
 	return new Crawler(

@@ -2,11 +2,14 @@ import { PublicKey } from '@stellarbeat/js-stellarbeat-shared';
 import { CrawlState } from '../crawl-state';
 import { QuorumSetManager } from '../quorum-set-manager';
 import { CrawlQueueManager } from '../crawl-queue-manager';
+import { P } from 'pino';
+import { truncate } from '../utilities/truncate';
 
 export class OnConnectionCloseHandler {
 	constructor(
 		private quorumSetManager: QuorumSetManager,
-		private crawlQueueManager: CrawlQueueManager
+		private crawlQueueManager: CrawlQueueManager,
+		private logger: P.Logger
 	) {}
 
 	public onConnectionClose(
@@ -22,6 +25,7 @@ export class OnConnectionCloseHandler {
 				crawlState,
 				localTime
 			);
+			this.logTopTierDisconnect(crawlState, publicKey, nodeAddress);
 		} else {
 			this.updateFailedConnections(nodeAddress, crawlState);
 		}
@@ -30,6 +34,19 @@ export class OnConnectionCloseHandler {
 			crawlState.crawlQueueTaskDoneCallbacks, //todo: Move
 			nodeAddress
 		);
+	}
+
+	private logTopTierDisconnect(
+		crawlState: CrawlState,
+		publicKey: string,
+		nodeAddress: string
+	) {
+		if (crawlState.topTierNodes.has(publicKey)) {
+			this.logger.info(
+				{ pk: truncate(publicKey), address: nodeAddress },
+				'Top tier node disconnected'
+			);
+		}
 	}
 
 	private performCleanupForClosedConnection(
