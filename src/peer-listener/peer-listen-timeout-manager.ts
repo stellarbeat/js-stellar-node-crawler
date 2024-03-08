@@ -16,7 +16,7 @@ export class PeerListenTimeoutManager {
 		timeoutCounter: number,
 		isTopTierNode: boolean,
 		disconnectCallback: () => void,
-		crawlProcessState: CrawlProcessState
+		getCrawlProcessState: () => CrawlProcessState
 	): void {
 		if (
 			!listenFurther(
@@ -28,7 +28,7 @@ export class PeerListenTimeoutManager {
 						PeerListenTimeoutManager.SCP_LISTEN_TIMEOUT
 				),
 				isTopTierNode,
-				crawlProcessState === CrawlProcessState.IDLE
+				getCrawlProcessState() === CrawlProcessState.STOPPING
 			)
 		) {
 			this.logger.debug(
@@ -64,7 +64,7 @@ export class PeerListenTimeoutManager {
 					timeoutCounter,
 					isTopTierNode,
 					disconnectCallback,
-					crawlProcessState
+					getCrawlProcessState
 				);
 			}, PeerListenTimeoutManager.SCP_LISTEN_TIMEOUT)
 		);

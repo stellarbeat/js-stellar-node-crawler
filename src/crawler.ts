@@ -1,6 +1,5 @@
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
-import { QuorumSetManager } from './peer-listener/quorum-set-manager';
 import { CrawlProcessState, CrawlState } from './crawl-state';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
@@ -43,7 +42,6 @@ export class Crawler {
 
 	constructor(
 		private config: CrawlerConfiguration,
-		private quorumSetManager: QuorumSetManager,
 		private stellarMessageHandler: StellarMessageHandler, //event bus would be cleaner...
 		private readonly connectionManager: ConnectionManager,
 		private crawlQueueManager: CrawlQueueManager,
@@ -67,7 +65,7 @@ export class Crawler {
 				data,
 				this.crawlState.peerNodes,
 				this.crawlState.topTierNodes.has(data.publicKey),
-				this.crawlState.state,
+				() => this.crawlState.state,
 				new Date()
 			);
 		});
@@ -79,6 +77,17 @@ export class Crawler {
 				this.crawlState.crawlQueueTaskDoneCallbacks,
 				data.address
 			);
+			if (
+				this.crawlState.state === CrawlProcessState.CRAWLING &&
+				this.connectionManager
+					.getActiveConnectionAddresses()
+					.every((address) => this.crawlState.topTierAddresses.has(address))
+			) {
+				this.crawlState.state = CrawlProcessState.STOPPING;
+				this.logger.info(
+					'Stopping crawl process, disconnecting top tier nodes when their state is fully determined'
+				);
+			}
 
 			if (!data.publicKey) {
 				this.crawlState.failedConnections.push(data.address);
@@ -116,12 +125,8 @@ export class Crawler {
 
 	private initializeCrawlState(
 		topTierQuorumSet: QuorumSet,
-		latestClosedLedger: Ledger = {
-			sequence: BigInt(0),
-			closeTime: new Date(0),
-			value: '', //todo: store and return value
-			localCloseTime: new Date(0)
-		},
+		topTierAddresses: NodeAddress[],
+		latestClosedLedger: Ledger,
 		quorumSets: Map<QuorumSetHash, QuorumSet> = new Map<
 			QuorumSetHash,
 			QuorumSet
@@ -137,6 +142,10 @@ export class Crawler {
 			latestClosedLedger,
 			this.config.nodeConfig.network,
 			this.logger
+		);
+
+		this._crawlState.topTierAddresses = new Set(
+			topTierAddresses.map((address) => `${address[0]}:${address[1]}`)
 		);
 
 		return CrawlStateValidator.validateCrawlState(this.crawlState, this.config);
@@ -183,7 +192,12 @@ export class Crawler {
 		nodeAddresses: NodeAddress[],
 		topTierNodeAddresses: NodeAddress[]
 	) {
-		this.initializeCrawlState(topTierQuorumSet, latestClosedLedger, quorumSets)
+		this.initializeCrawlState(
+			topTierQuorumSet,
+			topTierNodeAddresses,
+			latestClosedLedger,
+			quorumSets
+		)
 			.mapErr((error) => reject(error))
 			.map(() =>
 				this.syncTopTierAndCrawl(
@@ -207,7 +221,7 @@ export class Crawler {
 
 		setTimeout(() => {
 			this.startCrawlProcess(resolve, reject, crawlLogger, nodeAddresses);
-		}, 5000); //todo: after all top tier nodes have connected, not just timer
+		}, 10000); //todo: after all top tier nodes have connected, not just timer
 	}
 
 	private startCrawlProcess(
@@ -216,7 +230,13 @@ export class Crawler {
 		crawlLogger: CrawlLogger,
 		nodeAddresses: NodeAddress[]
 	) {
-		this.logger.info('Starting crawl process');
+		this.logger.info(
+			{
+				topTierConnectionCount:
+					this.connectionManager.getNumberOfActiveConnections()
+			},
+			'Starting crawl process'
+		);
 		this.crawlState.state = CrawlProcessState.CRAWLING;
 		this.setupCrawlCompletionHandlers(resolve, reject, crawlLogger);
 		if (
@@ -240,7 +260,7 @@ export class Crawler {
 	private startTopTierSync(topTierAddresses: NodeAddress[]) {
 		this.logger.info('Starting Top Tier sync');
 		this.crawlState.state = CrawlProcessState.TOP_TIER_SYNC;
-		topTierAddresses.forEach((address) => this.crawlPeerNode(address, true));
+		topTierAddresses.forEach((address) => this.crawlPeerNode(address));
 	}
 
 	private setupCrawlCompletionHandlers(
@@ -303,11 +323,10 @@ export class Crawler {
 		};
 	}
 
-	private crawlPeerNode(nodeAddress: NodeAddress, isTopTier = false): void {
+	private crawlPeerNode(nodeAddress: NodeAddress): void {
 		const crawlTask: CrawlTask = {
 			nodeAddress: nodeAddress,
 			crawlState: this.crawlState,
-			topTier: isTopTier,
 			connectCallback: () =>
 				this.connectionManager.connectToNode(nodeAddress[0], nodeAddress[1])
 		};

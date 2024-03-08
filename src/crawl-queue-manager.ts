@@ -74,16 +74,4 @@ export class CrawlQueueManager {
 			);
 		}
 	}
-
-	public readyWithNonTopTierPeers(): boolean {
-		if (this.crawlQueue.length() !== 0) return false; //we don't know yet because there are still peers left to be crawled
-
-		return !this.workersListContainsNonTopTierPeers();
-	}
-
-	private workersListContainsNonTopTierPeers() {
-		return this.crawlQueue.activeTasks().some((worker) => {
-			return !worker.topTier;
-		});
-	}
 }

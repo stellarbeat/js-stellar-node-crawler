@@ -48,7 +48,7 @@ describe('OnConnectedHandler', () => {
 			data,
 			peerNodes,
 			false,
-			CrawlProcessState.CRAWLING,
+			() => CrawlProcessState.CRAWLING,
 			localTime
 		);
 
@@ -84,7 +84,7 @@ describe('OnConnectedHandler', () => {
 			data,
 			peerNodes,
 			false,
-			CrawlProcessState.CRAWLING,
+			() => CrawlProcessState.CRAWLING,
 			localTime
 		);
 

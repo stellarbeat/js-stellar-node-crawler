@@ -25,7 +25,7 @@ export class PeerListener {
 		data: ConnectedPayload,
 		peerNodes: PeerNodeCollection,
 		isTopTierNode: boolean,
-		crawlProcessState: CrawlProcessState,
+		getCrawlProcessState: () => CrawlProcessState,
 		localTime: Date
 	): undefined | Error {
 		this.logIfTopTierConnected(isTopTierNode, data);
@@ -36,7 +36,11 @@ export class PeerListener {
 			return peerNodeOrError;
 		}
 
-		this.startListenTimeout(peerNodeOrError, isTopTierNode, crawlProcessState);
+		this.startListenTimeout(
+			peerNodeOrError,
+			isTopTierNode,
+			getCrawlProcessState
+		);
 	}
 
 	public onConnectionClose(
@@ -73,14 +77,14 @@ export class PeerListener {
 	private startListenTimeout(
 		peerNodeOrError: PeerNode,
 		isTopTierNode: boolean,
-		crawlProcessState: CrawlProcessState
+		getCrawlProcessState: () => CrawlProcessState
 	) {
 		this.peerListenTimeoutManager.startTimer(
 			peerNodeOrError,
 			0,
 			isTopTierNode,
 			() => this.connectionManager.disconnectByAddress(peerNodeOrError.key),
-			crawlProcessState
+			getCrawlProcessState
 		);
 	}
 
@@ -100,7 +104,7 @@ export class PeerListener {
 
 	private logIfTopTierConnected(isTopTierNode: boolean, data: any) {
 		if (isTopTierNode) {
-			this.logger.info(
+			this.logger.debug(
 				{ pk: truncate(data.publicKey) },
 				'Top tier node connected'
 			);
@@ -113,7 +117,7 @@ export class PeerListener {
 		nodeAddress: string
 	) {
 		if (crawlState.topTierNodes.has(publicKey)) {
-			this.logger.info(
+			this.logger.debug(
 				{ pk: truncate(publicKey), address: nodeAddress },
 				'Top tier node disconnected'
 			);

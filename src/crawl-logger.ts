@@ -21,8 +21,12 @@ export class CrawlLogger {
 		this.loggingTimer = setInterval(() => {
 			this.logger.info({
 				queueLength: this.crawlQueueManager.queueLength(),
-				activeConnections: this.connectionManager.getNumberOfActiveConnections()
-				//topTierConnections: this.ledgerCloseDetector.getConnectedNodesCount()
+				activeConnections:
+					this.connectionManager.getNumberOfActiveConnections(),
+				activeTopTiers: this.connectionManager
+					.getActiveConnectionAddresses()
+					.filter((address) => this.crawlState.topTierAddresses.has(address))
+					.length
 			});
 		}, 10000);
 	}

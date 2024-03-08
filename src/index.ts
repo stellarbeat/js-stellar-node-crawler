@@ -65,7 +65,6 @@ export function createCrawler(
 
 	return new Crawler(
 		config,
-		quorumSetManager,
 		stellarMessageHandler,
 		connectionManager,
 		crawlQueueManager,

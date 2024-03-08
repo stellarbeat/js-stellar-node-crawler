@@ -14,7 +14,8 @@ type PeerKey = string; //ip:port
 export enum CrawlProcessState {
 	IDLE,
 	TOP_TIER_SYNC,
-	CRAWLING
+	CRAWLING,
+	STOPPING
 }
 
 export class QuorumSetState {
@@ -51,6 +52,7 @@ export class CrawlState {
 	quorumSetState: QuorumSetState = new QuorumSetState();
 	failedConnections: string[] = [];
 	topTierNodes: Set<PublicKey>;
+	topTierAddresses: Set<PeerKey> = new Set();
 	peerAddressesReceivedDuringSync: NodeAddress[] = [];
 
 	constructor(
