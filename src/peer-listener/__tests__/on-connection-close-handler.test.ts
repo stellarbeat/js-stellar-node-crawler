@@ -1,13 +1,13 @@
 import { mock } from 'jest-mock-extended';
 import { CrawlQueueManager } from '../../crawl-queue-manager';
 import { CrawlState } from '../../crawl-state';
-import { QuorumSetManager } from '../../quorum-set-manager';
+import { QuorumSetManager } from '../quorum-set-manager';
 import { PeerNodeCollection } from '../../peer-node-collection';
 import { P } from 'pino';
 import { PeerListenTimeoutManager } from '../peer-listen-timeout-manager';
 import { PeerListener } from '../peer-listener';
 import { ConnectionManager } from '../../connection-manager';
-import { StellarMessageHandler } from '../../stellar-message-handlers/stellar-message-handler';
+import { StellarMessageHandler } from '../stellar-message-handlers/stellar-message-handler';
 
 describe('OnConnectionCloseHandler', () => {
 	const queueManager = mock<CrawlQueueManager>();

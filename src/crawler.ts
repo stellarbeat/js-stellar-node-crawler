@@ -1,6 +1,6 @@
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
-import { QuorumSetManager } from './quorum-set-manager';
+import { QuorumSetManager } from './peer-listener/quorum-set-manager';
 import { CrawlProcessState, CrawlState } from './crawl-state';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
@@ -16,7 +16,7 @@ import { err } from 'neverthrow';
 import {
 	PeerAddressesReceivedEvent,
 	StellarMessageHandler
-} from './stellar-message-handlers/stellar-message-handler';
+} from './peer-listener/stellar-message-handlers/stellar-message-handler';
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { NodeAddress } from './node-address';
 import { CrawlTask } from './crawl-task';

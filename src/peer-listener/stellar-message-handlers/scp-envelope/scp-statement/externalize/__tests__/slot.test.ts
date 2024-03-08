@@ -2,7 +2,7 @@ import { Slot } from '../slot';
 import { mock } from 'jest-mock-extended';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { P } from 'pino';
-import { createDummyValue } from '../../../../../__fixtures__/createDummyExternalizeMessage';
+import { createDummyValue } from '../../../../../../__fixtures__/createDummyExternalizeMessage';
 
 const mockLogger = mock<P.Logger>();
 let quorumSet: QuorumSet;

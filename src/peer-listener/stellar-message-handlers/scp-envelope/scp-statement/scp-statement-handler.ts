@@ -1,6 +1,6 @@
 import * as P from 'pino';
 import { xdr } from '@stellar/stellar-base';
-import { CrawlState } from '../../../crawl-state';
+import { CrawlState } from '../../../../crawl-state';
 import { getPublicKeyStringFromBuffer } from '@stellarbeat/js-stellar-node-connector';
 import { QuorumSetManager } from '../../../quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';

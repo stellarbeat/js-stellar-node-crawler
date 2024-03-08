@@ -1,5 +1,5 @@
 import { hash, xdr } from '@stellar/stellar-base';
-import { CrawlState } from '../../crawl-state';
+import { CrawlState } from '../../../crawl-state';
 import { verifySCPEnvelopeSignature } from '@stellarbeat/js-stellar-node-connector';
 import { err, ok, Result } from 'neverthrow';
 import { isLedgerSequenceValid } from './ledger-validator';

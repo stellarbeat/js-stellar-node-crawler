@@ -1,8 +1,8 @@
 import { mock } from 'jest-mock-extended';
 import { ScpStatementHandler } from '../scp-statement/scp-statement-handler';
 import { ScpEnvelopeHandler } from '../scp-envelope-handler';
-import { createDummyExternalizeScpEnvelope } from '../../../__fixtures__/createDummyExternalizeMessage';
-import { CrawlState } from '../../../crawl-state';
+import { createDummyExternalizeScpEnvelope } from '../../../../__fixtures__/createDummyExternalizeMessage';
+import { CrawlState } from '../../../../crawl-state';
 import LRUCache = require('lru-cache');
 import { Keypair, Networks } from '@stellar/stellar-base';
 

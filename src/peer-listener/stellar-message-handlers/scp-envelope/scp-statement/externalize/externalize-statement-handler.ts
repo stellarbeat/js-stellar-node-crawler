@@ -1,6 +1,6 @@
 import * as P from 'pino';
-import { Ledger } from '../../../../crawler';
-import { PeerNodeCollection } from '../../../../peer-node-collection';
+import { Ledger } from '../../../../../crawler';
+import { PeerNodeCollection } from '../../../../../peer-node-collection';
 import { ExternalizeData } from './map-externalize-statement';
 import { Slot } from './slot';
 import * as assert from 'assert';

@@ -1,15 +1,15 @@
 import { Crawler } from './crawler';
 import { pino } from 'pino';
-import { QuorumSetManager } from './quorum-set-manager';
+import { QuorumSetManager } from './peer-listener/quorum-set-manager';
 import { createNode } from '@stellarbeat/js-stellar-node-connector';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { ConnectionManager } from './connection-manager';
-import { ExternalizeStatementHandler } from './stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
-import { ScpEnvelopeHandler } from './stellar-message-handlers/scp-envelope/scp-envelope-handler';
-import { ScpStatementHandler } from './stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
+import { ExternalizeStatementHandler } from './peer-listener/stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
+import { ScpEnvelopeHandler } from './peer-listener/stellar-message-handlers/scp-envelope/scp-envelope-handler';
+import { ScpStatementHandler } from './peer-listener/stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { AsyncCrawlQueue } from './crawl-queue';
-import { StellarMessageHandler } from './stellar-message-handlers/stellar-message-handler';
+import { StellarMessageHandler } from './peer-listener/stellar-message-handlers/stellar-message-handler';
 import { PeerListener } from './peer-listener/peer-listener';
 import { PeerListenTimeoutManager } from './peer-listener/peer-listen-timeout-manager';
 

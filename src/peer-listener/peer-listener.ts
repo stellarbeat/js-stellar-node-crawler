@@ -8,8 +8,8 @@ import {
 	DataPayload
 } from '../connection-manager';
 import { PeerNode } from '../peer-node';
-import { QuorumSetManager } from '../quorum-set-manager';
-import { StellarMessageHandler } from '../stellar-message-handlers/stellar-message-handler';
+import { QuorumSetManager } from './quorum-set-manager';
+import { StellarMessageHandler } from './stellar-message-handlers/stellar-message-handler';
 import { PeerNodeCollection } from '../peer-node-collection';
 
 export class PeerListener {

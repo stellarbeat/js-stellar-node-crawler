@@ -1,4 +1,4 @@
-import { Ledger } from '../../../../crawler';
+import { Ledger } from '../../../../../crawler';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
 import containsSlice from '@stellarbeat/js-stellarbeat-shared/lib/quorum/containsSlice';

@@ -5,8 +5,8 @@ import { PeerListenTimeoutManager } from '../peer-listen-timeout-manager';
 import { P } from 'pino';
 import { CrawlProcessState } from '../../crawl-state';
 import { PeerListener } from '../peer-listener';
-import { QuorumSetManager } from '../../quorum-set-manager';
-import { StellarMessageHandler } from '../../stellar-message-handlers/stellar-message-handler';
+import { QuorumSetManager } from '../quorum-set-manager';
+import { StellarMessageHandler } from '../stellar-message-handlers/stellar-message-handler';
 
 describe('OnConnectedHandler', () => {
 	const connectionManager = mock<ConnectionManager>();

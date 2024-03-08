@@ -1,12 +1,12 @@
 import { ConnectionManager, DataPayload } from '../../connection-manager';
-import { StellarMessageHandler } from '../../stellar-message-handlers/stellar-message-handler';
+import { StellarMessageHandler } from '../stellar-message-handlers/stellar-message-handler';
 import { mock } from 'jest-mock-extended';
 import { P } from 'pino';
 import { CrawlState } from '../../crawl-state';
 import { createDummyExternalizeMessage } from '../../__fixtures__/createDummyExternalizeMessage';
 import { err, ok } from 'neverthrow';
 import { PeerListener } from '../peer-listener';
-import { QuorumSetManager } from '../../quorum-set-manager';
+import { QuorumSetManager } from '../quorum-set-manager';
 import { PeerListenTimeoutManager } from '../peer-listen-timeout-manager';
 
 describe('OnDataHandler', () => {
