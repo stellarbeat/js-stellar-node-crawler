@@ -1,23 +1,22 @@
-import { PeerNode } from './peer-node';
+import { PeerNode } from '../peer-node';
 import { listenFurther } from './listen-further';
-import { truncate } from './utilities/truncate';
+import { truncate } from '../utilities/truncate';
 import { P } from 'pino';
-import { PeerNodeCollection } from './peer-node-collection';
+import { CrawlProcessState } from '../crawl-state';
 
-export class DisconnectTimeout {
+export class PeerListenTimeoutManager {
 	private static readonly SCP_LISTEN_TIMEOUT = 10000; //how long do we listen to determine if a node is participating in SCP. Correlated with Herder::EXP_LEDGER_TIMESPAN_SECONDS
 	private static readonly CONSENSUS_STUCK_TIMEOUT = 35000; //https://github.com/stellar/stellar-core/blob/2b16c2599e9167c67032b402b71e37d2bf1b15e3/src/herder/Herder.cpp#L9C36-L9C36
+	private listenTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
 	constructor(private logger: P.Logger) {}
 
-	start(
+	startTimer(
 		peer: PeerNode,
-		timeoutCounter = 0,
-		peerNodes: PeerNodeCollection,
-		topTierNodes: Set<string>,
-		listenTimeouts: Map<string, NodeJS.Timeout>,
+		timeoutCounter: number,
+		isTopTierNode: boolean,
 		disconnectCallback: () => void,
-		readyWithNonTopTierPeers: () => boolean
+		crawlProcessState: CrawlProcessState
 	): void {
 		if (
 			!listenFurther(
@@ -25,12 +24,11 @@ export class DisconnectTimeout {
 				timeoutCounter,
 				//we wait max twice CONSENSUS_STUCK_TIMEOUT to ensure we receive al externalizing messages from straggling nodes;
 				Math.ceil(
-					(2 * DisconnectTimeout.CONSENSUS_STUCK_TIMEOUT) /
-						DisconnectTimeout.SCP_LISTEN_TIMEOUT
+					(2 * PeerListenTimeoutManager.CONSENSUS_STUCK_TIMEOUT) /
+						PeerListenTimeoutManager.SCP_LISTEN_TIMEOUT
 				),
-				topTierNodes,
-				readyWithNonTopTierPeers(),
-				peerNodes
+				isTopTierNode,
+				crawlProcessState === CrawlProcessState.IDLE
 			)
 		) {
 			this.logger.debug(
@@ -53,7 +51,7 @@ export class DisconnectTimeout {
 			},
 			'Listening for externalize msg'
 		);
-		listenTimeouts.set(
+		this.listenTimeouts.set(
 			peer.publicKey,
 			setTimeout(() => {
 				this.logger.debug(
@@ -61,16 +59,22 @@ export class DisconnectTimeout {
 					'SCP Listen timeout reached'
 				);
 				timeoutCounter++;
-				this.start(
+				this.startTimer(
 					peer,
 					timeoutCounter,
-					peerNodes,
-					topTierNodes,
-					listenTimeouts,
+					isTopTierNode,
 					disconnectCallback,
-					readyWithNonTopTierPeers
+					crawlProcessState
 				);
-			}, DisconnectTimeout.SCP_LISTEN_TIMEOUT)
+			}, PeerListenTimeoutManager.SCP_LISTEN_TIMEOUT)
 		);
+	}
+
+	stopTimer(peer: PeerNode): void {
+		const timeout = this.listenTimeouts.get(peer.publicKey);
+		if (timeout) {
+			clearTimeout(timeout);
+			this.listenTimeouts.delete(peer.publicKey);
+		}
 	}
 }

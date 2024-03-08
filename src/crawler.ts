@@ -6,7 +6,6 @@ import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlStateValidator } from './crawl-state-validator';
 import { CrawlLogger } from './crawl-logger';
-import { DisconnectTimeout } from './disconnect-timeout';
 import {
 	ClosePayload,
 	ConnectedPayload,
@@ -21,9 +20,8 @@ import {
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { NodeAddress } from './node-address';
 import { CrawlTask } from './crawl-task';
-import { OnConnectedHandler } from './crawl-connection-event-handlers/on-connected-handler';
-import { OnDataHandler } from './crawl-connection-event-handlers/on-data-handler';
-import { OnConnectionCloseHandler } from './crawl-connection-event-handlers/on-connection-close-handler';
+import { PeerListenTimeoutManager } from './peer-listener/peer-listen-timeout-manager';
+import { PeerListener } from './peer-listener/peer-listener';
 
 type QuorumSetHash = string;
 
@@ -40,23 +38,21 @@ export interface Ledger {
  * and manages the crawl state.
  */
 export class Crawler {
-	private disconnectTimeout: DisconnectTimeout;
+	private disconnectTimeout: PeerListenTimeoutManager;
 	private _crawlState: CrawlState | null = null;
 
 	constructor(
 		private config: CrawlerConfiguration,
 		private quorumSetManager: QuorumSetManager,
-		private stellarMessageHandler: StellarMessageHandler,
+		private stellarMessageHandler: StellarMessageHandler, //event bus would be cleaner...
 		private readonly connectionManager: ConnectionManager,
 		private crawlQueueManager: CrawlQueueManager,
-		private onConnectedHandler: OnConnectedHandler,
-		private onDataHandler: OnDataHandler,
-		private onConnectionCloseHandler: OnConnectionCloseHandler,
+		private peerListener: PeerListener,
 
 		private readonly logger: P.Logger
 	) {
 		this.logger = logger.child({ mod: 'Crawler' });
-		this.disconnectTimeout = new DisconnectTimeout(logger);
+		this.disconnectTimeout = new PeerListenTimeoutManager(logger);
 		this.setupEventHandlers();
 	}
 
@@ -67,24 +63,33 @@ export class Crawler {
 
 	private setupConnectionManagerEvents() {
 		this.connectionManager.on('connected', (data: ConnectedPayload) => {
-			this.onConnectedHandler.onConnected(
+			this.peerListener.onConnected(
 				data,
 				this.crawlState.peerNodes,
-				this.crawlState.topTierNodes,
-				this.crawlState.listenTimeouts,
+				this.crawlState.topTierNodes.has(data.publicKey),
+				this.crawlState.state,
 				new Date()
 			);
 		});
 		this.connectionManager.on('data', (data: DataPayload) => {
-			this.onDataHandler.onData(data, this.crawlState);
+			this.peerListener.onData(data, this.crawlState);
 		});
 		this.connectionManager.on('close', (data: ClosePayload) => {
-			this.onConnectionCloseHandler.onConnectionClose(
-				data.address,
-				data.publicKey,
-				this.crawlState,
-				new Date()
+			this.crawlQueueManager.completeCrawlQueueTask(
+				this.crawlState.crawlQueueTaskDoneCallbacks,
+				data.address
 			);
+
+			if (!data.publicKey) {
+				this.crawlState.failedConnections.push(data.address);
+			} else {
+				this.peerListener.onConnectionClose(
+					data.address,
+					data.publicKey,
+					this.crawlState,
+					new Date()
+				);
+			}
 		});
 	}
 

@@ -1,4 +1,3 @@
-import { OnDataHandler } from '../on-data-handler';
 import { ConnectionManager, DataPayload } from '../../connection-manager';
 import { StellarMessageHandler } from '../../stellar-message-handlers/stellar-message-handler';
 import { mock } from 'jest-mock-extended';
@@ -6,22 +5,33 @@ import { P } from 'pino';
 import { CrawlState } from '../../crawl-state';
 import { createDummyExternalizeMessage } from '../../__fixtures__/createDummyExternalizeMessage';
 import { err, ok } from 'neverthrow';
+import { PeerListener } from '../peer-listener';
+import { QuorumSetManager } from '../../quorum-set-manager';
+import { PeerListenTimeoutManager } from '../peer-listen-timeout-manager';
 
 describe('OnDataHandler', () => {
 	const connectionManager = mock<ConnectionManager>();
+	const quorumSetManager = mock<QuorumSetManager>();
 	const stellarMessageHandler = mock<StellarMessageHandler>();
+	const peerListenTimeoutManager = mock<PeerListenTimeoutManager>();
 	const logger = mock<P.Logger>();
 
 	beforeEach(() => {
 		jest.clearAllMocks();
 	});
 
-	it('should handle data', () => {
-		const onDataHandler = new OnDataHandler(
+	function createDataHandler() {
+		return new PeerListener(
 			connectionManager,
+			quorumSetManager,
 			stellarMessageHandler,
+			peerListenTimeoutManager,
 			logger
 		);
+	}
+
+	it('should handle data', () => {
+		const onDataHandler = createDataHandler();
 		const data: DataPayload = {
 			publicKey: 'publicKey',
 			stellarMessageWork: {
@@ -44,11 +54,7 @@ describe('OnDataHandler', () => {
 	});
 
 	it('should handle data error', () => {
-		const onDataHandler = new OnDataHandler(
-			connectionManager,
-			stellarMessageHandler,
-			logger
-		);
+		const onDataHandler = createDataHandler();
 		const data: DataPayload = {
 			publicKey: 'publicKey',
 			stellarMessageWork: {

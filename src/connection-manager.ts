@@ -26,7 +26,7 @@ export interface DataPayload {
 
 export interface ClosePayload {
 	address: string;
-	publicKey: PublicKey;
+	publicKey?: PublicKey;
 }
 
 export class ConnectionManager extends EventEmitter {
@@ -93,10 +93,11 @@ export class ConnectionManager extends EventEmitter {
 				'Node connection closed'
 			);
 			this.activeConnections.delete(address);
-			this.emit('close', {
+			const closePayload: ClosePayload = {
 				address,
 				publicKey: connection.remotePublicKey
-			});
+			};
+			this.emit('close', closePayload);
 		});
 
 		connection.on('data', (stellarMessageWork: StellarMessageWork) => {

@@ -1,31 +1,42 @@
 import { mock } from 'jest-mock-extended';
 import { CrawlQueueManager } from '../../crawl-queue-manager';
-import { OnConnectionCloseHandler } from '../on-connection-close-handler';
 import { CrawlState } from '../../crawl-state';
 import { QuorumSetManager } from '../../quorum-set-manager';
 import { PeerNodeCollection } from '../../peer-node-collection';
 import { P } from 'pino';
+import { PeerListenTimeoutManager } from '../peer-listen-timeout-manager';
+import { PeerListener } from '../peer-listener';
+import { ConnectionManager } from '../../connection-manager';
+import { StellarMessageHandler } from '../../stellar-message-handlers/stellar-message-handler';
 
 describe('OnConnectionCloseHandler', () => {
 	const queueManager = mock<CrawlQueueManager>();
 	const quorumSetManager = mock<QuorumSetManager>();
+	const connectionManager = mock<ConnectionManager>();
+	const stellarMessageHandler = mock<StellarMessageHandler>();
+	const logger = mock<P.Logger>();
+	const peerListenTimeoutManager = mock<PeerListenTimeoutManager>();
 
 	beforeEach(() => {
 		jest.clearAllMocks();
 	});
 
-	it('should cleanup a closed connection', () => {
-		const onConnectionCloseHandler = new OnConnectionCloseHandler(
+	function createConnectionCloseHandler() {
+		return new PeerListener(
+			connectionManager,
 			quorumSetManager,
-			queueManager,
-			mock<P.Logger>()
+			stellarMessageHandler,
+			peerListenTimeoutManager,
+			logger
 		);
+	}
+
+	it('should cleanup a closed connection', () => {
+		const onConnectionCloseHandler = createConnectionCloseHandler();
 		const address = 'localhost:11625';
 		const publicKey: string = 'publicKey';
 		const crawlState = mock<CrawlState>();
-		crawlState.listenTimeouts = new Map();
 		crawlState.topTierNodes = new Set();
-		const spy = jest.spyOn(crawlState.listenTimeouts, 'delete');
 		crawlState.peerNodes = new PeerNodeCollection();
 		const peer = crawlState.peerNodes.addSuccessfullyConnected(
 			publicKey,
@@ -56,32 +67,10 @@ describe('OnConnectionCloseHandler', () => {
 			publicKey,
 			crawlState
 		);
-		expect(queueManager.completeCrawlQueueTask).toHaveBeenCalledWith(
-			crawlState.crawlQueueTaskDoneCallbacks,
-			address
-		);
-		expect(spy).toHaveBeenCalledWith(publicKey);
+
+		expect(peerListenTimeoutManager.stopTimer).toHaveBeenCalledWith(peer);
 
 		expect(peer.disconnected).toBe(true);
 		expect(peer.disconnectionTime).toBe(localTime);
-	});
-
-	it('should update failed connections', () => {
-		const onConnectionCloseHandler = new OnConnectionCloseHandler(
-			quorumSetManager,
-			queueManager,
-			mock<P.Logger>()
-		);
-		const address = 'localhost:11625';
-		const crawlState = mock<CrawlState>();
-		crawlState.topTierNodes = new Set();
-		crawlState.failedConnections = [];
-		onConnectionCloseHandler.onConnectionClose(
-			address,
-			undefined,
-			crawlState,
-			new Date()
-		);
-		expect(crawlState.failedConnections).toEqual([address]);
 	});
 });

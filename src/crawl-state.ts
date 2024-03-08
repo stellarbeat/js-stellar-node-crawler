@@ -46,7 +46,6 @@ export class CrawlState {
 		value: '',
 		localCloseTime: new Date(0)
 	};
-	listenTimeouts: Map<PublicKey, NodeJS.Timeout> = new Map();
 	slots: Slots;
 	envelopeCache: LRUCache<string, number>;
 	quorumSetState: QuorumSetState = new QuorumSetState();

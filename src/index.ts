@@ -9,11 +9,9 @@ import { ScpEnvelopeHandler } from './stellar-message-handlers/scp-envelope/scp-
 import { ScpStatementHandler } from './stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { AsyncCrawlQueue } from './crawl-queue';
-import { DisconnectTimeout } from './disconnect-timeout';
-import { OnConnectedHandler } from './crawl-connection-event-handlers/on-connected-handler';
-import { OnDataHandler } from './crawl-connection-event-handlers/on-data-handler';
 import { StellarMessageHandler } from './stellar-message-handlers/stellar-message-handler';
-import { OnConnectionCloseHandler } from './crawl-connection-event-handlers/on-connection-close-handler';
+import { PeerListener } from './peer-listener/peer-listener';
+import { PeerListenTimeoutManager } from './peer-listener/peer-listen-timeout-manager';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -37,17 +35,13 @@ export function createCrawler(
 		config.blackList,
 		logger
 	);
+	const disconnectTimeoutManager = new PeerListenTimeoutManager(logger);
 	const quorumSetManager = new QuorumSetManager(connectionManager, logger);
 	const crawlQueueManager = new CrawlQueueManager(
 		new AsyncCrawlQueue(config.maxOpenConnections),
 		logger
 	);
-	const onConnectedHandler = new OnConnectedHandler(
-		connectionManager,
-		crawlQueueManager,
-		new DisconnectTimeout(logger),
-		logger
-	);
+
 	const scpEnvelopeHandler = new ScpEnvelopeHandler(
 		new ScpStatementHandler(
 			quorumSetManager,
@@ -61,14 +55,11 @@ export function createCrawler(
 		logger
 	);
 
-	const onStellarMessageHandler = new OnDataHandler(
+	const peerListener = new PeerListener(
 		connectionManager,
-		stellarMessageHandler,
-		logger
-	);
-	const onConnectionCloseHandler = new OnConnectionCloseHandler(
 		quorumSetManager,
-		crawlQueueManager,
+		stellarMessageHandler,
+		disconnectTimeoutManager,
 		logger
 	);
 
@@ -78,9 +69,7 @@ export function createCrawler(
 		stellarMessageHandler,
 		connectionManager,
 		crawlQueueManager,
-		onConnectedHandler,
-		onStellarMessageHandler,
-		onConnectionCloseHandler,
+		peerListener,
 		logger
 	);
 }
