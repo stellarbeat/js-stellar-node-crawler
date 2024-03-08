@@ -44,7 +44,7 @@ export class ScpEnvelopeHandler {
 
 	private isValidLedger(crawlState: CrawlState, scpEnvelope: xdr.ScpEnvelope) {
 		return !isLedgerSequenceValid(
-			crawlState.latestClosedLedger,
+			crawlState.latestConfirmedClosedLedger,
 			BigInt(scpEnvelope.statement().slotIndex().toString())
 		);
 	}

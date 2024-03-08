@@ -36,7 +36,7 @@ describe('scp-statement-handler', () => {
 		const crawlState = mock<CrawlState>();
 		crawlState.peerNodes = new PeerNodeCollection();
 		crawlState.slots = new Slots(new QuorumSet(1, ['A'], []), mock<P.Logger>());
-		crawlState.latestClosedLedger = {
+		crawlState.latestConfirmedClosedLedger = {
 			sequence: BigInt(1),
 			closeTime: new Date(),
 			value: '',
@@ -54,7 +54,7 @@ describe('scp-statement-handler', () => {
 		expect(
 			quorumSetManager.processQuorumSetHashFromStatement
 		).toHaveBeenCalledTimes(1);
-		expect(crawlState.latestClosedLedger).toEqual(closedLedger);
+		expect(crawlState.latestConfirmedClosedLedger).toEqual(closedLedger);
 	});
 
 	it('should not use non-externalize statement for ledger close confirmation', () => {

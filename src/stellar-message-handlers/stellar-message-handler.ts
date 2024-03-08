@@ -3,7 +3,7 @@ import {
 	getQuorumSetFromMessage
 } from '@stellarbeat/js-stellar-node-connector';
 import { hash, xdr } from '@stellar/stellar-base';
-import { CrawlState } from '../crawl-state';
+import { CrawlProcessState, CrawlState } from '../crawl-state';
 import { P } from 'pino';
 import { EventEmitter } from 'events';
 import { ScpEnvelopeHandler } from './scp-envelope/scp-envelope-handler';
@@ -35,11 +35,15 @@ export class StellarMessageHandler extends EventEmitter {
 		crawlState: CrawlState
 	): Result<void, Error> {
 		switch (stellarMessage.switch()) {
-			case xdr.MessageType.scpMessage():
+			case xdr.MessageType.scpMessage(): {
+				if (crawlState.state !== CrawlProcessState.CRAWLING)
+					return ok(undefined);
+
 				return this.scpEnvelopeHandler.handle(
 					stellarMessage.envelope(),
 					crawlState
 				);
+			}
 			case xdr.MessageType.peers():
 				return this.handlePeersMessage(
 					sender,

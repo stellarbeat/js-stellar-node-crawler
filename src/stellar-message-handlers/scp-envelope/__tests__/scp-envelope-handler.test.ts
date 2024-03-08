@@ -52,7 +52,7 @@ describe('scp-envelope-handler', () => {
 
 	function createMockCrawlState(sequence = BigInt(1)) {
 		const crawlState = mock<CrawlState>();
-		crawlState.latestClosedLedger = {
+		crawlState.latestConfirmedClosedLedger = {
 			sequence: sequence,
 			closeTime: new Date(),
 			value: '',

@@ -40,7 +40,7 @@ export class CrawlState {
 	peerNodes: PeerNodeCollection;
 	quorumSets: Map<string, QuorumSet>;
 	crawledNodeAddresses: Set<PeerKey> = new Set();
-	latestClosedLedger: Ledger = {
+	latestConfirmedClosedLedger: Ledger = {
 		sequence: BigInt(0),
 		closeTime: new Date(0),
 		value: '',
@@ -62,7 +62,7 @@ export class CrawlState {
 		protected logger: P.Logger
 	) {
 		this.quorumSets = quorumSets;
-		this.latestClosedLedger = latestClosedLedger;
+		this.latestConfirmedClosedLedger = latestClosedLedger;
 		this.slots = new Slots(topTierQuorumSet, logger);
 		this.envelopeCache = new LRUCache<string, number>(5000);
 		this.topTierNodes = new Set(

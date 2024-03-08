@@ -2,7 +2,7 @@ import { StellarMessageHandler } from '../stellar-message-handler';
 import { ScpEnvelopeHandler } from '../scp-envelope/scp-envelope-handler';
 import { QuorumSetManager } from '../../quorum-set-manager';
 import { P } from 'pino';
-import { CrawlState } from '../../crawl-state';
+import { CrawlProcessState, CrawlState } from '../../crawl-state';
 import { Keypair } from '@stellar/stellar-base';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { createDummyExternalizeMessage } from '../../__fixtures__/createDummyExternalizeMessage';
@@ -29,10 +29,11 @@ describe('StellarMessageHandler', () => {
 	});
 
 	describe('handleStellarMessage', () => {
-		it('should handle SCP message', () => {
+		it('should handle SCP message in crawl state', () => {
 			const keyPair = Keypair.random();
 			const stellarMessage = createDummyExternalizeMessage(keyPair);
 			const crawlState = mock<CrawlState>();
+			crawlState.state = CrawlProcessState.CRAWLING;
 			scpManager.handle.mockReturnValueOnce(ok(undefined));
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
@@ -40,6 +41,19 @@ describe('StellarMessageHandler', () => {
 				crawlState
 			);
 			expect(scpManager.handle).toHaveBeenCalledTimes(1);
+			expect(result.isOk()).toBeTruthy();
+		});
+
+		it('should not handle SCP message in non-crawl state', () => {
+			const stellarMessage = createDummyExternalizeMessage();
+			const crawlState = mock<CrawlState>();
+			crawlState.state = CrawlProcessState.TOP_TIER_SYNC;
+			const result = handler.handleStellarMessage(
+				senderPublicKey,
+				stellarMessage,
+				crawlState
+			);
+			expect(scpManager.handle).toHaveBeenCalledTimes(0);
 			expect(result.isOk()).toBeTruthy();
 		});
 

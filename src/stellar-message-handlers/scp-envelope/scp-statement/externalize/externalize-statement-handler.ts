@@ -3,6 +3,7 @@ import { Ledger } from '../../../../crawler';
 import { PeerNodeCollection } from '../../../../peer-node-collection';
 import { ExternalizeData } from './map-externalize-statement';
 import { Slot } from './slot';
+import * as assert from 'assert';
 
 //attempts slot close confirmation and updates peer statuses accordingly
 export class ExternalizeStatementHandler {
@@ -13,8 +14,11 @@ export class ExternalizeStatementHandler {
 		peerNodes: PeerNodeCollection,
 		slot: Slot,
 		externalizeData: ExternalizeData,
-		localCloseTime: Date
+		localCloseTime: Date,
+		latestConfirmedClosedLedger: Ledger
 	): Ledger | null {
+		assert.equal(slot.index, externalizeData.slotIndex, 'Slot index mismatch');
+
 		this.logExternalizeMessage(
 			externalizeData.publicKey,
 			slot.index,
@@ -30,9 +34,17 @@ export class ExternalizeStatementHandler {
 
 		const closedLedger = slot.getConfirmedClosedLedger();
 		if (closedLedger) {
-			peerNodes.confirmLedgerClose(externalizeData.publicKey, closedLedger);
+			peerNodes.confirmLedgerCloseForNode(
+				externalizeData.publicKey,
+				closedLedger
+			);
 			return null;
 		}
+
+		//don't confirm older slots as this could mess with the lag detection
+		//because nodes could relay/replay old externalize messages
+		if (externalizeData.slotIndex <= latestConfirmedClosedLedger.sequence)
+			return null;
 
 		const confirmedClosedSlotOrNull = this.attemptSlotCloseConfirmation(
 			slot,

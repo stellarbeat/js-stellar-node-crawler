@@ -63,14 +63,16 @@ export class ScpStatementHandler {
 			crawlState.peerNodes,
 			crawlState.slots.getSlot(slotIndex),
 			externalizeData.value,
-			new Date() //todo: move up
+			new Date(), //todo: move up,
+			crawlState.latestConfirmedClosedLedger
 		);
 
 		if (
 			closedLedgerOrNull !== null &&
-			closedLedgerOrNull.sequence > crawlState.latestClosedLedger.sequence
+			closedLedgerOrNull.sequence >
+				crawlState.latestConfirmedClosedLedger.sequence
 		) {
-			crawlState.latestClosedLedger = closedLedgerOrNull;
+			crawlState.latestConfirmedClosedLedger = closedLedgerOrNull;
 		} //todo: crawlstate should be higher up, eventEmitter bus?
 
 		return ok(undefined);

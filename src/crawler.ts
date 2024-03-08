@@ -294,7 +294,7 @@ export class Crawler {
 		return {
 			peers: this.crawlState.peerNodes.getAll(),
 			closedLedgers: this.crawlState.slots.getConfirmedClosedSlotIndexes(),
-			latestClosedLedger: this.crawlState.latestClosedLedger
+			latestClosedLedger: this.crawlState.latestConfirmedClosedLedger
 		};
 	}
 

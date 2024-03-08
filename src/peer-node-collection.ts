@@ -86,7 +86,7 @@ export class PeerNodeCollection {
 		}
 	}
 
-	confirmLedgerClose(publicKey: PublicKey, closedLedger: Ledger): void {
+	confirmLedgerCloseForNode(publicKey: PublicKey, closedLedger: Ledger): void {
 		const peer = this.getOrAdd(publicKey);
 		peer.processConfirmedLedgerClose(closedLedger);
 	}
