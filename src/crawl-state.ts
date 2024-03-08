@@ -111,5 +111,8 @@ export class CrawlState {
 				(node) => node.suppliedPeerList
 			).length + ' supplied us with a peers list.'
 		);
+		this.logger.info(
+			'Closed ledgers: ' + this.slots.getConfirmedClosedSlotIndexes().length
+		);
 	}
 }
