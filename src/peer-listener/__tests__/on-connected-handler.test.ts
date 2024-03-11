@@ -2,7 +2,6 @@ import { PeerNodeCollection } from '../../peer-node-collection';
 import { mock } from 'jest-mock-extended';
 import { ConnectedPayload, ConnectionManager } from '../../connection-manager';
 import { P } from 'pino';
-import { CrawlProcessState } from '../../crawl-state';
 import { PeerListener } from '../peer-listener';
 import { QuorumSetManager } from '../quorum-set-manager';
 import { StellarMessageHandler } from '../stellar-message-handlers/stellar-message-handler';
@@ -41,13 +40,7 @@ describe('OnConnectedHandler', () => {
 		};
 		const peerNodes = mock<PeerNodeCollection>();
 		const localTime = new Date();
-		onConnectedHandler.onConnected(
-			data,
-			peerNodes,
-			false,
-			() => CrawlProcessState.CRAWLING,
-			localTime
-		);
+		onConnectedHandler.onConnected(data, peerNodes, false, localTime);
 
 		expect(peerNodes.addSuccessfullyConnected).toHaveBeenCalledWith(
 			data.publicKey,
@@ -76,13 +69,7 @@ describe('OnConnectedHandler', () => {
 		const localTime = new Date();
 		const error = new Error('error');
 		peerNodes.addSuccessfullyConnected.mockReturnValue(error);
-		onConnectedHandler.onConnected(
-			data,
-			peerNodes,
-			false,
-			() => CrawlProcessState.CRAWLING,
-			localTime
-		);
+		onConnectedHandler.onConnected(data, peerNodes, false, localTime);
 
 		expect(peerNodes.addSuccessfullyConnected).toHaveBeenCalledWith(
 			data.publicKey,

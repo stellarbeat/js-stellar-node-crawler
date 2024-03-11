@@ -13,7 +13,7 @@ import { CrawlerConfiguration, createCrawler } from '../index';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { NodeAddress } from '../node-address';
 
-jest.setTimeout(30000);
+jest.setTimeout(40000);
 
 let peerNodeAddress: NodeAddress;
 let peerNetworkNode: NetworkNode;

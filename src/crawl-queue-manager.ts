@@ -1,6 +1,4 @@
-import { CrawlState } from './crawl-state';
 import * as P from 'pino';
-import { nodeAddressToPeerKey } from './node-address';
 import { AsyncResultCallback, CrawlQueue } from './crawl-queue';
 import { CrawlTask } from './crawl-task';
 
@@ -10,13 +8,6 @@ export class CrawlQueueManager {
 	}
 
 	public addCrawlTask(crawlTask: CrawlTask): void {
-		const peerKey = nodeAddressToPeerKey(crawlTask.nodeAddress);
-		this.logNodeAddition(crawlTask.crawlState, peerKey);
-
-		if (this.hasNodeBeenCrawled(crawlTask.crawlState, peerKey)) return;
-
-		crawlTask.crawlState.crawledNodeAddresses.add(peerKey);
-
 		this.crawlQueue.push(crawlTask, (error?: Error) => {
 			if (error) {
 				this.logger.error(
@@ -25,18 +16,6 @@ export class CrawlQueueManager {
 				);
 			}
 		});
-	}
-
-	private hasNodeBeenCrawled(crawlState: CrawlState, peerKey: string): boolean {
-		return crawlState.crawledNodeAddresses.has(peerKey);
-	}
-
-	private logNodeAddition(crawlState: CrawlState, peerKey: string): void {
-		if (this.hasNodeBeenCrawled(crawlState, peerKey)) {
-			this.logger.debug({ peer: peerKey }, 'Address already crawled');
-		} else {
-			this.logger.debug({ peer: peerKey }, 'Adding address to crawl queue');
-		}
 	}
 
 	public onDrain(callback: () => void) {
@@ -67,11 +46,6 @@ export class CrawlQueueManager {
 		if (taskDoneCallback) {
 			taskDoneCallback();
 			crawlQueueTaskDoneCallbacks.delete(nodeAddress);
-		} else {
-			this.logger.error(
-				{ peer: nodeAddress },
-				'No crawlQueueTaskDoneCallback found'
-			);
 		}
 	}
 }

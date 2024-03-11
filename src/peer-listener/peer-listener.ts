@@ -1,5 +1,5 @@
 import { P } from 'pino';
-import { CrawlProcessState, CrawlState } from '../crawl-state';
+import { CrawlState } from '../crawl-state';
 import { truncate } from '../utilities/truncate';
 import {
 	ConnectedPayload,
@@ -34,14 +34,28 @@ export class PeerListener {
 		this.setNetworkConsensusTimer();
 	}
 
-	public stop() {
-		if (this.networkConsensusTimer) clearTimeout(this.networkConsensusTimer);
-		this.stopping = true;
-		if (this.connectionManager.getActiveConnectionAddresses().length === 0)
-			return;
-		setTimeout(() => {
-			this.connectionManager.shutdown(); //give straggling top tier nodes a chance and then shut down.
-		}, PeerListener.PEER_STRAGGLE_TIMEOUT);
+	/*	public connectToTopTierNodes(topTierNodes: Set<NodeAddress>) {
+		topTierNodes.forEach((address) => {
+			this.connectionManager.connectToNode(address[0], address[1]);
+		});
+	}
+
+	public connectToNode(ip: string, port: number) {
+		this.connectionManager.connectToNode(ip, port);
+	}
+ */
+
+	public async stop() {
+		return new Promise<void>((resolve) => {
+			if (this.networkConsensusTimer) clearTimeout(this.networkConsensusTimer);
+			this.stopping = true;
+			if (this.connectionManager.getActiveConnectionAddresses().length === 0)
+				return;
+			setTimeout(() => {
+				this.connectionManager.shutdown(); //give straggling top tier nodes a chance and then shut down.
+				resolve();
+			}, PeerListener.PEER_STRAGGLE_TIMEOUT);
+		});
 	}
 
 	private setNetworkConsensusTimer() {
@@ -81,7 +95,6 @@ export class PeerListener {
 		data: ConnectedPayload,
 		peerNodes: PeerNodeCollection,
 		isTopTierNode: boolean,
-		getCrawlProcessState: () => CrawlProcessState,
 		localTime: Date
 	): undefined | Error {
 		this.logIfTopTierConnected(isTopTierNode, data);

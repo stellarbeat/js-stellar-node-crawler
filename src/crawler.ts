@@ -14,7 +14,7 @@ import {
 import { err } from 'neverthrow';
 import { StellarMessageHandler } from './peer-listener/stellar-message-handlers/stellar-message-handler';
 import { CrawlQueueManager } from './crawl-queue-manager';
-import { NodeAddress } from './node-address';
+import { NodeAddress, nodeAddressToPeerKey } from './node-address';
 import { CrawlTask } from './crawl-task';
 import { PeerListener } from './peer-listener/peer-listener';
 
@@ -58,7 +58,6 @@ export class Crawler {
 				data,
 				this.crawlState.peerNodes,
 				this.crawlState.topTierNodes.has(data.publicKey),
-				() => this.crawlState.state,
 				new Date()
 			);
 		});
@@ -73,17 +72,6 @@ export class Crawler {
 				this.crawlState.crawlQueueTaskDoneCallbacks,
 				data.address
 			);
-			if (
-				this.crawlState.state === CrawlProcessState.CRAWLING &&
-				this.crawlQueueManager.queueLength() === 0 &&
-				this.connectionManager
-					.getActiveConnectionAddresses()
-					.every((address) => this.crawlState.topTierAddresses.has(address))
-			) {
-				this.peerListener.stop();
-				this.logger.info('Stopping crawl process');
-				this.crawlState.state = CrawlProcessState.STOPPING;
-			}
 
 			if (!data.publicKey) {
 				this.crawlState.failedConnections.push(data.address);
@@ -249,7 +237,10 @@ export class Crawler {
 	private startTopTierSync(topTierAddresses: NodeAddress[]) {
 		this.logger.info('Starting Top Tier sync');
 		this.crawlState.state = CrawlProcessState.TOP_TIER_SYNC;
-		topTierAddresses.forEach((address) => this.crawlPeerNode(address));
+
+		topTierAddresses.forEach((address) =>
+			this.connectionManager.connectToNode(address[0], address[1])
+		);
 	}
 
 	private setupCrawlCompletionHandlers(
@@ -257,10 +248,27 @@ export class Crawler {
 		reject: (reason?: any) => void,
 		crawlLogger: CrawlLogger
 	) {
-		const maxCrawlTimeout = this.startMaxCrawlTimeout(this.crawlState);
+		const maxCrawlTimeout = this.startMaxCrawlTimeout(
+			resolve,
+			reject,
+			crawlLogger,
+			this.crawlState
+		);
 		this.crawlQueueManager.onDrain(() => {
 			clearTimeout(maxCrawlTimeout);
-			this.completeCrawlProcess(resolve, reject, crawlLogger);
+			if (
+				this.crawlState.state === CrawlProcessState.CRAWLING &&
+				this.crawlQueueManager.queueLength() === 0 &&
+				this.connectionManager
+					.getActiveConnectionAddresses()
+					.every((address) => this.crawlState.topTierAddresses.has(address))
+			) {
+				this.logger.info('Stopping crawl process');
+				this.peerListener.stop().then(() => {
+					this.finish(resolve, reject, crawlLogger);
+					this.crawlState.state = CrawlProcessState.STOPPING;
+				});
+			}
 		});
 	}
 
@@ -275,15 +283,22 @@ export class Crawler {
 		return crawlLogger;
 	}
 
-	private startMaxCrawlTimeout(crawlState: CrawlState) {
+	private startMaxCrawlTimeout(
+		resolve: (value: CrawlResult | PromiseLike<CrawlResult>) => void,
+		reject: (error: Error) => void,
+		crawlLogger: CrawlLogger,
+		crawlState: CrawlState
+	) {
 		return setTimeout(() => {
 			this.logger.fatal('Max crawl time hit, closing all connections');
-			this.connectionManager.shutdown();
+			this.peerListener
+				.stop()
+				.then(() => this.finish(resolve, reject, crawlLogger));
 			crawlState.maxCrawlTimeHit = true;
 		}, this.config.maxCrawlTime);
 	}
 
-	private completeCrawlProcess(
+	private finish(
 		resolve: (value: CrawlResult | PromiseLike<CrawlResult>) => void,
 		reject: (error: Error) => void,
 		crawlLogger: CrawlLogger
@@ -312,6 +327,12 @@ export class Crawler {
 	}
 
 	private crawlPeerNode(nodeAddress: NodeAddress): void {
+		const peerKey = nodeAddressToPeerKey(nodeAddress);
+
+		if (!this.canNodeBeCrawled(peerKey)) return;
+
+		this.logNodeAddition(peerKey);
+		this.crawlState.crawledNodeAddresses.add(peerKey);
 		const crawlTask: CrawlTask = {
 			nodeAddress: nodeAddress,
 			crawlState: this.crawlState,
@@ -320,5 +341,16 @@ export class Crawler {
 		};
 
 		this.crawlQueueManager.addCrawlTask(crawlTask);
+	}
+
+	private logNodeAddition(peerKey: string): void {
+		this.logger.debug({ peer: peerKey }, 'Adding address to crawl queue');
+	}
+
+	private canNodeBeCrawled(peerKey: string): boolean {
+		return (
+			!this.crawlState.crawledNodeAddresses.has(peerKey) &&
+			!this.crawlState.topTierAddresses.has(peerKey)
+		);
 	}
 }

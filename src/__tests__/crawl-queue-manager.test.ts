@@ -28,22 +28,6 @@ describe('CrawlQueueManager', () => {
 		expect(crawlQueue.push).toHaveBeenCalled();
 	});
 
-	it('should not add a crawl task if the node has been crawled', () => {
-		const crawlQueueManager = new CrawlQueueManager(crawlQueue, logger);
-		crawlQueueManager.addCrawlTask({
-			connectCallback: () => {},
-			crawlState,
-			nodeAddress: ['localhost', 11625]
-		});
-		crawlQueueManager.addCrawlTask({
-			connectCallback: () => {},
-			crawlState,
-			nodeAddress: ['localhost', 11625]
-		});
-
-		expect(crawlQueue.push).toHaveBeenCalledTimes(1);
-	});
-
 	it('should call onDrain', () => {
 		const crawlQueueManager = new CrawlQueueManager(crawlQueue, logger);
 		crawlQueueManager.onDrain(() => {});
