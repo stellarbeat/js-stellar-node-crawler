@@ -1,21 +1,17 @@
 import { mock } from 'jest-mock-extended';
-import { CrawlQueueManager } from '../../crawl-queue-manager';
 import { CrawlState } from '../../crawl-state';
 import { QuorumSetManager } from '../quorum-set-manager';
 import { PeerNodeCollection } from '../../peer-node-collection';
 import { P } from 'pino';
-import { PeerListenTimeoutManager } from '../peer-listen-timeout-manager';
 import { PeerListener } from '../peer-listener';
 import { ConnectionManager } from '../../connection-manager';
 import { StellarMessageHandler } from '../stellar-message-handlers/stellar-message-handler';
 
 describe('OnConnectionCloseHandler', () => {
-	const queueManager = mock<CrawlQueueManager>();
 	const quorumSetManager = mock<QuorumSetManager>();
 	const connectionManager = mock<ConnectionManager>();
 	const stellarMessageHandler = mock<StellarMessageHandler>();
 	const logger = mock<P.Logger>();
-	const peerListenTimeoutManager = mock<PeerListenTimeoutManager>();
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -26,7 +22,6 @@ describe('OnConnectionCloseHandler', () => {
 			connectionManager,
 			quorumSetManager,
 			stellarMessageHandler,
-			peerListenTimeoutManager,
 			logger
 		);
 	}
@@ -67,8 +62,6 @@ describe('OnConnectionCloseHandler', () => {
 			publicKey,
 			crawlState
 		);
-
-		expect(peerListenTimeoutManager.stopTimer).toHaveBeenCalledWith(peer);
 
 		expect(peer.disconnected).toBe(true);
 		expect(peer.disconnectionTime).toBe(localTime);

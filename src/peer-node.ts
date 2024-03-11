@@ -17,7 +17,6 @@ export class PeerNode {
 	public participatingInSCP = false;
 	public connectionTime?: Date;
 	public disconnectionTime?: Date;
-	public connectedDuringLedgerClose = false;
 	public disconnected: boolean = false;
 	private externalizedValues: Map<
 		bigint,
@@ -54,41 +53,7 @@ export class PeerNode {
 
 		this.isValidating = true;
 
-		if (
-			this.connectedBeforeLocalLedgerClose(closedLedger) &&
-			!this.disconnectedBeforeLocalLedgerClose(closedLedger) &&
-			!this.externalizedAfterDisconnect(externalized) &&
-			!this.overLoaded
-		) {
-			this.connectedDuringLedgerClose = true;
-		}
-
 		this.updateLag(closedLedger, externalized);
-	}
-
-	private externalizedAfterDisconnect(externalized: {
-		localTime: Date;
-		value: string;
-	}) {
-		if (!this.disconnectionTime) return false;
-		return externalized.localTime.getTime() > this.disconnectionTime.getTime();
-	}
-
-	private disconnectedBeforeLocalLedgerClose(closedLedger: Ledger) {
-		if (!this.disconnectionTime) {
-			return false;
-		}
-
-		return (
-			closedLedger.localCloseTime.getTime() >= this.disconnectionTime.getTime()
-		);
-	}
-
-	private connectedBeforeLocalLedgerClose(closedLedger: Ledger) {
-		return (
-			this.connectionTime &&
-			this.connectionTime.getTime() <= closedLedger.localCloseTime.getTime()
-		);
 	}
 
 	public addExternalizedValue(

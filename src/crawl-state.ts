@@ -33,6 +33,7 @@ export class QuorumSetState {
 
 export class CrawlState {
 	state: CrawlProcessState = CrawlProcessState.IDLE;
+	hasConfirmedNewClosedLedger = false;
 	network: string;
 	maxCrawlTimeHit = false;
 	crawlQueueTaskDoneCallbacks: Map<string, AsyncResultCallback<void>> =
@@ -73,6 +74,11 @@ export class CrawlState {
 		this.network = network;
 	}
 
+	updateLatestConfirmedClosedLedger(ledger: Ledger): void {
+		this.latestConfirmedClosedLedger = ledger;
+		this.hasConfirmedNewClosedLedger = true;
+	}
+
 	log() {
 		this.logger.debug({ peers: this.failedConnections }, 'Failed connections');
 		this.peerNodes.getAll().forEach((peer) => {
@@ -84,7 +90,6 @@ export class CrawlState {
 				validating: peer.isValidating,
 				overLoaded: peer.overLoaded,
 				lagMS: peer.getMinLagMS(),
-				connectedWhileExternalizing: peer.connectedDuringLedgerClose,
 				incorrect: peer.isValidatingIncorrectValues
 			});
 		});

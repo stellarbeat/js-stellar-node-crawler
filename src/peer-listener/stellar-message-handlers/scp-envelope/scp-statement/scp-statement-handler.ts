@@ -6,6 +6,7 @@ import { QuorumSetManager } from '../../../quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
 import { ExternalizeStatementHandler } from './externalize/externalize-statement-handler';
 import { mapExternalizeStatement } from './externalize/map-externalize-statement';
+import { Ledger } from '../../../../crawler';
 
 export class ScpStatementHandler {
 	constructor(
@@ -17,7 +18,12 @@ export class ScpStatementHandler {
 	public handle(
 		scpStatement: xdr.ScpStatement,
 		crawlState: CrawlState
-	): Result<void, Error> {
+	): Result<
+		{
+			closedLedger: Ledger | null;
+		},
+		Error
+	> {
 		const publicKeyResult = getPublicKeyStringFromBuffer(
 			scpStatement.nodeId().value()
 		);
@@ -51,7 +57,9 @@ export class ScpStatementHandler {
 			xdr.ScpStatementType.scpStExternalize().value
 		) {
 			//only if node is externalizing, we mark the node as validating
-			return ok(undefined);
+			return ok({
+				closedLedger: null
+			});
 		}
 
 		const externalizeData = mapExternalizeStatement(scpStatement);
@@ -72,9 +80,13 @@ export class ScpStatementHandler {
 			closedLedgerOrNull.sequence >
 				crawlState.latestConfirmedClosedLedger.sequence
 		) {
-			crawlState.latestConfirmedClosedLedger = closedLedgerOrNull;
-		} //todo: crawlstate should be higher up, eventEmitter bus?
+			return ok({
+				closedLedger: closedLedgerOrNull
+			});
+		}
 
-		return ok(undefined);
+		return ok({
+			closedLedger: null
+		});
 	}
 }

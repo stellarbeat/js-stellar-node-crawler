@@ -45,6 +45,8 @@ describe('scp-statement-handler', () => {
 
 		const result = handler.handle(scpStatement, crawlState);
 		expect(result.isOk()).toBeTruthy();
+		if (!result.isOk()) return;
+		expect(result.value.closedLedger).toEqual(closedLedger);
 		expect(
 			crawlState.peerNodes.get(keyPair.publicKey())?.participatingInSCP
 		).toBeTruthy();
@@ -54,7 +56,36 @@ describe('scp-statement-handler', () => {
 		expect(
 			quorumSetManager.processQuorumSetHashFromStatement
 		).toHaveBeenCalledTimes(1);
-		expect(crawlState.latestConfirmedClosedLedger).toEqual(closedLedger);
+	});
+
+	it('should not return already closed ledger or older ledger', () => {
+		const quorumSetManager = mock<QuorumSetManager>();
+		const externalizeStatementHandler = mock<ExternalizeStatementHandler>();
+		const handler = new ScpStatementHandler(
+			quorumSetManager,
+			externalizeStatementHandler,
+			mock<P.Logger>()
+		);
+
+		const keyPair = Keypair.random();
+		const scpStatement = createDummyExternalizeStatement(keyPair, '2');
+		const crawlState = mock<CrawlState>();
+		crawlState.peerNodes = new PeerNodeCollection();
+		crawlState.slots = new Slots(new QuorumSet(1, ['A'], []), mock<P.Logger>());
+		crawlState.latestConfirmedClosedLedger = {
+			sequence: BigInt(2),
+			closeTime: new Date(),
+			value: '',
+			localCloseTime: new Date()
+		};
+		externalizeStatementHandler.handle.mockReturnValueOnce(
+			crawlState.latestConfirmedClosedLedger
+		);
+
+		const result = handler.handle(scpStatement, crawlState);
+		expect(result.isOk()).toBeTruthy();
+		if (!result.isOk()) return;
+		expect(result.value.closedLedger).toBeNull();
 	});
 
 	it('should not use non-externalize statement for ledger close confirmation', () => {
@@ -78,6 +109,8 @@ describe('scp-statement-handler', () => {
 			crawlState
 		);
 		expect(result.isOk()).toBeTruthy();
+		if (!result.isOk()) return;
+		expect(result.value.closedLedger).toBeNull();
 		expect(
 			crawlState.peerNodes.get(keyPair.publicKey())?.participatingInSCP
 		).toBeTruthy();

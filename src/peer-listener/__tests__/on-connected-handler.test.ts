@@ -1,7 +1,6 @@
 import { PeerNodeCollection } from '../../peer-node-collection';
 import { mock } from 'jest-mock-extended';
 import { ConnectedPayload, ConnectionManager } from '../../connection-manager';
-import { PeerListenTimeoutManager } from '../peer-listen-timeout-manager';
 import { P } from 'pino';
 import { CrawlProcessState } from '../../crawl-state';
 import { PeerListener } from '../peer-listener';
@@ -12,7 +11,6 @@ describe('OnConnectedHandler', () => {
 	const connectionManager = mock<ConnectionManager>();
 	const quorumSetManager = mock<QuorumSetManager>();
 	const stellarMessageHandler = mock<StellarMessageHandler>();
-	const peerListenTimeoutManager = mock<PeerListenTimeoutManager>();
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -23,7 +21,6 @@ describe('OnConnectedHandler', () => {
 			connectionManager,
 			quorumSetManager,
 			stellarMessageHandler,
-			peerListenTimeoutManager,
 			mock<P.Logger>()
 		);
 	};
@@ -59,7 +56,6 @@ describe('OnConnectedHandler', () => {
 			data.nodeInfo,
 			localTime
 		);
-		expect(peerListenTimeoutManager.startTimer).toHaveBeenCalled();
 	});
 
 	it('should handle a peer node error', () => {

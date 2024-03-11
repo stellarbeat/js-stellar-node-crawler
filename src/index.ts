@@ -11,7 +11,6 @@ import { CrawlQueueManager } from './crawl-queue-manager';
 import { AsyncCrawlQueue } from './crawl-queue';
 import { StellarMessageHandler } from './peer-listener/stellar-message-handlers/stellar-message-handler';
 import { PeerListener } from './peer-listener/peer-listener';
-import { PeerListenTimeoutManager } from './peer-listener/peer-listen-timeout-manager';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -35,7 +34,6 @@ export function createCrawler(
 		config.blackList,
 		logger
 	);
-	const disconnectTimeoutManager = new PeerListenTimeoutManager(logger);
 	const quorumSetManager = new QuorumSetManager(connectionManager, logger);
 	const crawlQueueManager = new CrawlQueueManager(
 		new AsyncCrawlQueue(config.maxOpenConnections),
@@ -59,7 +57,6 @@ export function createCrawler(
 		connectionManager,
 		quorumSetManager,
 		stellarMessageHandler,
-		disconnectTimeoutManager,
 		logger
 	);
 

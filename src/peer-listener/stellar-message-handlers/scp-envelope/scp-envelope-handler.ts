@@ -4,6 +4,7 @@ import { verifySCPEnvelopeSignature } from '@stellarbeat/js-stellar-node-connect
 import { err, ok, Result } from 'neverthrow';
 import { isLedgerSequenceValid } from './ledger-validator';
 import { ScpStatementHandler } from './scp-statement/scp-statement-handler';
+import { Ledger } from '../../../crawler';
 
 /*
  * ScpEnvelopeHandler makes sure that no duplicate SCP envelopes are processed, that the signature is valid and
@@ -15,13 +16,24 @@ export class ScpEnvelopeHandler {
 	public handle(
 		scpEnvelope: xdr.ScpEnvelope,
 		crawlState: CrawlState
-	): Result<void, Error> {
-		if (this.isCached(scpEnvelope, crawlState)) return ok(undefined);
+	): Result<
+		{
+			closedLedger: Ledger | null;
+		},
+		Error
+	> {
+		if (this.isCached(scpEnvelope, crawlState))
+			return ok({
+				closedLedger: null
+			});
 
-		if (this.isValidLedger(crawlState, scpEnvelope)) return ok(undefined);
+		if (this.isValidLedger(crawlState, scpEnvelope))
+			return ok({
+				closedLedger: null
+			});
 
 		const verifiedSignature = this.verifySignature(scpEnvelope, crawlState);
-		if (verifiedSignature.isErr()) return verifiedSignature;
+		if (verifiedSignature.isErr()) return err(verifiedSignature.error);
 
 		return this.scpStatementHandler.handle(scpEnvelope.statement(), crawlState);
 	}

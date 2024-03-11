@@ -5,15 +5,26 @@ import { createDummyExternalizeScpEnvelope } from '../../../../__fixtures__/crea
 import { CrawlState } from '../../../../crawl-state';
 import LRUCache = require('lru-cache');
 import { Keypair, Networks } from '@stellar/stellar-base';
+import { ok } from 'neverthrow';
 
 describe('scp-envelope-handler', () => {
-	it('should process valid scp envelope', () => {
+	it('should process valid scp envelope and return closed ledger', () => {
 		const scpStatementHandler = mock<ScpStatementHandler>();
+		const closedLedger = {
+			sequence: BigInt(2),
+			closeTime: new Date(),
+			value: '',
+			localCloseTime: new Date()
+		};
+		scpStatementHandler.handle.mockReturnValueOnce(ok({ closedLedger }));
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
 		const crawlState = createMockCrawlState();
-		handler.handle(scpEnvelope, crawlState);
+		const result = handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(1);
+		expect(result.isOk()).toBeTruthy();
+		if (!result.isOk()) return;
+		expect(result.value.closedLedger).toEqual(closedLedger);
 	});
 
 	it('should not process duplicate scp envelope', () => {

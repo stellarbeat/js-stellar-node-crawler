@@ -12,14 +12,10 @@ import {
 	DataPayload
 } from './connection-manager';
 import { err } from 'neverthrow';
-import {
-	PeerAddressesReceivedEvent,
-	StellarMessageHandler
-} from './peer-listener/stellar-message-handlers/stellar-message-handler';
+import { StellarMessageHandler } from './peer-listener/stellar-message-handlers/stellar-message-handler';
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { NodeAddress } from './node-address';
 import { CrawlTask } from './crawl-task';
-import { PeerListenTimeoutManager } from './peer-listener/peer-listen-timeout-manager';
 import { PeerListener } from './peer-listener/peer-listener';
 
 type QuorumSetHash = string;
@@ -37,7 +33,6 @@ export interface Ledger {
  * and manages the crawl state.
  */
 export class Crawler {
-	private disconnectTimeout: PeerListenTimeoutManager;
 	private _crawlState: CrawlState | null = null;
 
 	constructor(
@@ -50,12 +45,10 @@ export class Crawler {
 		private readonly logger: P.Logger
 	) {
 		this.logger = logger.child({ mod: 'Crawler' });
-		this.disconnectTimeout = new PeerListenTimeoutManager(logger);
 		this.setupEventHandlers();
 	}
 
 	private setupEventHandlers() {
-		this.setupStellarMessageHandlerEvents();
 		this.setupConnectionManagerEvents();
 	}
 
@@ -70,7 +63,10 @@ export class Crawler {
 			);
 		});
 		this.connectionManager.on('data', (data: DataPayload) => {
-			this.peerListener.onData(data, this.crawlState);
+			const result = this.peerListener.onData(data, this.crawlState);
+			if (result.isOk() && result.value.peers.length > 0) {
+				this.onPeerAddressesReceived(result.value.peers);
+			}
 		});
 		this.connectionManager.on('close', (data: ClosePayload) => {
 			this.crawlQueueManager.completeCrawlQueueTask(
@@ -79,14 +75,14 @@ export class Crawler {
 			);
 			if (
 				this.crawlState.state === CrawlProcessState.CRAWLING &&
+				this.crawlQueueManager.queueLength() === 0 &&
 				this.connectionManager
 					.getActiveConnectionAddresses()
 					.every((address) => this.crawlState.topTierAddresses.has(address))
 			) {
+				this.peerListener.stop();
+				this.logger.info('Stopping crawl process');
 				this.crawlState.state = CrawlProcessState.STOPPING;
-				this.logger.info(
-					'Stopping crawl process, disconnecting top tier nodes when their state is fully determined'
-				);
 			}
 
 			if (!data.publicKey) {
@@ -100,14 +96,6 @@ export class Crawler {
 				);
 			}
 		});
-	}
-
-	private setupStellarMessageHandlerEvents() {
-		this.stellarMessageHandler.on(
-			'peerAddressesReceived',
-			(peerAddresses: PeerAddressesReceivedEvent) =>
-				this.onPeerAddressesReceived(peerAddresses.peerAddresses)
-		);
 	}
 
 	private onPeerAddressesReceived(peerAddresses: NodeAddress[]) {
@@ -238,6 +226,7 @@ export class Crawler {
 			'Starting crawl process'
 		);
 		this.crawlState.state = CrawlProcessState.CRAWLING;
+		this.peerListener.startConsensusTracking();
 		this.setupCrawlCompletionHandlers(resolve, reject, crawlLogger);
 		if (
 			nodeAddresses.concat(this.crawlState.peerAddressesReceivedDuringSync)
@@ -301,7 +290,6 @@ export class Crawler {
 	): void {
 		crawlLogger.stop();
 		this.crawlState.state = CrawlProcessState.IDLE;
-
 		if (this.hasCrawlTimedOut()) {
 			//todo clean crawl-queue and connections
 			reject(new Error('Max crawl time hit, shutting down crawler'));

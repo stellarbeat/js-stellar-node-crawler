@@ -9,7 +9,8 @@ export function createDummyValue() {
 }
 
 export function createDummyExternalizeStatement(
-	keyPair: Keypair = Keypair.random()
+	keyPair: Keypair = Keypair.random(),
+	slotIndex = '1'
 ) {
 	const commit = new xdr.ScpBallot({
 		counter: 1,
@@ -24,7 +25,7 @@ export function createDummyExternalizeStatement(
 
 	return new xdr.ScpStatement({
 		nodeId: xdr.PublicKey.publicKeyTypeEd25519(keyPair.rawPublicKey()),
-		slotIndex: xdr.Uint64.fromString('1'),
+		slotIndex: xdr.Uint64.fromString(slotIndex),
 		pledges: pledges
 	});
 }

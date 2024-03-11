@@ -7,13 +7,11 @@ import { createDummyExternalizeMessage } from '../../__fixtures__/createDummyExt
 import { err, ok } from 'neverthrow';
 import { PeerListener } from '../peer-listener';
 import { QuorumSetManager } from '../quorum-set-manager';
-import { PeerListenTimeoutManager } from '../peer-listen-timeout-manager';
 
 describe('OnDataHandler', () => {
 	const connectionManager = mock<ConnectionManager>();
 	const quorumSetManager = mock<QuorumSetManager>();
 	const stellarMessageHandler = mock<StellarMessageHandler>();
-	const peerListenTimeoutManager = mock<PeerListenTimeoutManager>();
 	const logger = mock<P.Logger>();
 
 	beforeEach(() => {
@@ -25,7 +23,6 @@ describe('OnDataHandler', () => {
 			connectionManager,
 			quorumSetManager,
 			stellarMessageHandler,
-			peerListenTimeoutManager,
 			logger
 		);
 	}
@@ -42,7 +39,12 @@ describe('OnDataHandler', () => {
 		};
 		const crawlState = mock<CrawlState>();
 
-		stellarMessageHandler.handleStellarMessage.mockReturnValue(ok(undefined));
+		stellarMessageHandler.handleStellarMessage.mockReturnValue(
+			ok({
+				closedLedger: null,
+				peers: []
+			})
+		);
 		onDataHandler.onData(data, crawlState);
 
 		expect(stellarMessageHandler.handleStellarMessage).toHaveBeenCalledWith(

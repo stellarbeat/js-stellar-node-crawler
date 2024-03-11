@@ -34,7 +34,17 @@ describe('StellarMessageHandler', () => {
 			const stellarMessage = createDummyExternalizeMessage(keyPair);
 			const crawlState = mock<CrawlState>();
 			crawlState.state = CrawlProcessState.CRAWLING;
-			scpManager.handle.mockReturnValueOnce(ok(undefined));
+			const closedLedger = {
+				sequence: BigInt(2),
+				closeTime: new Date(),
+				value: '',
+				localCloseTime: new Date()
+			};
+			scpManager.handle.mockReturnValueOnce(
+				ok({
+					closedLedger: closedLedger
+				})
+			);
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
@@ -42,6 +52,11 @@ describe('StellarMessageHandler', () => {
 			);
 			expect(scpManager.handle).toHaveBeenCalledTimes(1);
 			expect(result.isOk()).toBeTruthy();
+			if (!result.isOk()) return;
+			expect(result.value).toEqual({
+				closedLedger: closedLedger,
+				peers: []
+			});
 		});
 
 		it('should not handle SCP message in non-crawl state', () => {
@@ -63,16 +78,18 @@ describe('StellarMessageHandler', () => {
 			const peerNodes = new PeerNodeCollection();
 			peerNodes.getOrAdd(senderPublicKey);
 			crawlState.peerNodes = peerNodes;
-			const peerAddressesListener = jest.fn();
-			handler.on('peerAddressesReceived', peerAddressesListener);
 
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
 				crawlState
 			);
-			expect(peerAddressesListener).toHaveBeenCalledTimes(1);
 			expect(result.isOk()).toBeTruthy();
+			if (!result.isOk()) return;
+			expect(result.value).toEqual({
+				closedLedger: null,
+				peers: [['127.0.0.1', 11625]]
+			});
 			expect(peerNodes.get(senderPublicKey)?.suppliedPeerList).toBeTruthy();
 		});
 
@@ -86,15 +103,30 @@ describe('StellarMessageHandler', () => {
 			);
 			expect(quorumSetManager.processQuorumSet).toHaveBeenCalledTimes(1);
 			expect(result.isOk()).toBeTruthy();
+			if (!result.isOk()) return;
+			expect(result.value).toEqual({
+				closedLedger: null,
+				peers: []
+			});
 		});
 
 		it('should handle dont have message', () => {
 			const stellarMessage = createDummyDontHaveMessage();
 			const crawlState = mock<CrawlState>();
-			handler.handleStellarMessage(senderPublicKey, stellarMessage, crawlState);
+			const result = handler.handleStellarMessage(
+				senderPublicKey,
+				stellarMessage,
+				crawlState
+			);
 			expect(
 				quorumSetManager.peerNodeDoesNotHaveQuorumSet
 			).toHaveBeenCalledTimes(1);
+			expect(result.isOk()).toBeTruthy();
+			if (!result.isOk()) return;
+			expect(result.value).toEqual({
+				closedLedger: null,
+				peers: []
+			});
 		});
 
 		it('should handle errLoad message', () => {
@@ -112,6 +144,11 @@ describe('StellarMessageHandler', () => {
 			expect(
 				crawlState.peerNodes.get(senderPublicKey)?.overLoaded
 			).toBeTruthy();
+			if (!result.isOk()) return;
+			expect(result.value).toEqual({
+				closedLedger: null,
+				peers: []
+			});
 		});
 	});
 });
