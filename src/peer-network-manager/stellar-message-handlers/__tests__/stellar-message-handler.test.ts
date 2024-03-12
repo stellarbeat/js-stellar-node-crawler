@@ -2,7 +2,7 @@ import { StellarMessageHandler } from '../stellar-message-handler';
 import { ScpEnvelopeHandler } from '../scp-envelope/scp-envelope-handler';
 import { QuorumSetManager } from '../../quorum-set-manager';
 import { P } from 'pino';
-import { CrawlProcessState, CrawlState } from '../../../crawl-state';
+import { CrawlState } from '../../../crawl-state';
 import { Keypair } from '@stellar/stellar-base';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { createDummyExternalizeMessage } from '../../../__fixtures__/createDummyExternalizeMessage';
@@ -29,11 +29,10 @@ describe('StellarMessageHandler', () => {
 	});
 
 	describe('handleStellarMessage', () => {
-		it('should handle SCP message in crawl state', () => {
+		it('should handle SCP message and attempt ledger close', () => {
 			const keyPair = Keypair.random();
 			const stellarMessage = createDummyExternalizeMessage(keyPair);
 			const crawlState = mock<CrawlState>();
-			crawlState.state = CrawlProcessState.CRAWLING;
 			const closedLedger = {
 				sequence: BigInt(2),
 				closeTime: new Date(),
@@ -48,6 +47,7 @@ describe('StellarMessageHandler', () => {
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
+				true,
 				crawlState
 			);
 			expect(scpManager.handle).toHaveBeenCalledTimes(1);
@@ -59,13 +59,13 @@ describe('StellarMessageHandler', () => {
 			});
 		});
 
-		it('should not handle SCP message in non-crawl state', () => {
+		it('should not attempt ledger close', () => {
 			const stellarMessage = createDummyExternalizeMessage();
 			const crawlState = mock<CrawlState>();
-			crawlState.state = CrawlProcessState.TOP_TIER_SYNC;
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
+				false,
 				crawlState
 			);
 			expect(scpManager.handle).toHaveBeenCalledTimes(0);
@@ -82,6 +82,7 @@ describe('StellarMessageHandler', () => {
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
+				true,
 				crawlState
 			);
 			expect(result.isOk()).toBeTruthy();
@@ -99,6 +100,7 @@ describe('StellarMessageHandler', () => {
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
+				true,
 				crawlState
 			);
 			expect(quorumSetManager.processQuorumSet).toHaveBeenCalledTimes(1);
@@ -116,6 +118,7 @@ describe('StellarMessageHandler', () => {
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
+				true,
 				crawlState
 			);
 			expect(
@@ -138,6 +141,7 @@ describe('StellarMessageHandler', () => {
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
+				true,
 				crawlState
 			);
 			expect(result.isOk()).toBeTruthy();

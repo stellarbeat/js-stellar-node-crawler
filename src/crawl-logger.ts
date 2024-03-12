@@ -1,6 +1,6 @@
 import { CrawlState } from './crawl-state';
 import { P } from 'pino';
-import { ConnectionManager } from './connection-manager';
+import { ConnectionManager } from './peer-network-manager/connection-manager';
 import { CrawlQueueManager } from './crawl-queue-manager';
 
 export class CrawlLogger {

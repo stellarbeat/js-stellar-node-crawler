@@ -30,6 +30,7 @@ export class StellarMessageHandler {
 	handleStellarMessage(
 		sender: PublicKey,
 		stellarMessage: xdr.StellarMessage,
+		attemptLedgerClose: boolean,
 		crawlState: CrawlState
 	): Result<
 		{
@@ -40,7 +41,7 @@ export class StellarMessageHandler {
 	> {
 		switch (stellarMessage.switch()) {
 			case xdr.MessageType.scpMessage(): {
-				if (crawlState.state !== CrawlProcessState.CRAWLING)
+				if (!attemptLedgerClose)
 					return ok({
 						closedLedger: null,
 						peers: []

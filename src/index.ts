@@ -1,18 +1,19 @@
 import { Crawler } from './crawler';
 import { pino } from 'pino';
-import { QuorumSetManager } from './peer-listener/quorum-set-manager';
 import { createNode } from '@stellarbeat/js-stellar-node-connector';
 import { CrawlerConfiguration } from './crawler-configuration';
-import { ConnectionManager } from './connection-manager';
-import { ExternalizeStatementHandler } from './peer-listener/stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
-import { ScpEnvelopeHandler } from './peer-listener/stellar-message-handlers/scp-envelope/scp-envelope-handler';
-import { ScpStatementHandler } from './peer-listener/stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
+import { ConnectionManager } from './peer-network-manager/connection-manager';
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { AsyncCrawlQueue } from './crawl-queue';
-import { StellarMessageHandler } from './peer-listener/stellar-message-handlers/stellar-message-handler';
-import { PeerListener } from './peer-listener/peer-listener';
 import { MaxCrawlTimeManager } from './max-crawl-time-manager';
 import { CrawlLogger } from './crawl-logger';
+import { PeerNetworkManager } from './peer-network-manager/peer-network-manager';
+import { StellarMessageHandler } from './peer-network-manager/stellar-message-handlers/stellar-message-handler';
+import { ConsensusTimerManager } from './peer-network-manager/consensus-timer-manager';
+import { ExternalizeStatementHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
+import { ScpStatementHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
+import { ScpEnvelopeHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-envelope-handler';
+import { QuorumSetManager } from './peer-network-manager/quorum-set-manager';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -55,10 +56,11 @@ export function createCrawler(
 		logger
 	);
 
-	const peerListener = new PeerListener(
+	const peerListener = new PeerNetworkManager(
 		connectionManager,
 		quorumSetManager,
 		stellarMessageHandler,
+		new ConsensusTimerManager(),
 		logger
 	);
 

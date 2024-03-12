@@ -6,28 +6,38 @@ import {
 	ConnectedPayload,
 	ConnectionManager,
 	DataPayload
-} from '../connection-manager';
+} from './connection-manager';
 import { QuorumSetManager } from './quorum-set-manager';
 import { StellarMessageHandler } from './stellar-message-handlers/stellar-message-handler';
 import { NodeAddress } from '../node-address';
 import { Ledger } from '../crawler';
 import { EventEmitter } from 'events';
+import { ConsensusTimerManager } from './consensus-timer-manager';
+import * as assert from 'assert';
 
-export class PeerListener extends EventEmitter {
+export enum PeerNetworkManagerState {
+	Idle,
+	Syncing,
+	Synced,
+	Stopping
+}
+
+export class PeerNetworkManager extends EventEmitter {
 	private static readonly NETWORK_CONSENSUS_TIMEOUT = 90000; //90 seconds before we declare the network stuck.
 	private static readonly PEER_STRAGGLE_TIMEOUT = 10000; //if the network has externalized, you get 10 seconds to catch up.
 
-	private networkConsensusTimer: NodeJS.Timeout | null = null;
-	private networkHalted = false;
-	private stopping = false;
 	private topTierAddresses: Set<string> = new Set();
 
 	private _crawlState?: CrawlState; //todo: refactor out crawlState
+
+	private state: PeerNetworkManagerState = PeerNetworkManagerState.Idle;
+	private networkHalted: boolean = false;
 
 	constructor(
 		private connectionManager: ConnectionManager,
 		private quorumSetManager: QuorumSetManager,
 		private stellarMessageHandler: StellarMessageHandler,
+		private networkConsensusTimerManager: ConsensusTimerManager,
 		private logger: P.Logger
 	) {
 		super();
@@ -42,6 +52,10 @@ export class PeerListener extends EventEmitter {
 		});
 	}
 
+	getState(): PeerNetworkManagerState {
+		return this.state;
+	}
+
 	get crawlState(): CrawlState {
 		if (!this._crawlState) {
 			throw new Error('CrawlState not set');
@@ -49,79 +63,97 @@ export class PeerListener extends EventEmitter {
 		return this._crawlState;
 	}
 
-	public startConsensusTracking() {
-		this.setNetworkConsensusTimer();
-	}
-
-	public async start(
+	public async sync(
 		topTierNodes: NodeAddress[],
 		crawlState: CrawlState
 	): Promise<number> {
-		return new Promise<number>((resolve, reject) => {
-			this.networkHalted = false;
-			this.stopping = false;
+		return new Promise<number>((resolve) => {
 			this._crawlState = crawlState;
-			topTierNodes.forEach((address) => {
-				this.connectionManager.connectToNode(address[0], address[1]);
-				this.topTierAddresses.add(`${address[0]}:${address[1]}`);
-			});
+
+			this.moveToSyncingState(topTierNodes);
 
 			setTimeout(() => {
+				this.moveToSyncedState();
 				resolve(this.connectionManager.getNumberOfActiveConnections());
 			}, 10000);
 		});
 	}
 
-	getActiveTopTierConnections() {
-		return this.connectionManager
-			.getActiveConnectionAddresses()
-			.filter((address) => {
-				return this.topTierAddresses.has(address);
-			});
+	private moveToSyncingState(topTierNodes: NodeAddress[]) {
+		assert(this.state === PeerNetworkManagerState.Idle);
+		this.state = PeerNetworkManagerState.Syncing;
+		this.networkHalted = false;
+
+		topTierNodes.forEach((address) => {
+			this.connectionManager.connectToNode(address[0], address[1]);
+			this.topTierAddresses.add(`${address[0]}:${address[1]}`);
+		});
+	}
+
+	private moveToSyncedState() {
+		assert(this.state === PeerNetworkManagerState.Syncing);
+		this.state = PeerNetworkManagerState.Synced;
+		this.startNetworkConsensusTimer();
+	}
+
+	private moveToStoppingState(callback: () => void) {
+		this.state = PeerNetworkManagerState.Stopping;
+		this.networkConsensusTimerManager.stopTimer();
+		if (this.connectionManager.getActiveConnectionAddresses().length === 0) {
+			return this.moveToIdleState(callback);
+		}
+
+		//give straggling top tier nodes a chance and then shut down.
+		setTimeout(() => {
+			this.moveToIdleState(callback);
+		}, PeerNetworkManager.PEER_STRAGGLE_TIMEOUT);
+	}
+
+	private moveToIdleState(callback: () => void) {
+		this.connectionManager.shutdown();
+		this.state = PeerNetworkManagerState.Idle;
+		callback();
 	}
 
 	public connectToNode(ip: string, port: number) {
 		this.connectionManager.connectToNode(ip, port);
 	}
 
-	public async stop() {
+	public async shutdown() {
 		return new Promise<void>((resolve) => {
-			if (this.networkConsensusTimer) clearTimeout(this.networkConsensusTimer);
-			this.stopping = true;
-			if (this.connectionManager.getActiveConnectionAddresses().length === 0) {
-				resolve();
-				return;
-			}
-
-			setTimeout(() => {
-				this.connectionManager.shutdown(); //give straggling top tier nodes a chance and then shut down.
-				resolve();
-			}, PeerListener.PEER_STRAGGLE_TIMEOUT);
+			this.moveToStoppingState(resolve);
 		});
 	}
 
-	private setNetworkConsensusTimer() {
-		if (this.networkConsensusTimer) clearTimeout(this.networkConsensusTimer);
-		this.networkConsensusTimer = setTimeout(() => {
-			this.logger.info('Network consensus timeout');
-			this.onNetworkHalted();
-		}, PeerListener.NETWORK_CONSENSUS_TIMEOUT);
+	private startNetworkConsensusTimer() {
+		this.networkConsensusTimerManager.startTimer(
+			PeerNetworkManager.NETWORK_CONSENSUS_TIMEOUT,
+			() => this.onNetworkHalted()
+		);
 	}
 
 	private onNetworkHalted() {
+		this.logger.info('Network consensus timeout');
 		this.networkHalted = true;
-		this.connectionManager.getActiveConnectionAddresses().forEach((address) => {
-			this.connectionManager.disconnectByAddress(address);
-		}); //disconnect all peers
+		this.startStragglerTimeoutForActivePeers();
 	}
 
 	private onLedgerCloseConfirmation(crawlState: CrawlState, ledger: Ledger) {
-		if (this.networkHalted) return; // we report that the network was halted
+		if (this.state !== PeerNetworkManagerState.Synced) return;
+		if (this.networkHalted) return;
+
 		crawlState.updateLatestConfirmedClosedLedger(ledger);
+
+		this.startStragglerTimeoutForActivePeers();
+
+		this.startNetworkConsensusTimer();
+	}
+
+	private startStragglerTimeoutForActivePeers() {
 		const activePeers = this.connectionManager
 			.getActiveConnectionAddresses()
 			.filter((address) => {
-				return !crawlState.topTierAddresses.has(address);
+				return !this.crawlState.topTierAddresses.has(address);
 			});
 		if (activePeers.length === 0) return; //no potential stragglers
 		setTimeout(() => {
@@ -129,8 +161,7 @@ export class PeerListener extends EventEmitter {
 			activePeers.forEach((address) => {
 				this.connectionManager.disconnectByAddress(address);
 			});
-		}, PeerListener.PEER_STRAGGLE_TIMEOUT);
-		this.setNetworkConsensusTimer();
+		}, PeerNetworkManager.PEER_STRAGGLE_TIMEOUT);
 	}
 
 	private onConnected(data: ConnectedPayload): undefined | Error {
@@ -138,15 +169,15 @@ export class PeerListener extends EventEmitter {
 		const peerNodeOrError = this.addPeerNode(data, new Date());
 
 		if (peerNodeOrError instanceof Error) {
-			this.disconnect(`${data.ip}:${data.port}`, peerNodeOrError);
+			this.disconnectPeer(`${data.ip}:${data.port}`, peerNodeOrError);
 			return peerNodeOrError;
 		}
 
 		if (this.networkHalted) {
 			//try to gather minimal data from the peer and disconnect
 			setTimeout(() => {
-				this.disconnect(`${data.ip}:${data.port}`);
-			}, PeerListener.PEER_STRAGGLE_TIMEOUT);
+				this.disconnectPeer(`${data.ip}:${data.port}`);
+			}, PeerNetworkManager.PEER_STRAGGLE_TIMEOUT);
 		}
 	}
 
@@ -167,6 +198,7 @@ export class PeerListener extends EventEmitter {
 		const result = this.stellarMessageHandler.handleStellarMessage(
 			data.publicKey,
 			data.stellarMessageWork.stellarMessage,
+			this.state === PeerNetworkManagerState.Synced,
 			this.crawlState
 		);
 
@@ -188,7 +220,7 @@ export class PeerListener extends EventEmitter {
 		if (result.value.peers.length > 0) this.emit('peers', result.value.peers);
 	}
 
-	private disconnect(address: string, error?: Error) {
+	private disconnectPeer(address: string, error?: Error) {
 		this.connectionManager.disconnectByAddress(address, error);
 	}
 

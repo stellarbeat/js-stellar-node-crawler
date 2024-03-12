@@ -1,9 +1,8 @@
 import { Crawler } from '../index';
 import { createDummyCrawlerConfiguration } from '../__fixtures__/createDummyCrawlerConfiguration';
-import { ClosePayload } from '../connection-manager';
+import { ClosePayload } from '../peer-network-manager/connection-manager';
 import { CrawlQueueManager } from '../crawl-queue-manager';
 import { MaxCrawlTimeManager } from '../max-crawl-time-manager';
-import { PeerListener } from '../peer-listener/peer-listener';
 import { P } from 'pino';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
@@ -11,6 +10,7 @@ import { CrawlLogger } from '../crawl-logger';
 import { CrawlState } from '../crawl-state';
 import { EventEmitter } from 'events';
 import { AsyncCrawlQueue } from '../crawl-queue';
+import { PeerNetworkManager } from '../peer-network-manager/peer-network-manager';
 
 describe('Crawler', () => {
 	beforeEach(() => {
@@ -23,22 +23,22 @@ describe('Crawler', () => {
 			mock<P.Logger>()
 		);
 		const maxCrawlTimeManager = mock<MaxCrawlTimeManager>();
-		const peerListener = mock<PeerListener>();
+		const peerNetworkManager = mock<PeerNetworkManager>();
 		const crawlLogger = mock<CrawlLogger>();
 		const logger = mock<P.Logger>();
 		logger.child.mockReturnValue(logger as any);
 		const peerListenerEventEmitter = new EventEmitter();
 
-		peerListener.on.mockImplementation((event, listener) => {
+		peerNetworkManager.on.mockImplementation((event, listener) => {
 			peerListenerEventEmitter.on(event, listener);
-			return peerListener;
+			return peerNetworkManager;
 		});
 
 		const crawler = new Crawler(
 			createDummyCrawlerConfiguration(),
 			crawlQueueManager,
 			maxCrawlTimeManager,
-			peerListener,
+			peerNetworkManager,
 			crawlLogger,
 			logger
 		);
@@ -58,7 +58,7 @@ describe('Crawler', () => {
 		return {
 			crawler,
 			crawlState,
-			peerListener,
+			peerNetworkManager: peerNetworkManager,
 			peerListenerEventEmitter,
 			crawlLogger,
 			maxCrawlTimeManager
@@ -74,11 +74,11 @@ describe('Crawler', () => {
 		const {
 			crawler,
 			crawlState,
-			peerListener,
+			peerNetworkManager,
 			crawlLogger,
 			maxCrawlTimeManager
 		} = setupSUT();
-		peerListener.start.mockResolvedValue(0);
+		peerNetworkManager.sync.mockResolvedValue(0);
 		try {
 			await crawler.crawl([], [], crawlState);
 		} catch (e) {
@@ -106,12 +106,12 @@ describe('Crawler', () => {
 		const {
 			crawler,
 			crawlState,
-			peerListener,
+			peerNetworkManager,
 			crawlLogger,
 			maxCrawlTimeManager
 		} = setupSUT();
-		peerListener.start.mockResolvedValue(1);
-		peerListener.stop.mockResolvedValue();
+		peerNetworkManager.sync.mockResolvedValue(1);
+		peerNetworkManager.shutdown.mockResolvedValue();
 		const result = await crawler.crawl([], [], crawlState);
 		expect(result).toEqual({
 			closedLedgers: [],
@@ -125,19 +125,19 @@ describe('Crawler', () => {
 		});
 		expectCorrectMaxTimer(maxCrawlTimeManager);
 		expectCorrectLogger(crawlLogger);
-		expect(peerListener.stop).toHaveBeenCalled();
+		expect(peerNetworkManager.shutdown).toHaveBeenCalled();
 	});
 
 	it('should connect to top tier and crawl peer nodes received from top tier', (resolve) => {
 		const {
 			crawler,
 			crawlState,
-			peerListener,
+			peerNetworkManager,
 			peerListenerEventEmitter,
 			crawlLogger,
 			maxCrawlTimeManager
 		} = setupSUT();
-		peerListener.start.mockImplementationOnce(() => {
+		peerNetworkManager.sync.mockImplementationOnce(() => {
 			return new Promise((resolve) => {
 				peerListenerEventEmitter.emit('peers', [['127.0.0.1', 11625]]);
 				setTimeout(() => {
@@ -145,7 +145,7 @@ describe('Crawler', () => {
 				}, 1);
 			});
 		});
-		peerListener.connectToNode.mockImplementation((address, port) => {
+		peerNetworkManager.connectToNode.mockImplementation((address, port) => {
 			return new Promise((resolve) => {
 				const disconnectPayload: ClosePayload = {
 					address: address + ':' + port,
@@ -158,7 +158,7 @@ describe('Crawler', () => {
 			});
 		});
 
-		peerListener.stop.mockResolvedValue();
+		peerNetworkManager.shutdown.mockResolvedValue();
 		crawler
 			.crawl([['peer', 2]], [['top', 1]], crawlState)
 			.then((result) => {
@@ -174,12 +174,12 @@ describe('Crawler', () => {
 				});
 				expectCorrectMaxTimer(maxCrawlTimeManager);
 				expectCorrectLogger(crawlLogger);
-				expect(peerListener.start).toHaveBeenNthCalledWith(
+				expect(peerNetworkManager.sync).toHaveBeenNthCalledWith(
 					1,
 					[['top', 1]],
 					crawlState
 				);
-				expect(peerListener.connectToNode).toHaveBeenCalledTimes(2);
+				expect(peerNetworkManager.connectToNode).toHaveBeenCalledTimes(2);
 				resolve();
 			})
 			.catch((e) => {
@@ -191,14 +191,14 @@ describe('Crawler', () => {
 		const {
 			crawler,
 			crawlState,
-			peerListener,
+			peerNetworkManager,
 			crawlLogger,
 			maxCrawlTimeManager,
 			peerListenerEventEmitter
 		} = setupSUT();
-		peerListener.start.mockResolvedValue(1);
-		peerListener.stop.mockResolvedValue();
-		peerListener.connectToNode.mockImplementation((address, port) => {
+		peerNetworkManager.sync.mockResolvedValue(1);
+		peerNetworkManager.shutdown.mockResolvedValue();
+		peerNetworkManager.connectToNode.mockImplementation((address, port) => {
 			return new Promise((resolve) => {
 				const disconnectPayload: ClosePayload = {
 					address: address + ':' + port,
@@ -226,7 +226,7 @@ describe('Crawler', () => {
 				});
 				expectCorrectMaxTimer(maxCrawlTimeManager);
 				expectCorrectLogger(crawlLogger);
-				expect(peerListener.connectToNode).toHaveBeenCalledTimes(2);
+				expect(peerNetworkManager.connectToNode).toHaveBeenCalledTimes(2);
 				resolve();
 			})
 			.catch((e) => {

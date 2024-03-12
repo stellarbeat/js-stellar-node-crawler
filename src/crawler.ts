@@ -3,12 +3,12 @@ import { CrawlProcessState, CrawlState } from './crawl-state';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlLogger } from './crawl-logger';
-import { ClosePayload } from './connection-manager';
+import { ClosePayload } from './peer-network-manager/connection-manager';
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { NodeAddress, nodeAddressToPeerKey } from './node-address';
 import { CrawlTask } from './crawl-task';
-import { PeerListener } from './peer-listener/peer-listener';
 import { MaxCrawlTimeManager } from './max-crawl-time-manager';
+import { PeerNetworkManager } from './peer-network-manager/peer-network-manager';
 
 export interface Ledger {
 	sequence: bigint;
@@ -29,7 +29,7 @@ export class Crawler {
 		private config: CrawlerConfiguration,
 		private crawlQueueManager: CrawlQueueManager,
 		private maxCrawlTimeManager: MaxCrawlTimeManager,
-		private peerListener: PeerListener,
+		private peerNetworkManager: PeerNetworkManager,
 		private crawlLogger: CrawlLogger,
 		public readonly logger: P.Logger
 	) {
@@ -63,10 +63,10 @@ export class Crawler {
 	}
 
 	private setupPeerListenerEvents() {
-		this.peerListener.on('peers', (peers: NodeAddress[]) => {
+		this.peerNetworkManager.on('peers', (peers: NodeAddress[]) => {
 			this.onPeerAddressesReceived(peers);
 		});
-		this.peerListener.on('disconnect', (data: ClosePayload) => {
+		this.peerNetworkManager.on('disconnect', (data: ClosePayload) => {
 			this.crawlQueueManager.completeCrawlQueueTask(
 				this.crawlState.crawlQueueTaskDoneCallbacks,
 				data.address
@@ -125,12 +125,11 @@ export class Crawler {
 		this.logger.info('Starting crawl process');
 		this.crawlLogger.start(this.crawlState, nodeAddresses.length);
 		this.crawlState.state = CrawlProcessState.CRAWLING;
-		this.peerListener.startConsensusTracking();
 		this.setupCrawlCompletionHandlers(resolve, reject);
 
 		if (nodesToCrawl.length === 0) {
 			this.logger.warn('No nodes to crawl');
-			this.peerListener.stop().then(() => {
+			this.peerNetworkManager.shutdown().then(() => {
 				this.finish(resolve, reject);
 				this.crawlState.state = CrawlProcessState.STOPPING;
 			});
@@ -140,7 +139,7 @@ export class Crawler {
 	private async startTopTierSync(topTierAddresses: NodeAddress[]) {
 		this.logger.info('Starting Top Tier sync');
 		this.crawlState.state = CrawlProcessState.TOP_TIER_SYNC;
-		return this.peerListener.start(topTierAddresses, this.crawlState);
+		return this.peerNetworkManager.sync(topTierAddresses, this.crawlState);
 	}
 
 	private setupCrawlCompletionHandlers(
@@ -150,7 +149,7 @@ export class Crawler {
 		this.startMaxCrawlTimeout(resolve, reject, this.crawlState);
 		this.crawlQueueManager.onDrain(() => {
 			this.logger.info('Stopping crawl process');
-			this.peerListener.stop().then(() => {
+			this.peerNetworkManager.shutdown().then(() => {
 				this.finish(resolve, reject);
 				this.crawlState.state = CrawlProcessState.STOPPING;
 			});
@@ -164,7 +163,9 @@ export class Crawler {
 	) {
 		this.maxCrawlTimeManager.setTimer(this.config.maxCrawlTime, () => {
 			this.logger.fatal('Max crawl time hit, closing all connections');
-			this.peerListener.stop().then(() => this.finish(resolve, reject));
+			this.peerNetworkManager
+				.shutdown()
+				.then(() => this.finish(resolve, reject));
 			crawlState.maxCrawlTimeHit = true;
 		});
 	}
@@ -209,7 +210,7 @@ export class Crawler {
 			nodeAddress: nodeAddress,
 			crawlState: this.crawlState,
 			connectCallback: () =>
-				this.peerListener.connectToNode(nodeAddress[0], nodeAddress[1])
+				this.peerNetworkManager.connectToNode(nodeAddress[0], nodeAddress[1])
 		};
 
 		this.crawlQueueManager.addCrawlTask(crawlTask);

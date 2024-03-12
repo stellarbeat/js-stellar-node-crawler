@@ -5,7 +5,7 @@ import { PeerNode } from '../peer-node';
 import { CrawlState } from '../crawl-state';
 import { err, ok, Result } from 'neverthrow';
 import { truncate } from '../utilities/truncate';
-import { ConnectionManager } from '../connection-manager';
+import { ConnectionManager } from './connection-manager';
 
 type QuorumSetHash = string;
 
