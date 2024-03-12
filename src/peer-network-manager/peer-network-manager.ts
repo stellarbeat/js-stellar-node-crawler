@@ -12,8 +12,9 @@ import { StellarMessageHandler } from './stellar-message-handlers/stellar-messag
 import { NodeAddress } from '../node-address';
 import { Ledger } from '../crawler';
 import { EventEmitter } from 'events';
-import { ConsensusTimerManager } from './consensus-timer-manager';
+import { Timer } from '../utilities/timer';
 import * as assert from 'assert';
+import { StragglerTimer } from './straggler-timer';
 
 export enum PeerNetworkManagerState {
 	Idle,
@@ -37,7 +38,8 @@ export class PeerNetworkManager extends EventEmitter {
 		private connectionManager: ConnectionManager,
 		private quorumSetManager: QuorumSetManager,
 		private stellarMessageHandler: StellarMessageHandler,
-		private networkConsensusTimerManager: ConsensusTimerManager,
+		private networkConsensusTimerManager: Timer,
+		private stragglerTimer: StragglerTimer,
 		private logger: P.Logger
 	) {
 		super();
@@ -97,19 +99,19 @@ export class PeerNetworkManager extends EventEmitter {
 	}
 
 	private moveToStoppingState(callback: () => void) {
+		assert(this.state !== PeerNetworkManagerState.Idle);
 		this.state = PeerNetworkManagerState.Stopping;
 		this.networkConsensusTimerManager.stopTimer();
 		if (this.connectionManager.getActiveConnectionAddresses().length === 0) {
 			return this.moveToIdleState(callback);
 		}
 
-		//give straggling top tier nodes a chance and then shut down.
-		setTimeout(() => {
-			this.moveToIdleState(callback);
-		}, PeerNetworkManager.PEER_STRAGGLE_TIMEOUT);
+		this.startStragglerTimeoutForActivePeers(true);
 	}
 
 	private moveToIdleState(callback: () => void) {
+		assert(this.state === PeerNetworkManagerState.Stopping);
+		this.stragglerTimer.stopTimers(); //a node could have disconnected during the straggler timeout
 		this.connectionManager.shutdown();
 		this.state = PeerNetworkManagerState.Idle;
 		callback();
@@ -149,19 +151,26 @@ export class PeerNetworkManager extends EventEmitter {
 		this.startNetworkConsensusTimer();
 	}
 
-	private startStragglerTimeoutForActivePeers() {
+	private startStragglerTimeoutForActivePeers(includeTopTier = false) {
 		const activePeers = this.connectionManager
 			.getActiveConnectionAddresses()
 			.filter((address) => {
-				return !this.crawlState.topTierAddresses.has(address);
+				return includeTopTier || !this.crawlState.topTierAddresses.has(address);
 			});
-		if (activePeers.length === 0) return; //no potential stragglers
-		setTimeout(() => {
-			this.logger.debug({ activePeers }, 'Straggler timeout hit');
-			activePeers.forEach((address) => {
-				this.connectionManager.disconnectByAddress(address);
-			});
-		}, PeerNetworkManager.PEER_STRAGGLE_TIMEOUT);
+		this.startStragglerTimeout(activePeers);
+	}
+
+	private startStragglerTimeout(addresses: string[]) {
+		if (addresses.length === 0) return;
+		this.stragglerTimer.startTimer(
+			PeerNetworkManager.PEER_STRAGGLE_TIMEOUT,
+			() => {
+				this.logger.debug({ addresses }, 'Straggler timeout hit');
+				addresses.forEach((address) => {
+					this.connectionManager.disconnectByAddress(address);
+				});
+			}
+		);
 	}
 
 	private onConnected(data: ConnectedPayload): undefined | Error {
@@ -173,12 +182,14 @@ export class PeerNetworkManager extends EventEmitter {
 			return peerNodeOrError;
 		}
 
-		if (this.networkHalted) {
+		if (this.networkHalted || this.state === PeerNetworkManagerState.Stopping) {
 			//try to gather minimal data from the peer and disconnect
-			setTimeout(() => {
-				this.disconnectPeer(`${data.ip}:${data.port}`);
-			}, PeerNetworkManager.PEER_STRAGGLE_TIMEOUT);
+			this.startStragglerTimeout([data.ip + ':' + data.port]);
 		}
+
+		if (this.state === PeerNetworkManagerState.Idle)
+			//shouldn't happen
+			this.disconnectPeer(`${data.ip}:${data.port}`);
 	}
 
 	private onConnectionClose(data: ClosePayload): void {

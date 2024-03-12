@@ -9,11 +9,12 @@ import { MaxCrawlTimeManager } from './max-crawl-time-manager';
 import { CrawlLogger } from './crawl-logger';
 import { PeerNetworkManager } from './peer-network-manager/peer-network-manager';
 import { StellarMessageHandler } from './peer-network-manager/stellar-message-handlers/stellar-message-handler';
-import { ConsensusTimerManager } from './peer-network-manager/consensus-timer-manager';
+import { Timer } from './utilities/timer';
 import { ExternalizeStatementHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
 import { ScpStatementHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
 import { ScpEnvelopeHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-envelope-handler';
 import { QuorumSetManager } from './peer-network-manager/quorum-set-manager';
+import { StragglerTimer } from './peer-network-manager/straggler-timer';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -60,7 +61,8 @@ export function createCrawler(
 		connectionManager,
 		quorumSetManager,
 		stellarMessageHandler,
-		new ConsensusTimerManager(),
+		new Timer(),
+		new StragglerTimer(),
 		logger
 	);
 

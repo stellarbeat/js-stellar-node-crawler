@@ -1,4 +1,4 @@
-export class ConsensusTimerManager {
+export class Timer {
 	private timer: NodeJS.Timeout | null = null;
 
 	constructor() {}
