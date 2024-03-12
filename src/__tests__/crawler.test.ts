@@ -1,274 +1,236 @@
-import {
-	Node as NetworkNode,
-	Connection,
-	createSCPEnvelopeSignature,
-	createNode,
-	getConfigFromEnv
-} from '@stellarbeat/js-stellar-node-connector';
-import { xdr, Keypair, hash, Networks } from '@stellar/stellar-base';
+import { Crawler } from '../index';
+import { createDummyCrawlerConfiguration } from '../__fixtures__/createDummyCrawlerConfiguration';
+import { ClosePayload } from '../connection-manager';
+import { CrawlQueueManager } from '../crawl-queue-manager';
+import { MaxCrawlTimeManager } from '../max-crawl-time-manager';
+import { PeerListener } from '../peer-listener/peer-listener';
+import { P } from 'pino';
+import { mock, MockProxy } from 'jest-mock-extended';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
-import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
-import { ok, Result, err } from 'neverthrow';
-import { CrawlerConfiguration, createCrawler } from '../index';
-import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
-import { NodeAddress } from '../node-address';
+import { CrawlLogger } from '../crawl-logger';
+import { CrawlState } from '../crawl-state';
+import { EventEmitter } from 'events';
+import { AsyncCrawlQueue } from '../crawl-queue';
 
-jest.setTimeout(40000);
-
-let peerNodeAddress: NodeAddress;
-let peerNetworkNode: NetworkNode;
-
-let crawledPeerNetworkNode: NetworkNode;
-let crawledPeerNodeAddress: NodeAddress;
-
-let publicKeyReusingPeerNodeAddress: NodeAddress;
-let publicKeyReusingPeerNetworkNode: NetworkNode;
-
-let qSet: xdr.ScpQuorumSet;
-beforeEach(() => {
-	peerNodeAddress = ['127.0.0.1', 11621];
-	peerNetworkNode = getListeningPeerNode(peerNodeAddress);
-	crawledPeerNodeAddress = ['127.0.0.1', 11622];
-	crawledPeerNetworkNode = getListeningPeerNode(crawledPeerNodeAddress);
-	publicKeyReusingPeerNodeAddress = ['127.0.0.1', 11623];
-	publicKeyReusingPeerNetworkNode = getListeningPeerNode(
-		publicKeyReusingPeerNodeAddress,
-		peerNetworkNode.keyPair.secret()
-	);
-	qSet = new xdr.ScpQuorumSet({
-		threshold: 1,
-		validators: [
-			xdr.PublicKey.publicKeyTypeEd25519(
-				crawledPeerNetworkNode.keyPair.rawPublicKey()
-			),
-			xdr.PublicKey.publicKeyTypeEd25519(peerNetworkNode.keyPair.rawPublicKey())
-		],
-		innerSets: []
+describe('Crawler', () => {
+	beforeEach(() => {
+		jest.clearAllMocks();
 	});
-});
 
-afterEach((done) => {
-	let counter = 0;
+	function setupSUT() {
+		const crawlQueueManager = new CrawlQueueManager(
+			new AsyncCrawlQueue(1),
+			mock<P.Logger>()
+		);
+		const maxCrawlTimeManager = mock<MaxCrawlTimeManager>();
+		const peerListener = mock<PeerListener>();
+		const crawlLogger = mock<CrawlLogger>();
+		const logger = mock<P.Logger>();
+		logger.child.mockReturnValue(logger as any);
+		const peerListenerEventEmitter = new EventEmitter();
 
-	const cleanup = () => {
-		counter++;
-		if (counter === 2) {
-			done();
+		peerListener.on.mockImplementation((event, listener) => {
+			peerListenerEventEmitter.on(event, listener);
+			return peerListener;
+		});
+
+		const crawler = new Crawler(
+			createDummyCrawlerConfiguration(),
+			crawlQueueManager,
+			maxCrawlTimeManager,
+			peerListener,
+			crawlLogger,
+			logger
+		);
+		const crawlState = new CrawlState(
+			new QuorumSet(2, []),
+			new Map(),
+			{
+				closeTime: new Date(0),
+				localCloseTime: new Date(0),
+				sequence: BigInt(0),
+				value: ''
+			},
+			'test',
+			logger
+		);
+
+		return {
+			crawler,
+			crawlState,
+			peerListener,
+			peerListenerEventEmitter,
+			crawlLogger,
+			maxCrawlTimeManager
+		};
+	}
+
+	it('should create a Crawler', () => {
+		const crawler = setupSUT().crawler;
+		expect(crawler).toBeInstanceOf(Crawler);
+	});
+
+	it('should return error if no active top tier connections and no node addresses to crawl', async () => {
+		const {
+			crawler,
+			crawlState,
+			peerListener,
+			crawlLogger,
+			maxCrawlTimeManager
+		} = setupSUT();
+		peerListener.start.mockResolvedValue(0);
+		try {
+			await crawler.crawl([], [], crawlState);
+		} catch (e) {
+			expect(e).toBeInstanceOf(Error);
+			expect(crawlLogger.start).not.toHaveBeenCalled();
+			expect(crawlLogger.stop).not.toHaveBeenCalled();
+			expect(maxCrawlTimeManager.setTimer).not.toHaveBeenCalled();
+			expect(maxCrawlTimeManager.clearTimer).not.toHaveBeenCalled();
 		}
-	};
-	peerNetworkNode.stopAcceptingIncomingConnections(cleanup);
-	crawledPeerNetworkNode.stopAcceptingIncomingConnections(cleanup);
-	publicKeyReusingPeerNetworkNode.stopAcceptingIncomingConnections(cleanup);
-});
+	});
 
-it('should crawl, listen for validating nodes and harvest quorumSets', async () => {
-	peerNetworkNode.on('connection', (connection: Connection) => {
-		connection.on('connect', () => {
-			const peerAddress = new xdr.PeerAddress({
-				ip: xdr.PeerAddressIp.iPv4(Buffer.from([127, 0, 0, 1])),
-				port: crawledPeerNodeAddress[1],
-				numFailures: 0
+	function expectCorrectMaxTimer(
+		maxCrawlTimeManager: MockProxy<MaxCrawlTimeManager>
+	) {
+		expect(maxCrawlTimeManager.setTimer).toHaveBeenCalled();
+		expect(maxCrawlTimeManager.clearTimer).toHaveBeenCalled();
+	}
+
+	function expectCorrectLogger(crawlLogger: MockProxy<CrawlLogger>) {
+		expect(crawlLogger.start).toHaveBeenCalled();
+		expect(crawlLogger.stop).toHaveBeenCalled();
+	}
+
+	it('should connect to top tier and not crawl if there are no nodes to be crawled', async () => {
+		const {
+			crawler,
+			crawlState,
+			peerListener,
+			crawlLogger,
+			maxCrawlTimeManager
+		} = setupSUT();
+		peerListener.start.mockResolvedValue(1);
+		peerListener.stop.mockResolvedValue();
+		const result = await crawler.crawl([], [], crawlState);
+		expect(result).toEqual({
+			closedLedgers: [],
+			latestClosedLedger: {
+				closeTime: new Date(0),
+				localCloseTime: new Date(0),
+				sequence: BigInt(0),
+				value: ''
+			},
+			peers: new Map()
+		});
+		expectCorrectMaxTimer(maxCrawlTimeManager);
+		expectCorrectLogger(crawlLogger);
+		expect(peerListener.stop).toHaveBeenCalled();
+	});
+
+	it('should connect to top tier and crawl peer nodes received from top tier', (resolve) => {
+		const {
+			crawler,
+			crawlState,
+			peerListener,
+			peerListenerEventEmitter,
+			crawlLogger,
+			maxCrawlTimeManager
+		} = setupSUT();
+		peerListener.start.mockImplementationOnce(() => {
+			return new Promise((resolve) => {
+				peerListenerEventEmitter.emit('peers', [['127.0.0.1', 11625]]);
+				setTimeout(() => {
+					resolve(1);
+				}, 1);
 			});
-			const peers = xdr.StellarMessage.peers([peerAddress]);
-			connection.sendStellarMessage(peers);
-			const externalizeResult = createExternalizeMessage(peerNetworkNode);
-			if (externalizeResult.isOk()) {
-				connection.sendStellarMessage(externalizeResult.value, (error) => {
-					if (error) console.log(error);
+		});
+		peerListener.connectToNode.mockImplementation((address, port) => {
+			return new Promise((resolve) => {
+				const disconnectPayload: ClosePayload = {
+					address: address + ':' + port,
+					publicKey: 'A'
+				};
+				peerListenerEventEmitter.emit('disconnect', disconnectPayload);
+				setTimeout(() => {
+					resolve(undefined);
+				}, 1);
+			});
+		});
+
+		peerListener.stop.mockResolvedValue();
+		crawler
+			.crawl([['peer', 2]], [['top', 1]], crawlState)
+			.then((result) => {
+				expect(result).toEqual({
+					closedLedgers: [],
+					latestClosedLedger: {
+						closeTime: new Date(0),
+						localCloseTime: new Date(0),
+						sequence: BigInt(0),
+						value: ''
+					},
+					peers: new Map()
 				});
-			} else console.log(externalizeResult.error);
-		});
-		connection.on('data', (stellarMessageWork: StellarMessageWork) => {
-			const stellarMessage = stellarMessageWork.stellarMessage;
-			switch (stellarMessage.switch()) {
-				case xdr.MessageType.getScpQuorumset(): {
-					const dontHave = new xdr.DontHave({
-						reqHash: stellarMessage.qSetHash(),
-						type: xdr.MessageType.getScpQuorumset()
-					});
-					const dontHaveMessage = xdr.StellarMessage.dontHave(dontHave);
-					connection.sendStellarMessage(dontHaveMessage);
-				}
-			}
-		});
-		connection.on('error', (error: Error) => console.log(error));
-
-		connection.on('close', () => {
-			return;
-		});
-		connection.on('end', (error?: Error) => {
-			connection.destroy(error);
-		});
-	});
-	peerNetworkNode.on('close', () => {
-		console.log('seed peer server close');
+				expectCorrectMaxTimer(maxCrawlTimeManager);
+				expectCorrectLogger(crawlLogger);
+				expect(peerListener.start).toHaveBeenNthCalledWith(
+					1,
+					[['top', 1]],
+					crawlState
+				);
+				expect(peerListener.connectToNode).toHaveBeenCalledTimes(2);
+				resolve();
+			})
+			.catch((e) => {
+				throw e;
+			});
 	});
 
-	crawledPeerNetworkNode.on('connection', (connection: Connection) => {
-		connection.on('connect', () => {
-			const externalizeResult = createExternalizeMessage(
-				crawledPeerNetworkNode
-			);
-			if (externalizeResult.isOk()) {
-				connection.sendStellarMessage(externalizeResult.value, (error) => {
-					if (error) console.log(error);
+	it('should crawl nodes received from peers', (resolve) => {
+		const {
+			crawler,
+			crawlState,
+			peerListener,
+			crawlLogger,
+			maxCrawlTimeManager,
+			peerListenerEventEmitter
+		} = setupSUT();
+		peerListener.start.mockResolvedValue(1);
+		peerListener.stop.mockResolvedValue();
+		peerListener.connectToNode.mockImplementation((address, port) => {
+			return new Promise((resolve) => {
+				const disconnectPayload: ClosePayload = {
+					address: address + ':' + port,
+					publicKey: 'A'
+				};
+				peerListenerEventEmitter.emit('peers', [['otherPeer', 2]]);
+				peerListenerEventEmitter.emit('disconnect', disconnectPayload);
+				setTimeout(() => {
+					resolve(undefined);
+				}, 1);
+			});
+		});
+		crawler
+			.crawl([['peer', 2]], [['top', 1]], crawlState)
+			.then((result) => {
+				expect(result).toEqual({
+					closedLedgers: [],
+					latestClosedLedger: {
+						closeTime: new Date(0),
+						localCloseTime: new Date(0),
+						sequence: BigInt(0),
+						value: ''
+					},
+					peers: new Map()
 				});
-			}
-		});
-		connection.on('data', (stellarMessageWork: StellarMessageWork) => {
-			const stellarMessage = stellarMessageWork.stellarMessage;
-			switch (stellarMessage.switch()) {
-				case xdr.MessageType.getScpQuorumset(): {
-					const qSetMessage = xdr.StellarMessage.scpQuorumset(qSet);
-					connection.sendStellarMessage(qSetMessage);
-				}
-			}
-		});
-		connection.on('error', (error: Error) => console.log(error));
-
-		connection.on('close', () => {
-			return;
-		});
-		connection.on('end', (error?: Error) => {
-			connection.destroy(error);
-		});
+				expectCorrectMaxTimer(maxCrawlTimeManager);
+				expectCorrectLogger(crawlLogger);
+				expect(peerListener.connectToNode).toHaveBeenCalledTimes(2);
+				resolve();
+			})
+			.catch((e) => {
+				throw e;
+			});
 	});
-	crawledPeerNetworkNode.on('close', () => {
-		console.log('crawled peer server close');
-	});
-
-	const trustedQSet = new QuorumSet(2, [
-		peerNetworkNode.keyPair.publicKey(),
-		crawledPeerNetworkNode.keyPair.publicKey()
-	]);
-
-	const nodeConfig: NodeConfig = {
-		network: Networks.TESTNET,
-		nodeInfo: {
-			ledgerVersion: 1,
-			overlayVersion: 1,
-			overlayMinVersion: 1,
-			versionString: '1.0.0',
-			networkId: Networks.TESTNET
-		},
-		listeningPort: 11026,
-		receiveTransactionMessages: false,
-		receiveSCPMessages: true,
-		peerFloodReadingCapacity: 200,
-		flowControlSendMoreBatchSize: 40,
-		peerFloodReadingCapacityBytes: 300000,
-		flowControlSendMoreBatchSizeBytes: 100000
-	};
-
-	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig));
-
-	const result = await crawler.crawl(
-		[peerNodeAddress, publicKeyReusingPeerNodeAddress],
-		trustedQSet,
-		[]
-	);
-	const peerNode = result.peers.get(peerNetworkNode.keyPair.publicKey());
-	expect(peerNode).toBeDefined();
-	if (!peerNode) return;
-	const crawledPeerNode = result.peers.get(
-		crawledPeerNetworkNode.keyPair.publicKey()
-	);
-	expect(peerNode.successfullyConnected).toBeTruthy();
-	expect(peerNode.isValidating).toBeTruthy();
-	expect(peerNode.overLoaded).toBeFalsy();
-	expect(peerNode.participatingInSCP).toBeTruthy();
-	expect(peerNode.latestActiveSlotIndex).toEqual('1');
-	expect(peerNode.suppliedPeerList).toBeTruthy();
-	expect(peerNode.quorumSetHash).toEqual(hash(qSet.toXDR()).toString('base64'));
-	expect(peerNode.quorumSet).toBeDefined();
-	expect(crawledPeerNode).toBeDefined();
-	if (!crawledPeerNode) return;
-	expect(crawledPeerNode.quorumSetHash).toEqual(
-		hash(qSet.toXDR()).toString('base64')
-	);
-	expect(crawledPeerNode.quorumSet).toBeDefined();
-	expect(crawledPeerNode.isValidating).toBeTruthy();
-	expect(crawledPeerNode.participatingInSCP).toBeTruthy();
-	expect(crawledPeerNode.latestActiveSlotIndex).toEqual('1');
 });
-
-it('should hit the max crawl limit', async function () {
-	const trustedQSet = new QuorumSet(2, [
-		peerNetworkNode.keyPair.publicKey(),
-		crawledPeerNetworkNode.keyPair.publicKey()
-	]);
-
-	const nodeConfig = getConfigFromEnv();
-	nodeConfig.network = Networks.TESTNET;
-
-	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig, 25, 1000));
-
-	try {
-		expect(
-			await crawler.crawl(
-				[peerNodeAddress, publicKeyReusingPeerNodeAddress],
-				trustedQSet,
-				[]
-			)
-		).toThrowError();
-	} catch (e) {
-		expect(e).toBeInstanceOf(Error);
-	}
-});
-
-function createExternalizeMessage(
-	node: NetworkNode
-): Result<xdr.StellarMessage, Error> {
-	const commit = new xdr.ScpBallot({ counter: 1, value: Buffer.alloc(32) });
-	const externalize = new xdr.ScpStatementExternalize({
-		commit: commit,
-		nH: 1,
-		commitQuorumSetHash: hash(qSet.toXDR())
-	});
-	const pledges = xdr.ScpStatementPledges.scpStExternalize(externalize);
-
-	const statement = new xdr.ScpStatement({
-		nodeId: xdr.PublicKey.publicKeyTypeEd25519(node.keyPair.rawPublicKey()),
-		slotIndex: xdr.Uint64.fromString('1'),
-		pledges: pledges
-	});
-	const signatureResult = createSCPEnvelopeSignature(
-		statement,
-		node.keyPair.rawPublicKey(),
-		node.keyPair.rawSecretKey(),
-		hash(Buffer.from(Networks.TESTNET))
-	);
-	if (signatureResult.isOk()) {
-		const envelope = new xdr.ScpEnvelope({
-			statement: statement,
-			signature: signatureResult.value
-		});
-		const message = xdr.StellarMessage.scpMessage(envelope);
-		return ok(message);
-	}
-	return err(signatureResult.error);
-}
-
-function getListeningPeerNode(address: NodeAddress, privateKey?: string) {
-	const peerNodeConfig: NodeConfig = {
-		network: Networks.TESTNET,
-		nodeInfo: {
-			ledgerVersion: 1,
-			overlayMinVersion: 1,
-			overlayVersion: 20,
-			versionString: '1'
-		},
-		listeningPort: address[1],
-		privateKey: privateKey ? privateKey : Keypair.random().secret(),
-		receiveSCPMessages: true,
-		receiveTransactionMessages: false,
-		peerFloodReadingCapacity: 200,
-		flowControlSendMoreBatchSize: 40,
-		peerFloodReadingCapacityBytes: 300000,
-		flowControlSendMoreBatchSizeBytes: 100000
-	};
-	const peerNetworkNode = createNode(peerNodeConfig);
-	peerNetworkNode.acceptIncomingConnections(address[1], address[0]);
-
-	return peerNetworkNode;
-}

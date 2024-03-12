@@ -4,17 +4,25 @@ import { ConnectionManager } from './connection-manager';
 import { CrawlQueueManager } from './crawl-queue-manager';
 
 export class CrawlLogger {
-	loggingTimer?: NodeJS.Timeout;
+	private loggingTimer?: NodeJS.Timeout;
+	private _crawlState?: CrawlState;
 
 	constructor(
-		private crawlState: CrawlState,
 		private connectionManager: ConnectionManager,
 		private crawlQueueManager: CrawlQueueManager,
 		private logger: P.Logger
 	) {}
 
-	start(nodeAddressesLength: number) {
+	get crawlState(): CrawlState {
+		if (!this._crawlState) {
+			throw new Error('CrawlState not set');
+		}
+		return this._crawlState;
+	}
+
+	start(crawlState: CrawlState, nodeAddressesLength: number) {
 		console.time('crawl');
+		this._crawlState = crawlState;
 		this.logger.info(
 			'Starting crawl with seed of ' + nodeAddressesLength + 'addresses.'
 		);

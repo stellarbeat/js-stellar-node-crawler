@@ -11,6 +11,8 @@ import { CrawlQueueManager } from './crawl-queue-manager';
 import { AsyncCrawlQueue } from './crawl-queue';
 import { StellarMessageHandler } from './peer-listener/stellar-message-handlers/stellar-message-handler';
 import { PeerListener } from './peer-listener/peer-listener';
+import { MaxCrawlTimeManager } from './max-crawl-time-manager';
+import { CrawlLogger } from './crawl-logger';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -62,10 +64,10 @@ export function createCrawler(
 
 	return new Crawler(
 		config,
-		stellarMessageHandler,
-		connectionManager,
 		crawlQueueManager,
+		new MaxCrawlTimeManager(),
 		peerListener,
+		new CrawlLogger(connectionManager, crawlQueueManager, logger),
 		logger
 	);
 }

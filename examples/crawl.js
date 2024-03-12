@@ -3,6 +3,7 @@ const blocked = require('blocked-at');
 const { QuorumSet } = require('@stellarbeat/js-stellarbeat-shared');
 const { createCrawler } = require('../lib');
 const { getConfigFromEnv } = require('@stellarbeat/js-stellar-node-connector');
+const { CrawlState } = require('../src/crawl-state');
 
 // noinspection JSIgnoredPromiseFromCall
 main();
@@ -45,8 +46,9 @@ async function main() {
 		'GAAV2GCVFLNN522ORUYFV33E76VPC22E72S75AQ6MBR5V45Z5DWVPWEU'
 	]);
 
+	const config = getConfigFromEnv();
 	let myCrawler = createCrawler({
-		nodeConfig: getConfigFromEnv(),
+		nodeConfig: config,
 		maxOpenConnections: 100,
 		maxCrawlTime: 900000,
 		blackList: new Set()
@@ -65,16 +67,17 @@ async function main() {
 			.filter((node) => topTierQSet.validators.includes(node.publicKey))
 			.map((node) => [node.ip, node.port]);
 
-		let result = await myCrawler.crawl(
-			addresses,
+		const crawlState = new CrawlState(
 			topTierQSet,
-			topTierAddresses,
+			knownQuorumSets,
 			{
 				sequence: BigInt(0),
 				closeTime: new Date(0)
 			},
-			knownQuorumSets
+			config.network,
+			myCrawler.logger
 		);
+		let result = await myCrawler.crawl(addresses, topTierAddresses, crawlState);
 		console.log(
 			'[MAIN] Writing results to file nodes.json in directory crawl_result'
 		);
