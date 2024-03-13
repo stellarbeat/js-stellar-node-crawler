@@ -163,7 +163,9 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 		flowControlSendMoreBatchSizeBytes: 100000
 	};
 
-	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig));
+	const crawlerConfig = new CrawlerConfiguration(nodeConfig);
+	crawlerConfig.peerStraggleTimeoutMS = 2000;
+	const crawler = createCrawler(crawlerConfig);
 	const crawlState = new CrawlState(
 		trustedQSet,
 		new Map(),
@@ -216,7 +218,9 @@ it('should hit the max crawl limit', async function () {
 	const nodeConfig = getConfigFromEnv();
 	nodeConfig.network = Networks.TESTNET;
 
-	const crawler = createCrawler(new CrawlerConfiguration(nodeConfig, 25, 1000));
+	const crawler = createCrawler(
+		new CrawlerConfiguration(nodeConfig, 25, 1000, new Set(), 1000)
+	);
 	const crawlState = new CrawlState(
 		trustedQSet,
 		new Map(),

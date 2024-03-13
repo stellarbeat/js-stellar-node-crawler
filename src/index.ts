@@ -20,6 +20,8 @@ import { OnPeerConnectionClosed } from './network-observer/peer-event-handler/on
 import { OnPeerData } from './network-observer/peer-event-handler/on-peer-data';
 import { NetworkObserverStateManager } from './network-observer/network-observer-state-manager';
 import { PeerEventHandler } from './network-observer/peer-event-handler/peer-event-handler';
+import { Timers } from './utilities/timers';
+import { TimerFactory } from './utilities/timer-factory';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -62,7 +64,13 @@ export function createCrawler(
 		logger
 	);
 
-	const stragglerTimer = new StragglerTimer(connectionManager, logger);
+	const timers = new Timers(new TimerFactory());
+	const stragglerTimer = new StragglerTimer(
+		connectionManager,
+		timers,
+		config.peerStraggleTimeoutMS,
+		logger
+	);
 	const peerEventHandler = new PeerEventHandler(
 		new OnPeerConnected(stragglerTimer, connectionManager, logger),
 		new OnPeerConnectionClosed(quorumSetManager, logger),

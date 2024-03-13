@@ -77,7 +77,7 @@ export class NetworkObserverStateManager {
 
 	public moveToIdleState(callback: () => void) {
 		assert(this._state === NetworkObserverState.Stopping);
-		this.stragglerTimer.stopTimers(); //a node could have disconnected during the straggler timeout
+		this.stragglerTimer.stopStragglerTimeouts(); //a node could have disconnected during the straggler timeout
 		this.connectionManager.shutdown();
 		this._state = NetworkObserverState.Idle;
 		callback();
