@@ -6,7 +6,7 @@ import { truncate } from './utilities/truncate';
 import { PeerNodeCollection } from './peer-node-collection';
 import { AsyncResultCallback } from 'async';
 import { NodeAddress } from './node-address';
-import { Slots } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-statement/externalize/slots';
+import { Slots } from './network-observer/peer-event-handler/stellar-message-handlers/scp-envelope/scp-statement/externalize/slots';
 
 type QuorumSetHash = string;
 type PeerKey = string; //ip:port

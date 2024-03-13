@@ -2,24 +2,24 @@ import { Crawler } from './crawler';
 import { pino } from 'pino';
 import { createNode } from '@stellarbeat/js-stellar-node-connector';
 import { CrawlerConfiguration } from './crawler-configuration';
-import { ConnectionManager } from './peer-network-manager/connection-manager';
+import { ConnectionManager } from './network-observer/connection-manager';
 import { CrawlQueueManager } from './crawl-queue-manager';
 import { AsyncCrawlQueue } from './crawl-queue';
 import { MaxCrawlTimeManager } from './max-crawl-time-manager';
 import { CrawlLogger } from './crawl-logger';
-import { PeerNetworkManager } from './peer-network-manager/peer-network-manager';
-import { StellarMessageHandler } from './peer-network-manager/stellar-message-handlers/stellar-message-handler';
+import { NetworkObserver } from './network-observer/network-observer';
+import { StellarMessageHandler } from './network-observer/peer-event-handler/stellar-message-handlers/stellar-message-handler';
 import { Timer } from './utilities/timer';
-import { ExternalizeStatementHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
-import { ScpStatementHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
-import { ScpEnvelopeHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-envelope-handler';
-import { QuorumSetManager } from './peer-network-manager/quorum-set-manager';
-import { StragglerTimer } from './peer-network-manager/straggler-timer';
-import { PeerConnectionEventHandler } from './peer-network-manager/peer-connection-event-handler/peer-connection-event-handler';
-import { OnPeerConnected } from './peer-network-manager/peer-connection-event-handler/on-peer-connected';
-import { OnPeerConnectionClosed } from './peer-network-manager/peer-connection-event-handler/on-peer-connection-closed';
-import { OnPeerData } from './peer-network-manager/peer-connection-event-handler/on-peer-data';
-import { PeerNetworkStateManager } from './peer-network-manager/peer-network-state-manager';
+import { ExternalizeStatementHandler } from './network-observer/peer-event-handler/stellar-message-handlers/scp-envelope/scp-statement/externalize/externalize-statement-handler';
+import { ScpStatementHandler } from './network-observer/peer-event-handler/stellar-message-handlers/scp-envelope/scp-statement/scp-statement-handler';
+import { ScpEnvelopeHandler } from './network-observer/peer-event-handler/stellar-message-handlers/scp-envelope/scp-envelope-handler';
+import { QuorumSetManager } from './network-observer/quorum-set-manager';
+import { StragglerTimer } from './network-observer/straggler-timer';
+import { OnPeerConnected } from './network-observer/peer-event-handler/on-peer-connected';
+import { OnPeerConnectionClosed } from './network-observer/peer-event-handler/on-peer-connection-closed';
+import { OnPeerData } from './network-observer/peer-event-handler/on-peer-data';
+import { NetworkObserverStateManager } from './network-observer/network-observer-state-manager';
+import { PeerEventHandler } from './network-observer/peer-event-handler/peer-event-handler';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -63,24 +63,24 @@ export function createCrawler(
 	);
 
 	const stragglerTimer = new StragglerTimer(connectionManager, logger);
-	const peerConnectionEventHandler = new PeerConnectionEventHandler(
+	const peerEventHandler = new PeerEventHandler(
 		new OnPeerConnected(stragglerTimer, connectionManager, logger),
 		new OnPeerConnectionClosed(quorumSetManager, logger),
 		new OnPeerData(stellarMessageHandler, logger, connectionManager)
 	);
 	const consensusTimer = new Timer();
 
-	const peerNetworkStateManager = new PeerNetworkStateManager(
+	const networkObserverStateManager = new NetworkObserverStateManager(
 		connectionManager,
 		consensusTimer,
 		stragglerTimer,
 		logger
 	);
-	const peerNetworkManager = new PeerNetworkManager(
+	const peerNetworkManager = new NetworkObserver(
 		connectionManager,
 		quorumSetManager,
-		peerConnectionEventHandler,
-		peerNetworkStateManager
+		peerEventHandler,
+		networkObserverStateManager
 	);
 
 	return new Crawler(

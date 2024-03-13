@@ -1,7 +1,7 @@
 import { CrawlState } from './crawl-state';
 import { P } from 'pino';
-import { ConnectionManager } from './peer-network-manager/connection-manager';
 import { CrawlQueueManager } from './crawl-queue-manager';
+import { ConnectionManager } from './network-observer/connection-manager';
 
 export class CrawlLogger {
 	private loggingTimer?: NodeJS.Timeout;
