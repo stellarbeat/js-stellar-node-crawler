@@ -8,12 +8,6 @@ describe('PeerNode', () => {
 		expect(peerNode.key).toBe('localhost:8000');
 	});
 
-	it('should be successfully connected', () => {
-		const peerNode = new PeerNode('publicKey');
-		peerNode.connectionTime = new Date();
-		expect(peerNode.successfullyConnected).toBe(true);
-	});
-
 	describe('processConfirmedLedgerClose', () => {
 		test('not externalized', () => {
 			const peerNode = new PeerNode('publicKey');
@@ -30,7 +24,7 @@ describe('PeerNode', () => {
 
 		test('externalized', () => {
 			const peerNode = new PeerNode('publicKey');
-			peerNode.connectionTime = new Date('2021-01-01');
+			peerNode.successfullyConnected = true;
 
 			const closeTime = new Date('2021-01-01');
 			const localCloseTime = new Date('2021-01-01');
@@ -52,7 +46,7 @@ describe('PeerNode', () => {
 
 		test('invalid value', () => {
 			const peerNode = new PeerNode('publicKey');
-			peerNode.connectionTime = new Date('2021-02-02');
+			peerNode.successfullyConnected = true;
 
 			const closeTime = new Date('2021-01-01');
 			const localCloseTime = new Date('2021-02-01');

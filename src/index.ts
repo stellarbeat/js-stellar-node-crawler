@@ -15,6 +15,11 @@ import { ScpStatementHandler } from './peer-network-manager/stellar-message-hand
 import { ScpEnvelopeHandler } from './peer-network-manager/stellar-message-handlers/scp-envelope/scp-envelope-handler';
 import { QuorumSetManager } from './peer-network-manager/quorum-set-manager';
 import { StragglerTimer } from './peer-network-manager/straggler-timer';
+import { PeerConnectionEventHandler } from './peer-network-manager/peer-connection-event-handler/peer-connection-event-handler';
+import { OnPeerConnected } from './peer-network-manager/peer-connection-event-handler/on-peer-connected';
+import { OnPeerConnectionClosed } from './peer-network-manager/peer-connection-event-handler/on-peer-connection-closed';
+import { OnPeerData } from './peer-network-manager/peer-connection-event-handler/on-peer-data';
+import { PeerNetworkStateManager } from './peer-network-manager/peer-network-state-manager';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -57,20 +62,32 @@ export function createCrawler(
 		logger
 	);
 
-	const peerListener = new PeerNetworkManager(
+	const stragglerTimer = new StragglerTimer(connectionManager, logger);
+	const peerConnectionEventHandler = new PeerConnectionEventHandler(
+		new OnPeerConnected(stragglerTimer, connectionManager, logger),
+		new OnPeerConnectionClosed(quorumSetManager, logger),
+		new OnPeerData(stellarMessageHandler, logger, connectionManager)
+	);
+	const consensusTimer = new Timer();
+
+	const peerNetworkStateManager = new PeerNetworkStateManager(
+		connectionManager,
+		consensusTimer,
+		stragglerTimer,
+		logger
+	);
+	const peerNetworkManager = new PeerNetworkManager(
 		connectionManager,
 		quorumSetManager,
-		stellarMessageHandler,
-		new Timer(),
-		new StragglerTimer(),
-		logger
+		peerConnectionEventHandler,
+		peerNetworkStateManager
 	);
 
 	return new Crawler(
 		config,
 		crawlQueueManager,
 		new MaxCrawlTimeManager(),
-		peerListener,
+		peerNetworkManager,
 		new CrawlLogger(connectionManager, crawlQueueManager, logger),
 		logger
 	);

@@ -22,13 +22,11 @@ describe('PeerNodeCollection', () => {
 				ledgerVersion: 2,
 				versionString: 'versionString'
 			};
-			const connectionTime = new Date();
 			const peerNode = peerNodeCollection.addSuccessfullyConnected(
 				publicKey,
 				ip,
 				port,
-				nodeInfo,
-				connectionTime
+				nodeInfo
 			);
 			expect(peerNode).toBeInstanceOf(PeerNode);
 			if (peerNode instanceof Error) {
@@ -38,7 +36,7 @@ describe('PeerNodeCollection', () => {
 			expect(peerNode.ip).toBe(ip);
 			expect(peerNode.port).toBe(port);
 			expect(peerNode.nodeInfo).toBe(nodeInfo);
-			expect(peerNode.connectionTime).toEqual(connectionTime);
+			expect(peerNode.successfullyConnected).toBeTruthy();
 		});
 
 		it('should return an error if the peer node already exists and has already successfully connected', () => {
@@ -56,15 +54,13 @@ describe('PeerNodeCollection', () => {
 				publicKey,
 				ip,
 				port,
-				nodeInfo,
-				new Date()
+				nodeInfo
 			);
 			const peerNode = peerNodeCollection.addSuccessfullyConnected(
 				publicKey,
 				ip,
 				port,
-				nodeInfo,
-				new Date()
+				nodeInfo
 			);
 			expect(peerNode).toBeInstanceOf(Error);
 		});
@@ -74,7 +70,6 @@ describe('PeerNodeCollection', () => {
 			peerNodeCollection.getOrAdd(publicKey);
 			const newIp = 'newIp';
 			const newPort = 11626;
-			const connectionTime = new Date();
 			const newNodeInfo: NodeInfo = {
 				overlayVersion: 4,
 				overlayMinVersion: 2,
@@ -86,8 +81,7 @@ describe('PeerNodeCollection', () => {
 				publicKey,
 				newIp,
 				newPort,
-				newNodeInfo,
-				connectionTime
+				newNodeInfo
 			);
 			expect(peerNode).toBeInstanceOf(PeerNode);
 			if (peerNode instanceof Error) {
@@ -97,7 +91,7 @@ describe('PeerNodeCollection', () => {
 			expect(peerNode.ip).toBe(newIp);
 			expect(peerNode.port).toBe(newPort);
 			expect(peerNode.nodeInfo).toBe(newNodeInfo);
-			expect(peerNode.connectionTime).toEqual(connectionTime);
+			expect(peerNode.successfullyConnected).toBeTruthy();
 		});
 
 		it('should return an existing peer node', () => {

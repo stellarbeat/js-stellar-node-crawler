@@ -35,8 +35,7 @@ export class PeerNodeCollection {
 		publicKey: string,
 		ip: string,
 		port: number,
-		nodeInfo: NodeInfo,
-		localTime: Date
+		nodeInfo: NodeInfo
 	): PeerNode | Error {
 		let peerNode = this.peerNodes.get(publicKey);
 		if (peerNode && peerNode.successfullyConnected) {
@@ -50,7 +49,7 @@ export class PeerNodeCollection {
 		peerNode.nodeInfo = nodeInfo;
 		peerNode.ip = ip;
 		peerNode.port = port;
-		peerNode.connectionTime = localTime;
+		peerNode.successfullyConnected = true;
 
 		this.peerNodes.set(publicKey, peerNode);
 

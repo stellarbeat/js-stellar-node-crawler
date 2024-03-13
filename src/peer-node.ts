@@ -15,9 +15,7 @@ export class PeerNode {
 	public suppliedPeerList = false;
 	public latestActiveSlotIndex?: string;
 	public participatingInSCP = false;
-	public connectionTime?: Date;
-	public disconnectionTime?: Date;
-	public disconnected: boolean = false;
+	public successfullyConnected = false;
 	private externalizedValues: Map<
 		bigint,
 		{
@@ -33,10 +31,6 @@ export class PeerNode {
 
 	get key(): string {
 		return this.ip + ':' + this.port;
-	}
-
-	get successfullyConnected(): boolean {
-		return this.connectionTime !== undefined;
 	}
 
 	processConfirmedLedgerClose(closedLedger: Ledger) {
