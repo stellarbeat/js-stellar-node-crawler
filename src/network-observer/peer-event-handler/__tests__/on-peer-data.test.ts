@@ -6,11 +6,11 @@ import { StellarMessageHandler } from '../stellar-message-handlers/stellar-messa
 import { createDummyExternalizeMessage } from '../../../__fixtures__/createDummyExternalizeMessage';
 import { CrawlState } from '../../../crawl-state';
 import { err, ok } from 'neverthrow';
-import { ObservationState } from '../../network-observer';
 import { PeerNodeCollection } from '../../../peer-node-collection';
 import { Ledger } from '../../../crawler';
 import { NodeAddress } from '../../../node-address';
 import { Observation } from '../../observation';
+import { ObservationState } from '../../observation-state';
 
 describe('OnDataHandler', () => {
 	const connectionManager = mock<ConnectionManager>();

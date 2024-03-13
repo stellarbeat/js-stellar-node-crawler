@@ -1,10 +1,10 @@
 import { ConnectionManager, DataPayload } from '../connection-manager';
-import { ObservationState } from '../network-observer';
 import { Ledger } from '../../crawler';
 import { NodeAddress } from '../../node-address';
 import { StellarMessageHandler } from './stellar-message-handlers/stellar-message-handler';
 import { P } from 'pino';
 import { Observation } from '../observation';
+import { ObservationState } from '../observation-state';
 
 export interface OnPeerDataResult {
 	closedLedger: Ledger | null;

@@ -1,10 +1,10 @@
 import { ConnectedPayload, ConnectionManager } from '../connection-manager';
-import { ObservationState } from '../network-observer';
 import { StragglerTimer } from '../straggler-timer';
 import { P } from 'pino';
 import { truncate } from '../../utilities/truncate';
 import { PeerNodeCollection } from '../../peer-node-collection';
 import { Observation } from '../observation';
+import { ObservationState } from '../observation-state';
 
 export class OnPeerConnected {
 	constructor(

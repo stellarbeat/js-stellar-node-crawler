@@ -3,22 +3,25 @@ import { StragglerTimer } from './straggler-timer';
 import { ConnectionManager } from './connection-manager';
 import { P } from 'pino';
 import { Ledger } from '../crawler';
-import { ConsensusTimer } from './consensus-timer';
 import { Observation } from './observation';
+import { ConsensusTimer } from './consensus-timer';
 
 export class ObservationManager {
 	constructor(
 		private connectionManager: ConnectionManager,
 		private consensusTimer: ConsensusTimer,
 		private stragglerTimer: StragglerTimer,
+		private syncingTimeoutMS: number,
 		private logger: P.Logger
 	) {}
 
-	public startSync(observation: Observation): void {
+	public async startSync(observation: Observation) {
 		this.logger.info('Moving to syncing state');
 		observation.moveToSyncingState();
-
 		this.connectToTopTierNodes(observation.topTierAddresses);
+
+		await this.timeout(this.syncingTimeoutMS);
+		return this.syncCompleted(observation);
 	}
 
 	public syncCompleted(observation: Observation) {
@@ -38,41 +41,44 @@ export class ObservationManager {
 	}
 
 	private startNetworkConsensusTimer(observation: Observation) {
-		const onNetworkHaltedCallback = () => {
-			this.logger.info('Network consensus timeout');
-			observation.networkHalted = true;
-			this.stragglerTimer.startStragglerTimeoutForActivePeers(
-				false,
-				observation.topTierAddressesSet
-			);
-		};
-		this.startNetworkConsensusTimerInternal(onNetworkHaltedCallback);
+		this.startNetworkConsensusTimerInternal(
+			this.onNetworkHalted.bind(this, observation)
+		);
 	}
 
-	public moveToStoppingState(
-		observation: Observation,
-		doneCallback: () => void
-	) {
+	private onNetworkHalted(observation: Observation) {
+		this.logger.info('Network consensus timeout');
+		observation.networkHalted = true;
+		this.stragglerTimer.startStragglerTimeoutForActivePeers(
+			false,
+			observation.topTierAddressesSet
+		);
+	}
+
+	public stopObservation(observation: Observation, doneCallback: () => void) {
 		this.logger.info('Moving to stopping state');
 		observation.moveToStoppingState();
 
 		this.consensusTimer.stop();
 		if (this.connectionManager.getActiveConnectionAddresses().length === 0) {
-			return this.moveToStoppedState(observation, doneCallback);
+			return this.onLastNodesDisconnected(observation, doneCallback);
 		}
 
 		this.stragglerTimer.startStragglerTimeoutForActivePeers(
 			true,
 			observation.topTierAddressesSet,
-			() => this.moveToStoppedState(observation, doneCallback)
+			() => this.onLastNodesDisconnected(observation, doneCallback)
 		);
 	}
 
-	public moveToStoppedState(observation: Observation, onStopped: () => void) {
+	private onLastNodesDisconnected(
+		observation: Observation,
+		onStopped: () => void
+	) {
 		this.logger.info('Moving to stopped state');
 		observation.moveToStoppedState();
 
-		this.stragglerTimer.stopStragglerTimeouts(); //a node could have disconnected during the straggler timeout
+		this.stragglerTimer.stopStragglerTimeouts();
 		this.connectionManager.shutdown();
 
 		onStopped();
@@ -86,5 +92,9 @@ export class ObservationManager {
 		topTierNodes.forEach((address) => {
 			this.connectionManager.connectToNode(address[0], address[1]);
 		});
+	}
+
+	private timeout(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 }

@@ -1,9 +1,9 @@
-import { ObservationState } from './network-observer';
 import { CrawlState } from '../crawl-state';
 import { NodeAddress } from '../node-address';
 import { PeerNodeCollection } from '../peer-node-collection';
 import * as assert from 'assert';
 import { Ledger } from '../crawler';
+import { ObservationState } from './observation-state';
 
 export class Observation {
 	public state: ObservationState = ObservationState.Idle;

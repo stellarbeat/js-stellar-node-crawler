@@ -3,10 +3,10 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { P } from 'pino';
 import { ConnectedPayload, ConnectionManager } from '../../connection-manager';
 import { StragglerTimer } from '../../straggler-timer';
-import { ObservationState } from '../../network-observer';
 import { CrawlState } from '../../../crawl-state';
 import { OnPeerConnected } from '../on-peer-connected';
 import { Observation } from '../../observation';
+import { ObservationState } from '../../observation-state';
 
 describe('OnPeerConnectedHandler', () => {
 	const connectionManager = mock<ConnectionManager>();

@@ -8,18 +8,11 @@ import {
 import { QuorumSetManager } from './quorum-set-manager';
 import { NodeAddress } from '../node-address';
 import { EventEmitter } from 'events';
-import * as assert from 'assert';
 import { ObservationManager } from './observation-manager';
 import { PeerEventHandler } from './peer-event-handler/peer-event-handler';
 import { Observation } from './observation';
-
-export enum ObservationState {
-	Idle,
-	Syncing,
-	Synced,
-	Stopping,
-	Stopped
-}
+import * as assert from 'assert';
+import { ObservationState } from './observation-state';
 
 export class NetworkObserver extends EventEmitter {
 	private _observation: Observation | null = null;
@@ -28,34 +21,19 @@ export class NetworkObserver extends EventEmitter {
 		private connectionManager: ConnectionManager,
 		private quorumSetManager: QuorumSetManager,
 		private peerEventHandler: PeerEventHandler,
-		private observationManager: ObservationManager,
-		private syncingTimeoutMS: number
+		private observationManager: ObservationManager
 	) {
 		super();
-		this.connectionManager.on('connected', (data: ConnectedPayload) => {
-			this.onPeerConnected(data);
-		});
-		this.connectionManager.on('close', (data: ClosePayload) => {
-			this.onPeerConnectionClose(data);
-		});
-		this.connectionManager.on('data', (data: DataPayload) => {
-			this.onPeerData(data);
-		});
+		this.setupPeerEventHandlers();
 	}
 
 	public async observe(
 		topTierNodes: NodeAddress[],
 		crawlState: CrawlState
 	): Promise<number> {
-		return new Promise<number>((resolve) => {
-			this._observation = this.createObservation(crawlState, topTierNodes);
-			this.observationManager.startSync(this._observation);
-
-			setTimeout(() => {
-				this.observationManager.syncCompleted(this.observation);
-				resolve(this.connectionManager.getNumberOfActiveConnections());
-			}, this.syncingTimeoutMS);
-		});
+		this._observation = this.createObservation(crawlState, topTierNodes);
+		await this.observationManager.startSync(this.observation);
+		return this.connectionManager.getNumberOfActiveConnections();
 	}
 
 	public connectToNode(ip: string, port: number) {
@@ -65,7 +43,7 @@ export class NetworkObserver extends EventEmitter {
 
 	public async stop() {
 		return new Promise<Observation>((resolve) => {
-			this.observationManager.moveToStoppingState(this.observation, () =>
+			this.observationManager.stopObservation(this.observation, () =>
 				this.onObservationStopped(resolve)
 			);
 		});
@@ -84,13 +62,17 @@ export class NetworkObserver extends EventEmitter {
 		return new Observation(topTierAddresses, crawlState.peerNodes, crawlState);
 	}
 
-	private onPeerConnected(data: ConnectedPayload) {
-		this.peerEventHandler.onConnected(data, this.observation);
-	}
-
-	private onPeerConnectionClose(data: ClosePayload): void {
-		this.peerEventHandler.onConnectionClose(data, this.observation);
-		this.emit('disconnect', data);
+	private setupPeerEventHandlers() {
+		this.connectionManager.on('connected', (data: ConnectedPayload) => {
+			this.peerEventHandler.onConnected(data, this.observation);
+		});
+		this.connectionManager.on('close', (data: ClosePayload) => {
+			this.peerEventHandler.onConnectionClose(data, this.observation);
+			this.emit('disconnect', data);
+		});
+		this.connectionManager.on('data', (data: DataPayload) => {
+			this.onPeerData(data);
+		});
 	}
 
 	private onPeerData(data: DataPayload): void {

@@ -90,14 +90,14 @@ export function createCrawler(
 		connectionManager,
 		consensusTimer,
 		stragglerTimer,
+		config.syncingTimeoutMS,
 		logger
 	);
 	const peerNetworkManager = new NetworkObserver(
 		connectionManager,
 		quorumSetManager,
 		peerEventHandler,
-		networkObserverStateManager,
-		config.syncingTimeoutMS
+		networkObserverStateManager
 	);
 
 	return new Crawler(
