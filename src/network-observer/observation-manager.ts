@@ -1,8 +1,6 @@
 import { NodeAddress } from '../node-address';
-import { ObservationState } from './network-observer';
 import { StragglerTimer } from './straggler-timer';
 import { ConnectionManager } from './connection-manager';
-import * as assert from 'assert';
 import { P } from 'pino';
 import { Ledger } from '../crawler';
 import { ConsensusTimer } from './consensus-timer';
@@ -16,28 +14,21 @@ export class ObservationManager {
 		private logger: P.Logger
 	) {}
 
-	public moveToSyncingState(observation: Observation): void {
+	public startSync(observation: Observation): void {
 		this.logger.info('Moving to syncing state');
-		assert(observation.state === ObservationState.Idle);
-		observation.state = ObservationState.Syncing;
-		observation.networkHalted = false;
+		observation.moveToSyncingState();
 
 		this.connectToTopTierNodes(observation.topTierAddresses);
 	}
 
-	public moveToSyncedState(observation: Observation) {
+	public syncCompleted(observation: Observation) {
 		this.logger.info('Moving to synced state');
-		assert(observation.state === ObservationState.Syncing);
-		observation.state = ObservationState.Synced;
+		observation.moveToSyncedState();
 		this.startNetworkConsensusTimer(observation);
 	}
 
 	public ledgerCloseConfirmed(observation: Observation, ledger: Ledger) {
-		if (observation.state !== ObservationState.Synced) return;
-		if (observation.networkHalted) return;
-
-		observation.crawlState.updateLatestConfirmedClosedLedger(ledger);
-
+		observation.ledgerCloseConfirmed(ledger);
 		this.stragglerTimer.startStragglerTimeoutForActivePeers(
 			false,
 			observation.topTierAddressesSet
@@ -63,8 +54,8 @@ export class ObservationManager {
 		doneCallback: () => void
 	) {
 		this.logger.info('Moving to stopping state');
-		assert(observation.state !== ObservationState.Idle);
-		observation.state = ObservationState.Stopping;
+		observation.moveToStoppingState();
+
 		this.consensusTimer.stop();
 		if (this.connectionManager.getActiveConnectionAddresses().length === 0) {
 			return this.moveToStoppedState(observation, doneCallback);
@@ -77,13 +68,14 @@ export class ObservationManager {
 		);
 	}
 
-	public moveToStoppedState(observation: Observation, callback: () => void) {
-		this.logger.info('Moving to idle state');
-		assert(observation.state === ObservationState.Stopping);
+	public moveToStoppedState(observation: Observation, onStopped: () => void) {
+		this.logger.info('Moving to stopped state');
+		observation.moveToStoppedState();
+
 		this.stragglerTimer.stopStragglerTimeouts(); //a node could have disconnected during the straggler timeout
 		this.connectionManager.shutdown();
-		observation.state = ObservationState.Stopped;
-		callback();
+
+		onStopped();
 	}
 
 	private startNetworkConsensusTimerInternal(onNetworkHalted: () => void) {

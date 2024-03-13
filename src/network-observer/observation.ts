@@ -2,6 +2,8 @@ import { ObservationState } from './network-observer';
 import { CrawlState } from '../crawl-state';
 import { NodeAddress } from '../node-address';
 import { PeerNodeCollection } from '../peer-node-collection';
+import * as assert from 'assert';
+import { Ledger } from '../crawler';
 
 export class Observation {
 	public state: ObservationState = ObservationState.Idle;
@@ -22,5 +24,32 @@ export class Observation {
 			topTierAddresses.add(`${address[0]}:${address[1]}`);
 		});
 		return topTierAddresses;
+	}
+
+	moveToSyncingState() {
+		assert(this.state === ObservationState.Idle);
+		this.state = ObservationState.Syncing;
+	}
+
+	moveToSyncedState() {
+		assert(this.state === ObservationState.Syncing);
+		this.state = ObservationState.Synced;
+	}
+
+	moveToStoppingState() {
+		assert(this.state !== ObservationState.Idle);
+		this.state = ObservationState.Stopping;
+	}
+
+	moveToStoppedState() {
+		assert(this.state === ObservationState.Stopping);
+		this.state = ObservationState.Stopped;
+	}
+
+	ledgerCloseConfirmed(ledger: Ledger) {
+		if (this.state !== ObservationState.Synced) return;
+		if (this.networkHalted) return;
+
+		this.crawlState.updateLatestConfirmedClosedLedger(ledger);
 	}
 }

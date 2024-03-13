@@ -49,10 +49,10 @@ export class NetworkObserver extends EventEmitter {
 	): Promise<number> {
 		return new Promise<number>((resolve) => {
 			this._observation = this.createObservation(crawlState, topTierNodes);
-			this.observationManager.moveToSyncingState(this._observation);
+			this.observationManager.startSync(this._observation);
 
 			setTimeout(() => {
-				this.observationManager.moveToSyncedState(this.observation);
+				this.observationManager.syncCompleted(this.observation);
 				resolve(this.connectionManager.getNumberOfActiveConnections());
 			}, this.syncingTimeoutMS);
 		});
