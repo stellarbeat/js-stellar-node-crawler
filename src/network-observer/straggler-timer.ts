@@ -12,23 +12,25 @@ export class StragglerTimer {
 
 	public startStragglerTimeoutForActivePeers(
 		includeTopTier = false,
-		topTierAddresses: Set<string>
+		topTierAddresses: Set<string>,
+		done?: () => void
 	) {
 		const activePeers = this.connectionManager
 			.getActiveConnectionAddresses()
 			.filter((address) => {
 				return includeTopTier || !topTierAddresses.has(address);
 			});
-		this.startStragglerTimeout(activePeers);
+		this.startStragglerTimeout(activePeers, done);
 	}
 
-	public startStragglerTimeout(addresses: string[]) {
+	public startStragglerTimeout(addresses: string[], done?: () => void) {
 		if (addresses.length === 0) return;
 		this.timers.startTimer(this.straggleTimeoutMS, () => {
 			this.logger.debug({ addresses }, 'Straggler timeout hit');
 			addresses.forEach((address) => {
 				this.connectionManager.disconnectByAddress(address);
 			});
+			if (done) done();
 		});
 	}
 

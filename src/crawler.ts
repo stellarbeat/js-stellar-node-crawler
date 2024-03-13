@@ -129,7 +129,7 @@ export class Crawler {
 
 		if (nodesToCrawl.length === 0) {
 			this.logger.warn('No nodes to crawl');
-			this.networkObserver.shutdown().then(() => {
+			this.networkObserver.stop().then(() => {
 				this.finish(resolve, reject);
 				this.crawlState.state = CrawlProcessState.STOPPING;
 			});
@@ -139,7 +139,7 @@ export class Crawler {
 	private async startTopTierSync(topTierAddresses: NodeAddress[]) {
 		this.logger.info('Starting Top Tier sync');
 		this.crawlState.state = CrawlProcessState.TOP_TIER_SYNC;
-		return this.networkObserver.sync(topTierAddresses, this.crawlState);
+		return this.networkObserver.observe(topTierAddresses, this.crawlState);
 	}
 
 	private setupCrawlCompletionHandlers(
@@ -149,7 +149,7 @@ export class Crawler {
 		this.startMaxCrawlTimeout(resolve, reject, this.crawlState);
 		this.crawlQueueManager.onDrain(() => {
 			this.logger.info('Stopping crawl process');
-			this.networkObserver.shutdown().then(() => {
+			this.networkObserver.stop().then(() => {
 				this.finish(resolve, reject);
 				this.crawlState.state = CrawlProcessState.STOPPING;
 			});
@@ -163,7 +163,7 @@ export class Crawler {
 	) {
 		this.maxCrawlTimeManager.setTimer(this.config.maxCrawlTime, () => {
 			this.logger.fatal('Max crawl time hit, closing all connections');
-			this.networkObserver.shutdown().then(() => this.finish(resolve, reject));
+			this.networkObserver.stop().then(() => this.finish(resolve, reject));
 			crawlState.maxCrawlTimeHit = true;
 		});
 	}

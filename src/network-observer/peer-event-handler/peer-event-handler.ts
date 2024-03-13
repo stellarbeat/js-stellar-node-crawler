@@ -3,12 +3,12 @@ import {
 	ConnectedPayload,
 	DataPayload
 } from '../connection-manager';
-import { SyncState } from '../network-observer';
 import { Ledger } from '../../crawler';
 import { NodeAddress } from '../../node-address';
 import { OnPeerConnected } from './on-peer-connected';
 import { OnPeerConnectionClosed } from './on-peer-connection-closed';
 import { OnPeerData } from './on-peer-data';
+import { Observation } from '../observation';
 
 export class PeerEventHandler {
 	constructor(
@@ -17,21 +17,21 @@ export class PeerEventHandler {
 		private onPeerDataHandler: OnPeerData
 	) {}
 
-	public onConnected(data: ConnectedPayload, syncState: SyncState) {
-		this.onConnectedHandler.handle(data, syncState);
+	public onConnected(data: ConnectedPayload, observation: Observation) {
+		this.onConnectedHandler.handle(data, observation);
 	}
 
-	public onConnectionClose(data: ClosePayload, syncState: SyncState) {
-		this.onConnectionCloseHandler.handle(data, syncState);
+	public onConnectionClose(data: ClosePayload, observation: Observation) {
+		this.onConnectionCloseHandler.handle(data, observation);
 	}
 
 	public onData(
 		data: DataPayload,
-		syncState: SyncState
+		observation: Observation
 	): {
 		closedLedger: Ledger | null;
 		peers: Array<NodeAddress>;
 	} {
-		return this.onPeerDataHandler.handle(data, syncState);
+		return this.onPeerDataHandler.handle(data, observation);
 	}
 }

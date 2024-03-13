@@ -3,7 +3,7 @@ import { CrawlState } from '../../../crawl-state';
 import { QuorumSetManager } from '../../quorum-set-manager';
 import { P } from 'pino';
 import { OnPeerConnectionClosed } from '../on-peer-connection-closed';
-import { SyncState } from '../../network-observer';
+import { Observation } from '../../observation';
 
 describe('OnConnectionCloseHandler', () => {
 	const quorumSetManager = mock<QuorumSetManager>();
@@ -23,11 +23,11 @@ describe('OnConnectionCloseHandler', () => {
 			publicKey: 'publicKey',
 			address: 'address'
 		};
-		const syncState = mock<SyncState>();
+		const observation = mock<Observation>();
 		const crawlState = mock<CrawlState>();
-		syncState.crawlState = crawlState;
-		syncState.topTierAddresses = new Set();
-		onConnectionCloseHandler.handle(data, syncState);
+		observation.crawlState = crawlState;
+		observation.topTierAddressesSet = new Set();
+		onConnectionCloseHandler.handle(data, observation);
 		expect(quorumSetManager.onNodeDisconnected).toHaveBeenCalledWith(
 			data.publicKey,
 			crawlState

@@ -4,11 +4,11 @@ import {
 	ConnectedPayload,
 	DataPayload
 } from '../../connection-manager';
-import { SyncState } from '../../network-observer';
 import { OnPeerConnected } from '../on-peer-connected';
 import { OnPeerConnectionClosed } from '../on-peer-connection-closed';
 import { OnPeerData } from '../on-peer-data';
 import { PeerEventHandler } from '../peer-event-handler';
+import { Observation } from '../../observation';
 
 describe('PeerConnectionEventHandler', () => {
 	const onConnectedHandler = mock<OnPeerConnected>();
@@ -26,25 +26,25 @@ describe('PeerConnectionEventHandler', () => {
 
 	it('should call onConnectedHandler.handle', () => {
 		const data = mock<ConnectedPayload>();
-		const syncState = mock<SyncState>();
-		peerConnectionEventHandler.onConnected(data, syncState);
-		expect(onConnectedHandler.handle).toHaveBeenCalledWith(data, syncState);
+		const observation = mock<Observation>();
+		peerConnectionEventHandler.onConnected(data, observation);
+		expect(onConnectedHandler.handle).toHaveBeenCalledWith(data, observation);
 	});
 
 	it('should call onConnectionCloseHandler.handle', () => {
 		const data = mock<ClosePayload>();
-		const syncState = mock<SyncState>();
-		peerConnectionEventHandler.onConnectionClose(data, syncState);
+		const observation = mock<Observation>();
+		peerConnectionEventHandler.onConnectionClose(data, observation);
 		expect(onConnectionCloseHandler.handle).toHaveBeenCalledWith(
 			data,
-			syncState
+			observation
 		);
 	});
 
 	it('should call onPeerDataHandler.handle', () => {
 		const data = mock<DataPayload>();
-		const syncState = mock<SyncState>();
-		peerConnectionEventHandler.onData(data, syncState);
-		expect(onPeerDataHandler.handle).toHaveBeenCalledWith(data, syncState);
+		const observation = mock<Observation>();
+		peerConnectionEventHandler.onData(data, observation);
+		expect(onPeerDataHandler.handle).toHaveBeenCalledWith(data, observation);
 	});
 });

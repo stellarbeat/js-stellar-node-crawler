@@ -18,7 +18,7 @@ import { StragglerTimer } from './network-observer/straggler-timer';
 import { OnPeerConnected } from './network-observer/peer-event-handler/on-peer-connected';
 import { OnPeerConnectionClosed } from './network-observer/peer-event-handler/on-peer-connection-closed';
 import { OnPeerData } from './network-observer/peer-event-handler/on-peer-data';
-import { NetworkObserverStateManager } from './network-observer/network-observer-state-manager';
+import { ObservationManager } from './network-observer/observation-manager';
 import { PeerEventHandler } from './network-observer/peer-event-handler/peer-event-handler';
 import { Timers } from './utilities/timers';
 import { TimerFactory } from './utilities/timer-factory';
@@ -86,7 +86,7 @@ export function createCrawler(
 		config.consensusTimeoutMS
 	);
 
-	const networkObserverStateManager = new NetworkObserverStateManager(
+	const networkObserverStateManager = new ObservationManager(
 		connectionManager,
 		consensusTimer,
 		stragglerTimer,

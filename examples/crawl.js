@@ -3,7 +3,8 @@ const blocked = require('blocked-at');
 const { QuorumSet } = require('@stellarbeat/js-stellarbeat-shared');
 const { createCrawler } = require('../lib');
 const { getConfigFromEnv } = require('@stellarbeat/js-stellar-node-connector');
-const { CrawlState } = require('../src/crawl-state');
+const { CrawlState } = require('../lib/crawl-state');
+const { CrawlerConfiguration } = require('../lib/crawler-configuration');
 
 // noinspection JSIgnoredPromiseFromCall
 main();
@@ -47,12 +48,9 @@ async function main() {
 	]);
 
 	const config = getConfigFromEnv();
-	let myCrawler = createCrawler({
-		nodeConfig: config,
-		maxOpenConnections: 100,
-		maxCrawlTime: 900000,
-		blackList: new Set()
-	});
+	const crawlerConfig = new CrawlerConfiguration(config);
+	crawlerConfig.maxOpenConnections = 100;
+	let myCrawler = createCrawler(crawlerConfig);
 
 	try {
 		let knownQuorumSets = new Map();

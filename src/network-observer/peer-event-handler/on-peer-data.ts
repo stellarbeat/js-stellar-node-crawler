@@ -1,9 +1,10 @@
 import { ConnectionManager, DataPayload } from '../connection-manager';
-import { NetworkObserverState, SyncState } from '../network-observer';
+import { ObservationState } from '../network-observer';
 import { Ledger } from '../../crawler';
 import { NodeAddress } from '../../node-address';
 import { StellarMessageHandler } from './stellar-message-handlers/stellar-message-handler';
 import { P } from 'pino';
+import { Observation } from '../observation';
 
 export interface OnPeerDataResult {
 	closedLedger: Ledger | null;
@@ -17,9 +18,9 @@ export class OnPeerData {
 		private connectionManager: ConnectionManager
 	) {}
 
-	public handle(data: DataPayload, syncState: SyncState): OnPeerDataResult {
-		const attemptLedgerClose = this.attemptLedgerClose(syncState);
-		const result = this.performWork(data, syncState, attemptLedgerClose);
+	public handle(data: DataPayload, observation: Observation): OnPeerDataResult {
+		const attemptLedgerClose = this.attemptLedgerClose(observation);
+		const result = this.performWork(data, observation, attemptLedgerClose);
 
 		if (result.isErr()) {
 			this.disconnect(data, result.error);
@@ -41,22 +42,22 @@ export class OnPeerData {
 
 	private performWork(
 		data: DataPayload,
-		syncState: SyncState,
+		observation: Observation,
 		attemptLedgerClose: boolean
 	) {
 		const result = this.stellarMessageHandler.handleStellarMessage(
 			data.publicKey,
 			data.stellarMessageWork.stellarMessage,
 			attemptLedgerClose,
-			syncState.crawlState
+			observation.crawlState
 		);
 
 		data.stellarMessageWork.done();
 		return result;
 	}
 
-	private attemptLedgerClose(syncState: SyncState) {
-		return syncState.state === NetworkObserverState.Synced;
+	private attemptLedgerClose(observation: Observation) {
+		return observation.state === ObservationState.Synced;
 	}
 
 	private returnEmpty() {

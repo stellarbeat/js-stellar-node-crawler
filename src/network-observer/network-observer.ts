@@ -9,33 +9,26 @@ import { QuorumSetManager } from './quorum-set-manager';
 import { NodeAddress } from '../node-address';
 import { EventEmitter } from 'events';
 import * as assert from 'assert';
-import { PeerNodeCollection } from '../peer-node-collection';
-import { NetworkObserverStateManager } from './network-observer-state-manager';
+import { ObservationManager } from './observation-manager';
 import { PeerEventHandler } from './peer-event-handler/peer-event-handler';
+import { Observation } from './observation';
 
-export enum NetworkObserverState {
+export enum ObservationState {
 	Idle,
 	Syncing,
 	Synced,
-	Stopping
-}
-
-export interface SyncState {
-	state: NetworkObserverState;
-	networkHalted: boolean;
-	topTierAddresses: Set<string>;
-	peerNodes: PeerNodeCollection;
-	crawlState: CrawlState; //todo: refactor out
+	Stopping,
+	Stopped
 }
 
 export class NetworkObserver extends EventEmitter {
-	private _crawlState?: CrawlState; //todo: refactor out crawlState
+	private _observation: Observation | null = null;
 
 	constructor(
 		private connectionManager: ConnectionManager,
 		private quorumSetManager: QuorumSetManager,
 		private peerEventHandler: PeerEventHandler,
-		private stateManager: NetworkObserverStateManager,
+		private observationManager: ObservationManager,
 		private syncingTimeoutMS: number
 	) {
 		super();
@@ -50,57 +43,61 @@ export class NetworkObserver extends EventEmitter {
 		});
 	}
 
-	public async sync(
+	public async observe(
 		topTierNodes: NodeAddress[],
 		crawlState: CrawlState
 	): Promise<number> {
 		return new Promise<number>((resolve) => {
-			this._crawlState = crawlState;
-
-			this.stateManager.moveToSyncingState(topTierNodes);
+			this._observation = this.createObservation(crawlState, topTierNodes);
+			this.observationManager.moveToSyncingState(this._observation);
 
 			setTimeout(() => {
-				this.stateManager.moveToSyncedState();
+				this.observationManager.moveToSyncedState(this.observation);
 				resolve(this.connectionManager.getNumberOfActiveConnections());
 			}, this.syncingTimeoutMS);
 		});
 	}
 
 	public connectToNode(ip: string, port: number) {
-		assert(this.stateManager.state === NetworkObserverState.Synced);
+		assert(this.observation.state === ObservationState.Synced);
 		this.connectionManager.connectToNode(ip, port);
 	}
 
-	public async shutdown() {
-		return new Promise<void>((resolve) => {
-			this.stateManager.moveToStoppingState(resolve);
+	public async stop() {
+		return new Promise<Observation>((resolve) => {
+			this.observationManager.moveToStoppingState(this.observation, () =>
+				this.onObservationStopped(resolve)
+			);
 		});
 	}
 
-	private createSyncState(): SyncState {
-		return {
-			peerNodes: this.crawlState.peerNodes,
-			networkHalted: this.stateManager.isNetworkHalted,
-			crawlState: this.crawlState,
-			state: this.stateManager.state,
-			topTierAddresses: this.stateManager.topTierAddresses
-		};
+	private onObservationStopped(
+		resolve: (observation: Observation) => void
+	): void {
+		resolve(this.observation);
+	}
+
+	private createObservation(
+		crawlState: CrawlState,
+		topTierAddresses: NodeAddress[]
+	): Observation {
+		return new Observation(topTierAddresses, crawlState.peerNodes, crawlState);
 	}
 
 	private onPeerConnected(data: ConnectedPayload) {
-		this.peerEventHandler.onConnected(data, this.createSyncState());
+		this.peerEventHandler.onConnected(data, this.observation);
 	}
 
 	private onPeerConnectionClose(data: ClosePayload): void {
-		this.peerEventHandler.onConnectionClose(data, this.createSyncState());
+		this.peerEventHandler.onConnectionClose(data, this.observation);
 		this.emit('disconnect', data);
 	}
 
 	private onPeerData(data: DataPayload): void {
-		const result = this.peerEventHandler.onData(data, this.createSyncState());
+		const result = this.peerEventHandler.onData(data, this.observation);
 		if (result.closedLedger) {
-			this.stateManager.ledgerCloseConfirmed(
-				this.crawlState,
+			this.observationManager.ledgerCloseConfirmed(
+				this.observation,
 				result.closedLedger
 			);
 		}
@@ -108,10 +105,10 @@ export class NetworkObserver extends EventEmitter {
 		if (result.peers.length > 0) this.emit('peers', result.peers);
 	}
 
-	private get crawlState(): CrawlState {
-		if (!this._crawlState) {
-			throw new Error('CrawlState not set');
+	private get observation(): Observation {
+		if (!this._observation) {
+			throw new Error('Observation not set');
 		}
-		return this._crawlState;
+		return this._observation;
 	}
 }

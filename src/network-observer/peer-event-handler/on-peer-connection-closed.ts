@@ -1,8 +1,8 @@
 import { ClosePayload } from '../connection-manager';
-import { SyncState } from '../network-observer';
 import { truncate } from '../../utilities/truncate';
 import { QuorumSetManager } from '../quorum-set-manager';
 import { P } from 'pino';
+import { Observation } from '../observation';
 
 export class OnPeerConnectionClosed {
 	constructor(
@@ -10,12 +10,12 @@ export class OnPeerConnectionClosed {
 		private logger: P.Logger
 	) {}
 
-	public handle(data: ClosePayload, syncState: SyncState) {
-		this.logIfTopTierDisconnect(data, syncState.topTierAddresses);
+	public handle(data: ClosePayload, observation: Observation) {
+		this.logIfTopTierDisconnect(data, observation.topTierAddressesSet);
 		if (data.publicKey) {
 			this.quorumSetManager.onNodeDisconnected(
 				data.publicKey,
-				syncState.crawlState
+				observation.crawlState
 			);
 		}
 	}

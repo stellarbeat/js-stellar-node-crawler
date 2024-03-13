@@ -1,13 +1,10 @@
-import {
-	ClosePayload,
-	ConnectedPayload,
-	ConnectionManager
-} from '../connection-manager';
-import { NetworkObserverState, SyncState } from '../network-observer';
+import { ConnectedPayload, ConnectionManager } from '../connection-manager';
+import { ObservationState } from '../network-observer';
 import { StragglerTimer } from '../straggler-timer';
 import { P } from 'pino';
 import { truncate } from '../../utilities/truncate';
 import { PeerNodeCollection } from '../../peer-node-collection';
+import { Observation } from '../observation';
 
 export class OnPeerConnected {
 	constructor(
@@ -15,27 +12,30 @@ export class OnPeerConnected {
 		private connectionManager: ConnectionManager,
 		private logger: P.Logger
 	) {}
-	public handle(data: ConnectedPayload, syncState: SyncState) {
-		this.logIfTopTierConnected(data, syncState);
-		const peerNodeOrError = this.addPeerNode(data, syncState.peerNodes);
+	public handle(data: ConnectedPayload, observation: Observation) {
+		this.logIfTopTierConnected(data, observation);
+		const peerNodeOrError = this.addPeerNode(data, observation.peerNodes);
 
 		if (peerNodeOrError instanceof Error) {
 			this.disconnect(data.ip, data.port, peerNodeOrError);
 			return peerNodeOrError;
 		}
 
-		if (this.networkIsHalted(syncState)) {
+		if (this.networkIsHalted(observation)) {
 			return this.collectMinimalDataAndDisconnect(data);
 		}
 
-		this.handleConnectedByState(syncState, data);
+		this.handleConnectedByState(observation, data);
 	}
 
-	private handleConnectedByState(syncState: SyncState, data: ConnectedPayload) {
-		switch (syncState.state) {
-			case NetworkObserverState.Idle:
+	private handleConnectedByState(
+		observation: Observation,
+		data: ConnectedPayload
+	) {
+		switch (observation.state) {
+			case ObservationState.Idle:
 				return this.disconnectBecauseIdle(data);
-			case NetworkObserverState.Stopping:
+			case ObservationState.Stopping:
 				return this.collectMinimalDataAndDisconnect(data);
 			default:
 				return;
@@ -50,23 +50,12 @@ export class OnPeerConnected {
 		return new Error('Connected while idle');
 	}
 
-	private isIdleState(syncState: SyncState) {
-		return syncState.state === NetworkObserverState.Idle;
-	}
-
-	private isStoppingState(syncState: SyncState) {
-		return syncState.state === NetworkObserverState.Stopping;
-	}
 	private collectMinimalDataAndDisconnect(data: ConnectedPayload) {
 		return this.startStragglerTimeout(data);
 	}
 
-	private networkIsHalted(syncState: SyncState) {
-		return syncState.networkHalted;
-	}
-
-	private handleConnectedWhenNetworkIsHalted(data: ConnectedPayload) {
-		return this.startStragglerTimeout(data);
+	private networkIsHalted(observation: Observation) {
+		return observation.networkHalted;
 	}
 
 	private startStragglerTimeout(data: ConnectedPayload) {
@@ -88,8 +77,11 @@ export class OnPeerConnected {
 		);
 	}
 
-	private logIfTopTierConnected(data: ConnectedPayload, syncState: SyncState) {
-		if (syncState.topTierAddresses.has(`${data.ip}:${data.port}`)) {
+	private logIfTopTierConnected(
+		data: ConnectedPayload,
+		observation: Observation
+	) {
+		if (observation.topTierAddressesSet.has(`${data.ip}:${data.port}`)) {
 			this.logger.debug(
 				{ pk: truncate(data.publicKey) },
 				'Top tier node connected'
