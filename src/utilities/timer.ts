@@ -3,7 +3,7 @@ export class Timer {
 
 	constructor() {}
 
-	startTimer(time: number, callback: () => void) {
+	start(time: number, callback: () => void) {
 		if (this.timer) {
 			clearTimeout(this.timer);
 		}

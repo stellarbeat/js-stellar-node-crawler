@@ -17,14 +17,14 @@ describe('timers', () => {
 		timerFactory.createTimer.mockReturnValue(timer);
 		timers.startTimer(1000, callback);
 
-		const calledTime = timer.startTimer.mock.calls[0][0];
-		const timerCallback = timer.startTimer.mock.calls[0][1];
+		const calledTime = timer.start.mock.calls[0][0];
+		const timerCallback = timer.start.mock.calls[0][1];
 
 		timerCallback();
 
 		expect(calledTime).toBe(1000);
 		expect(timerFactory.createTimer).toHaveBeenCalled();
-		expect(timer.startTimer).toHaveBeenCalled();
+		expect(timer.start).toHaveBeenCalled();
 		expect(timers.hasActiveTimers()).toBeFalsy();
 	});
 

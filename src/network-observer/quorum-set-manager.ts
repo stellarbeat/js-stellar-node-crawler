@@ -14,10 +14,9 @@ type QuorumSetHash = string;
  * Makes sure every peerNode that sent a scp message with a hash, gets the correct quorumSet.
  */
 export class QuorumSetManager {
-	static MS_TO_WAIT_FOR_REPLY = 1500;
-
 	constructor(
 		private connectionManager: ConnectionManager,
+		private quorumRequestTimeoutMS: number,
 		private logger: P.Logger
 	) {}
 
@@ -155,7 +154,7 @@ export class QuorumSetManager {
 					);
 
 					this.requestQuorumSet(quorumSetHash, crawlState);
-				}, QuorumSetManager.MS_TO_WAIT_FOR_REPLY)
+				}, this.quorumRequestTimeoutMS)
 			});
 		};
 

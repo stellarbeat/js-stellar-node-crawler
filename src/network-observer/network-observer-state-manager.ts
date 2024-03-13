@@ -1,12 +1,12 @@
 import { NodeAddress } from '../node-address';
-import { NetworkObserver, NetworkObserverState } from './network-observer';
+import { NetworkObserverState } from './network-observer';
 import { StragglerTimer } from './straggler-timer';
-import { Timer } from '../utilities/timer';
 import { ConnectionManager } from './connection-manager';
 import * as assert from 'assert';
 import { P } from 'pino';
 import { CrawlState } from '../crawl-state';
 import { Ledger } from '../crawler';
+import { ConsensusTimer } from './consensus-timer';
 
 export class NetworkObserverStateManager {
 	private _state: NetworkObserverState = NetworkObserverState.Idle;
@@ -15,7 +15,7 @@ export class NetworkObserverStateManager {
 
 	constructor(
 		private connectionManager: ConnectionManager,
-		private consensusTimer: Timer,
+		private consensusTimer: ConsensusTimer,
 		private stragglerTimer: StragglerTimer,
 		private logger: P.Logger
 	) {}
@@ -64,7 +64,7 @@ export class NetworkObserverStateManager {
 	public moveToStoppingState(doneCallback: () => void) {
 		assert(this._state !== NetworkObserverState.Idle);
 		this._state = NetworkObserverState.Stopping;
-		this.consensusTimer.stopTimer();
+		this.consensusTimer.stop();
 		if (this.connectionManager.getActiveConnectionAddresses().length === 0) {
 			return this.moveToIdleState(doneCallback);
 		}
@@ -96,10 +96,7 @@ export class NetworkObserverStateManager {
 	}
 
 	private startNetworkConsensusTimerInternal(onNetworkHalted: () => void) {
-		this.consensusTimer.startTimer(
-			NetworkObserver.NETWORK_CONSENSUS_TIMEOUT,
-			onNetworkHalted
-		);
+		this.consensusTimer.start(onNetworkHalted);
 	}
 
 	private mapTopTierAddresses(topTierNodes: NodeAddress[]) {

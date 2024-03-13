@@ -29,16 +29,14 @@ export interface SyncState {
 }
 
 export class NetworkObserver extends EventEmitter {
-	public static readonly NETWORK_CONSENSUS_TIMEOUT = 90000; //90 seconds before we declare the network stuck.
-	private static readonly SYNCING_TIMEOUT = 10000;
-
 	private _crawlState?: CrawlState; //todo: refactor out crawlState
 
 	constructor(
 		private connectionManager: ConnectionManager,
 		private quorumSetManager: QuorumSetManager,
 		private peerEventHandler: PeerEventHandler,
-		private stateManager: NetworkObserverStateManager
+		private stateManager: NetworkObserverStateManager,
+		private syncingTimeoutMS: number
 	) {
 		super();
 		this.connectionManager.on('connected', (data: ConnectedPayload) => {
@@ -64,7 +62,7 @@ export class NetworkObserver extends EventEmitter {
 			setTimeout(() => {
 				this.stateManager.moveToSyncedState();
 				resolve(this.connectionManager.getNumberOfActiveConnections());
-			}, NetworkObserver.SYNCING_TIMEOUT);
+			}, this.syncingTimeoutMS);
 		});
 	}
 

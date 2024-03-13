@@ -165,6 +165,8 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 
 	const crawlerConfig = new CrawlerConfiguration(nodeConfig);
 	crawlerConfig.peerStraggleTimeoutMS = 2000;
+	crawlerConfig.syncingTimeoutMS = 100;
+	crawlerConfig.quorumSetRequestTimeoutMS = 100;
 	const crawler = createCrawler(crawlerConfig);
 	const crawlState = new CrawlState(
 		trustedQSet,
@@ -219,7 +221,7 @@ it('should hit the max crawl limit', async function () {
 	nodeConfig.network = Networks.TESTNET;
 
 	const crawler = createCrawler(
-		new CrawlerConfiguration(nodeConfig, 25, 1000, new Set(), 1000)
+		new CrawlerConfiguration(nodeConfig, 25, 1000, new Set(), 1000, 100, 100)
 	);
 	const crawlState = new CrawlState(
 		trustedQSet,

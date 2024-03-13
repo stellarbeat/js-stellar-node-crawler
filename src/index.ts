@@ -22,6 +22,7 @@ import { NetworkObserverStateManager } from './network-observer/network-observer
 import { PeerEventHandler } from './network-observer/peer-event-handler/peer-event-handler';
 import { Timers } from './utilities/timers';
 import { TimerFactory } from './utilities/timer-factory';
+import { ConsensusTimer } from './network-observer/consensus-timer';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -45,7 +46,11 @@ export function createCrawler(
 		config.blackList,
 		logger
 	);
-	const quorumSetManager = new QuorumSetManager(connectionManager, logger);
+	const quorumSetManager = new QuorumSetManager(
+		connectionManager,
+		config.quorumSetRequestTimeoutMS,
+		logger
+	);
 	const crawlQueueManager = new CrawlQueueManager(
 		new AsyncCrawlQueue(config.maxOpenConnections),
 		logger
@@ -76,7 +81,10 @@ export function createCrawler(
 		new OnPeerConnectionClosed(quorumSetManager, logger),
 		new OnPeerData(stellarMessageHandler, logger, connectionManager)
 	);
-	const consensusTimer = new Timer();
+	const consensusTimer = new ConsensusTimer(
+		new Timer(),
+		config.consensusTimeoutMS
+	);
 
 	const networkObserverStateManager = new NetworkObserverStateManager(
 		connectionManager,
@@ -88,7 +96,8 @@ export function createCrawler(
 		connectionManager,
 		quorumSetManager,
 		peerEventHandler,
-		networkObserverStateManager
+		networkObserverStateManager,
+		config.syncingTimeoutMS
 	);
 
 	return new Crawler(

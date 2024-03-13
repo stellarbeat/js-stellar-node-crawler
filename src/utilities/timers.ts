@@ -12,7 +12,7 @@ export class Timers {
 			this.timers.delete(timer);
 			callback();
 		};
-		timer.startTimer(time, myCallback);
+		timer.start(time, myCallback);
 		this.timers.add(timer);
 	}
 
