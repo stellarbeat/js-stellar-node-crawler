@@ -23,6 +23,7 @@ import { PeerEventHandler } from './network-observer/peer-event-handler/peer-eve
 import { Timers } from './utilities/timers';
 import { TimerFactory } from './utilities/timer-factory';
 import { ConsensusTimer } from './network-observer/consensus-timer';
+import { ObservationFactory } from './network-observer/observation-factory';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
@@ -94,6 +95,7 @@ export function createCrawler(
 		logger
 	);
 	const peerNetworkManager = new NetworkObserver(
+		new ObservationFactory(),
 		connectionManager,
 		quorumSetManager,
 		peerEventHandler,

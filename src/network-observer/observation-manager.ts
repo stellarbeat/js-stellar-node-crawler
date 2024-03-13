@@ -24,7 +24,7 @@ export class ObservationManager {
 		return this.syncCompleted(observation);
 	}
 
-	public syncCompleted(observation: Observation) {
+	private syncCompleted(observation: Observation) {
 		this.logger.info('Moving to synced state');
 		observation.moveToSyncedState();
 		this.startNetworkConsensusTimer(observation);
@@ -55,19 +55,22 @@ export class ObservationManager {
 		);
 	}
 
-	public stopObservation(observation: Observation, doneCallback: () => void) {
+	public stopObservation(
+		observation: Observation,
+		onStoppedCallback: () => void
+	) {
 		this.logger.info('Moving to stopping state');
 		observation.moveToStoppingState();
 
 		this.consensusTimer.stop();
-		if (this.connectionManager.getActiveConnectionAddresses().length === 0) {
-			return this.onLastNodesDisconnected(observation, doneCallback);
+		if (this.connectionManager.getNumberOfActiveConnections() === 0) {
+			return this.onLastNodesDisconnected(observation, onStoppedCallback);
 		}
 
 		this.stragglerTimer.startStragglerTimeoutForActivePeers(
 			true,
 			observation.topTierAddressesSet,
-			() => this.onLastNodesDisconnected(observation, doneCallback)
+			() => this.onLastNodesDisconnected(observation, onStoppedCallback)
 		);
 	}
 

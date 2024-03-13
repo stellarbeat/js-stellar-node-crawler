@@ -13,11 +13,13 @@ import { PeerEventHandler } from './peer-event-handler/peer-event-handler';
 import { Observation } from './observation';
 import * as assert from 'assert';
 import { ObservationState } from './observation-state';
+import { ObservationFactory } from './observation-factory';
 
 export class NetworkObserver extends EventEmitter {
 	private _observation: Observation | null = null;
 
 	constructor(
+		private observationFactory: ObservationFactory,
 		private connectionManager: ConnectionManager,
 		private quorumSetManager: QuorumSetManager,
 		private peerEventHandler: PeerEventHandler,
@@ -59,7 +61,11 @@ export class NetworkObserver extends EventEmitter {
 		crawlState: CrawlState,
 		topTierAddresses: NodeAddress[]
 	): Observation {
-		return new Observation(topTierAddresses, crawlState.peerNodes, crawlState);
+		return this.observationFactory.createObservation(
+			topTierAddresses,
+			crawlState.peerNodes,
+			crawlState
+		);
 	}
 
 	private setupPeerEventHandlers() {
