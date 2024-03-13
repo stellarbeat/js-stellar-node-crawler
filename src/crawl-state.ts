@@ -120,5 +120,17 @@ export class CrawlState {
 		this.logger.info(
 			'Closed ledgers: ' + this.slots.getConfirmedClosedSlotIndexes().length
 		);
+		const slowNodes = Array.from(this.peerNodes.values()).filter(
+			(node) => (node.getMinLagMS() ?? 0) > 2000
+		);
+
+		this.logger.info(
+			'Slow nodes: ' +
+				slowNodes.length +
+				' ' +
+				slowNodes
+					.map((node) => truncate(node.publicKey) + ':' + node.getMinLagMS())
+					.join(', ')
+		);
 	}
 }
