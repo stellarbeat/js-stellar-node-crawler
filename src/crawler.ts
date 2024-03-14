@@ -149,9 +149,9 @@ export class Crawler {
 		this.startMaxCrawlTimeout(resolve, reject, this.crawlState);
 		this.crawlQueueManager.onDrain(() => {
 			this.logger.info('Stopping crawl process');
+			this.crawlState.state = CrawlProcessState.STOPPING;
 			this.networkObserver.stop().then(() => {
 				this.finish(resolve, reject);
-				this.crawlState.state = CrawlProcessState.STOPPING;
 			});
 		});
 	}

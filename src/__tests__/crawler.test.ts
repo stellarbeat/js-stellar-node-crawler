@@ -6,7 +6,7 @@ import { P } from 'pino';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { CrawlLogger } from '../crawl-logger';
-import { CrawlState } from '../crawl-state';
+import { CrawlProcessState, CrawlState } from '../crawl-state';
 import { EventEmitter } from 'events';
 import { AsyncCrawlQueue } from '../crawl-queue';
 import { NetworkObserver } from '../network-observer/network-observer';
@@ -186,6 +186,7 @@ describe('Crawler', () => {
 					crawlState
 				);
 				expect(networkObserver.connectToNode).toHaveBeenCalledTimes(2);
+				expect(crawlState.state).toBe(CrawlProcessState.IDLE);
 				resolve();
 			})
 			.catch((e) => {
