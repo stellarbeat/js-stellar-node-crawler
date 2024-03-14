@@ -34,4 +34,3 @@ An ScpStatement is a message that is part of the consensus process. It contains 
 * Externalize
 
 We use the Externalize messages to determine ledger closing and the validating state of a Node.
-The other types of messages are used to determine if a Node is participating in consensus. For example if it is lagging behind we want to listen a bit longer for its externalize messages
