@@ -21,7 +21,7 @@ export class OnPeerConnected {
 			return peerNodeOrError;
 		}
 
-		if (this.networkIsHalted(observation)) {
+		if (observation.isNetworkHalted()) {
 			return this.collectMinimalDataAndDisconnect(data);
 		}
 
@@ -53,11 +53,6 @@ export class OnPeerConnected {
 	private collectMinimalDataAndDisconnect(data: ConnectedPayload) {
 		return this.startStragglerTimeout(data);
 	}
-
-	private networkIsHalted(observation: Observation) {
-		return observation.networkHalted;
-	}
-
 	private startStragglerTimeout(data: ConnectedPayload) {
 		return this.stragglerHandler.startStragglerTimeout([
 			data.ip + ':' + data.port

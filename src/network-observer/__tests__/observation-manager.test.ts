@@ -120,11 +120,12 @@ describe('ObservationManager', () => {
 			new Slots(new QuorumSet(1, ['A'], []), mock<P.Logger>())
 		);
 		await observationManager.startSync(observation);
-		expect(observation.networkHalted).toBe(false);
+		expect(observation.isNetworkHalted()).toBe(false);
 		const networkHaltedCallback = consensusTimer.start.mock
 			.calls[0][0] as () => void;
 		networkHaltedCallback();
-		expect(observation.networkHalted).toBe(true);
+		expect(observation.isNetworkHalted()).toBe(true);
+
 		expect(
 			stragglerTimer.startStragglerTimeoutForActivePeers
 		).toHaveBeenCalled();

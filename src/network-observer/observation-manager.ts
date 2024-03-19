@@ -54,7 +54,7 @@ export class ObservationManager {
 
 	private onNetworkHalted(observation: Observation) {
 		this.logger.info('Network consensus timeout');
-		observation.networkHalted = true;
+		observation.setNetworkHalted();
 		this.stragglerTimer.startStragglerTimeoutForActivePeers(
 			false,
 			observation.topTierAddressesSet

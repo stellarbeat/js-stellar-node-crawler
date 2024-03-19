@@ -87,11 +87,11 @@ describe('Observation', () => {
 		expect(observation.latestConfirmedClosedLedger.sequence).toBe(BigInt(0));
 	});
 
-	it('should not confirm ledger close if network halted', () => {
+	it('should mark network halted if new ledger is found after network was previously halted', () => {
 		const observation = createObservation();
 		observation.moveToSyncingState();
 		observation.moveToSyncedState();
-		observation.networkHalted = true;
+		observation.setNetworkHalted();
 		const ledger = {
 			sequence: BigInt(1),
 			closeTime: new Date(),
@@ -99,6 +99,7 @@ describe('Observation', () => {
 			localCloseTime: new Date()
 		};
 		observation.ledgerCloseConfirmed(ledger);
-		expect(observation.latestConfirmedClosedLedger.sequence).toBe(BigInt(0));
+		expect(observation.latestConfirmedClosedLedger.sequence).toBe(BigInt(1));
+		expect(observation.isNetworkHalted()).toBeFalsy();
 	});
 });

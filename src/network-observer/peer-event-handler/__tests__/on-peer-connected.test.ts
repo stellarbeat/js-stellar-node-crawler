@@ -128,7 +128,7 @@ describe('OnPeerConnectedHandler', () => {
 		const data = createData();
 		const observation = createObservation();
 		observation.state = ObservationState.Synced;
-		observation.networkHalted = true;
+		observation.setNetworkHalted();
 		onConnectedHandler.handle(data, observation);
 		assertPeerSuccessfullyConnected(observation.peerNodes, data);
 		assertStragglerTimeoutStarted(data);

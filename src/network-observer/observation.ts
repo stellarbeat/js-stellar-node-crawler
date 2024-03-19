@@ -10,7 +10,7 @@ import { QuorumSetState } from './quorum-set-state';
 
 export class Observation {
 	public state: ObservationState = ObservationState.Idle;
-	public networkHalted = false;
+	private networkHalted = false;
 	public topTierAddressesSet: Set<string>;
 	public envelopeCache: LRUCache<string, number>;
 	public quorumSetState: QuorumSetState = new QuorumSetState();
@@ -56,9 +56,17 @@ export class Observation {
 	}
 
 	ledgerCloseConfirmed(ledger: Ledger) {
+		this.networkHalted = false;
 		if (this.state !== ObservationState.Synced) return;
-		if (this.networkHalted) return;
 
 		this.latestConfirmedClosedLedger = ledger;
+	}
+
+	isNetworkHalted(): boolean {
+		return this.networkHalted;
+	}
+
+	setNetworkHalted() {
+		this.networkHalted = true;
 	}
 }
