@@ -24,21 +24,40 @@ import { Timers } from './utilities/timers';
 import { TimerFactory } from './utilities/timer-factory';
 import { ConsensusTimer } from './network-observer/consensus-timer';
 import { ObservationFactory } from './network-observer/observation-factory';
+import { CrawlFactory } from './crawl-factory';
 
 export { Crawler } from './crawler';
 export { CrawlResult } from './crawl-result';
 export { PeerNode } from './peer-node';
 export { default as jsonStorage } from './utilities/json-storage';
 
+export function createLogger(): pino.Logger {
+	return pino({
+		level: process.env.LOG_LEVEL || 'info',
+		base: undefined
+	});
+}
+
+export function createCrawlFactory(
+	config: CrawlerConfiguration,
+	logger?: pino.Logger
+) {
+	if (!logger) {
+		logger = createLogger();
+	}
+	return new CrawlFactory(
+		new ObservationFactory(),
+		config.nodeConfig.network,
+		logger
+	);
+}
+
 export function createCrawler(
 	config: CrawlerConfiguration,
 	logger?: pino.Logger
 ): Crawler {
 	if (!logger) {
-		logger = pino({
-			level: process.env.LOG_LEVEL || 'info',
-			base: undefined
-		});
+		logger = createLogger();
 	}
 
 	const node = createNode(config.nodeConfig, logger);

@@ -9,13 +9,13 @@ import { xdr, Keypair, hash, Networks } from '@stellar/stellar-base';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { NodeConfig } from '@stellarbeat/js-stellar-node-connector/lib/node-config';
 import { ok, Result, err } from 'neverthrow';
-import { CrawlerConfiguration, createCrawler } from '../index';
+import {
+	CrawlerConfiguration,
+	createCrawler,
+	createCrawlFactory
+} from '../index';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { NodeAddress } from '../node-address';
-import { mock } from 'jest-mock-extended';
-import { P } from 'pino';
-import { CrawlFactory } from '../crawl-factory';
-import { ObservationFactory } from '../network-observer/observation-factory';
 
 jest.setTimeout(60000);
 
@@ -169,9 +169,8 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 	crawlerConfig.syncingTimeoutMS = 100;
 	crawlerConfig.quorumSetRequestTimeoutMS = 100;
 	const crawler = createCrawler(crawlerConfig);
-	const crawlerFactory = new CrawlFactory(new ObservationFactory());
+	const crawlerFactory = createCrawlFactory(crawlerConfig);
 	const crawl = crawlerFactory.createCrawl(
-		nodeConfig.network,
 		[peerNodeAddress, publicKeyReusingPeerNodeAddress],
 		[],
 		trustedQSet,
@@ -181,8 +180,7 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 			value: '',
 			localCloseTime: new Date(0)
 		},
-		new Map<string, QuorumSet>(),
-		mock<P.Logger>()
+		new Map<string, QuorumSet>()
 	);
 
 	const result = await crawler.startCrawl(crawl);
@@ -220,12 +218,19 @@ it('should hit the max crawl limit', async function () {
 	const nodeConfig = getConfigFromEnv();
 	nodeConfig.network = Networks.TESTNET;
 
-	const crawler = createCrawler(
-		new CrawlerConfiguration(nodeConfig, 25, 1000, new Set(), 1000, 100, 100)
+	const crawlerConfig = new CrawlerConfiguration(
+		nodeConfig,
+		25,
+		1000,
+		new Set(),
+		1000,
+		100,
+		100
 	);
-	const crawlerFactory = new CrawlFactory(new ObservationFactory());
-	const crawl = crawlerFactory.createCrawl(
-		nodeConfig.network,
+	const crawler = createCrawler(crawlerConfig);
+	const crawlFactory = createCrawlFactory(crawlerConfig);
+
+	const crawl = crawlFactory.createCrawl(
 		[peerNodeAddress, publicKeyReusingPeerNodeAddress],
 		[],
 		trustedQSet,
@@ -235,8 +240,7 @@ it('should hit the max crawl limit', async function () {
 			value: '',
 			localCloseTime: new Date(0)
 		},
-		new Map<string, QuorumSet>(),
-		mock<P.Logger>()
+		new Map<string, QuorumSet>()
 	);
 
 	try {

@@ -25,7 +25,13 @@ export class ObservationManager {
 	}
 
 	private syncCompleted(observation: Observation) {
-		this.logger.info('Moving to synced state');
+		this.logger.info(
+			{
+				topTierConnections:
+					this.connectionManager.getNumberOfActiveConnections()
+			},
+			'Moving to synced state'
+		);
 		observation.moveToSyncedState();
 		this.startNetworkConsensusTimer(observation);
 	}

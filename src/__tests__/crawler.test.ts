@@ -16,7 +16,11 @@ import { CrawlFactory } from '../crawl-factory';
 import { Observation } from '../network-observer/observation';
 
 describe('Crawler', () => {
-	const crawlFactory = new CrawlFactory(new ObservationFactory());
+	const crawlFactory = new CrawlFactory(
+		new ObservationFactory(),
+		'test',
+		mock<P.Logger>()
+	);
 	beforeEach(() => {
 		jest.clearAllMocks();
 	});
@@ -47,7 +51,6 @@ describe('Crawler', () => {
 			logger
 		);
 		const crawl = crawlFactory.createCrawl(
-			'test',
 			[['peer', 2]],
 			[['top', 1]],
 			new QuorumSet(2, []),
@@ -57,8 +60,7 @@ describe('Crawler', () => {
 				sequence: BigInt(0),
 				value: ''
 			},
-			new Map(),
-			logger
+			new Map()
 		);
 
 		return {

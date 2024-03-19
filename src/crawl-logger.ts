@@ -25,7 +25,7 @@ export class CrawlLogger {
 		console.time('crawl');
 		this._crawl = crawl;
 		this.logger.info(
-			'Starting crawl with seed of ' + crawl.nodesToCrawl + 'addresses.'
+			'Starting crawl with seed of ' + crawl.nodesToCrawl.length + 'addresses.'
 		);
 		this.loggingTimer = setInterval(() => {
 			this.logger.info({
@@ -38,7 +38,7 @@ export class CrawlLogger {
 						crawl.observation.topTierAddressesSet.has(address)
 					).length
 			});
-		}, 10000);
+		}, 5000);
 	}
 
 	stop() {

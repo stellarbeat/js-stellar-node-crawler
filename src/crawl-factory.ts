@@ -8,19 +8,21 @@ import { P } from 'pino';
 import { PeerNodeCollection } from './peer-node-collection';
 
 export class CrawlFactory {
-	constructor(private observationFactory: ObservationFactory) {}
+	constructor(
+		private observationFactory: ObservationFactory,
+		private network: string,
+		private logger: P.Logger
+	) {}
 	public createCrawl(
-		network: string, //todo: configuration?
 		nodesToCrawl: NodeAddress[],
 		topTierAddresses: NodeAddress[],
 		topTierQuorumSet: QuorumSet,
 		latestConfirmedClosedLedger: Ledger,
-		quorumSets: Map<string, QuorumSet>,
-		logger: P.Logger
+		quorumSets: Map<string, QuorumSet>
 	): Crawl {
 		const observation = this.observationFactory.createObservation(
-			network,
-			new Slots(topTierQuorumSet, logger),
+			this.network,
+			new Slots(topTierQuorumSet, this.logger),
 			topTierAddresses,
 			new PeerNodeCollection(),
 			latestConfirmedClosedLedger,
