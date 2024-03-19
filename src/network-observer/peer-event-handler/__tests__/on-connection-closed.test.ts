@@ -1,5 +1,4 @@
 import { mock } from 'jest-mock-extended';
-import { CrawlState } from '../../../crawl-state';
 import { QuorumSetManager } from '../../quorum-set-manager';
 import { P } from 'pino';
 import { OnPeerConnectionClosed } from '../on-peer-connection-closed';
@@ -24,13 +23,11 @@ describe('OnConnectionCloseHandler', () => {
 			address: 'address'
 		};
 		const observation = mock<Observation>();
-		const crawlState = mock<CrawlState>();
-		observation.crawlState = crawlState;
 		observation.topTierAddressesSet = new Set();
 		onConnectionCloseHandler.handle(data, observation);
 		expect(quorumSetManager.onNodeDisconnected).toHaveBeenCalledWith(
 			data.publicKey,
-			crawlState
+			observation
 		);
 	});
 });

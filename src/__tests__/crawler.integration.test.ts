@@ -12,9 +12,10 @@ import { ok, Result, err } from 'neverthrow';
 import { CrawlerConfiguration, createCrawler } from '../index';
 import { StellarMessageWork } from '@stellarbeat/js-stellar-node-connector/lib/connection/connection';
 import { NodeAddress } from '../node-address';
-import { CrawlState } from '../crawl-state';
 import { mock } from 'jest-mock-extended';
 import { P } from 'pino';
+import { CrawlFactory } from '../crawl-factory';
+import { ObservationFactory } from '../network-observer/observation-factory';
 
 jest.setTimeout(60000);
 
@@ -168,24 +169,23 @@ it('should crawl, listen for validating nodes and harvest quorumSets', async () 
 	crawlerConfig.syncingTimeoutMS = 100;
 	crawlerConfig.quorumSetRequestTimeoutMS = 100;
 	const crawler = createCrawler(crawlerConfig);
-	const crawlState = new CrawlState(
+	const crawlerFactory = new CrawlFactory(new ObservationFactory());
+	const crawl = crawlerFactory.createCrawl(
+		nodeConfig.network,
+		[peerNodeAddress, publicKeyReusingPeerNodeAddress],
+		[],
 		trustedQSet,
-		new Map(),
 		{
 			sequence: BigInt(0),
 			closeTime: new Date(0),
 			value: '',
 			localCloseTime: new Date(0)
 		},
-		nodeConfig.network,
+		new Map<string, QuorumSet>(),
 		mock<P.Logger>()
 	);
 
-	const result = await crawler.crawl(
-		[peerNodeAddress, publicKeyReusingPeerNodeAddress],
-		[],
-		crawlState
-	);
+	const result = await crawler.startCrawl(crawl);
 	const peerNode = result.peers.get(peerNetworkNode.keyPair.publicKey());
 	expect(peerNode).toBeDefined();
 	if (!peerNode) return;
@@ -223,27 +223,24 @@ it('should hit the max crawl limit', async function () {
 	const crawler = createCrawler(
 		new CrawlerConfiguration(nodeConfig, 25, 1000, new Set(), 1000, 100, 100)
 	);
-	const crawlState = new CrawlState(
+	const crawlerFactory = new CrawlFactory(new ObservationFactory());
+	const crawl = crawlerFactory.createCrawl(
+		nodeConfig.network,
+		[peerNodeAddress, publicKeyReusingPeerNodeAddress],
+		[],
 		trustedQSet,
-		new Map(),
 		{
 			sequence: BigInt(0),
 			closeTime: new Date(0),
 			value: '',
 			localCloseTime: new Date(0)
 		},
-		nodeConfig.network,
+		new Map<string, QuorumSet>(),
 		mock<P.Logger>()
 	);
 
 	try {
-		expect(
-			await crawler.crawl(
-				[peerNodeAddress, publicKeyReusingPeerNodeAddress],
-				[],
-				crawlState
-			)
-		).toThrowError();
+		expect(await crawler.startCrawl(crawl)).toThrowError();
 	} catch (e) {
 		expect(e).toBeInstanceOf(Error);
 	}

@@ -1,21 +1,30 @@
-import { CrawlState } from '../crawl-state';
 import { NodeAddress } from '../node-address';
 import { PeerNodeCollection } from '../peer-node-collection';
 import * as assert from 'assert';
 import { Ledger } from '../crawler';
 import { ObservationState } from './observation-state';
+import { Slots } from './peer-event-handler/stellar-message-handlers/scp-envelope/scp-statement/externalize/slots';
+import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
+import * as LRUCache from 'lru-cache';
+import { QuorumSetState } from './quorum-set-state';
 
 export class Observation {
 	public state: ObservationState = ObservationState.Idle;
 	public networkHalted = false;
 	public topTierAddressesSet: Set<string>;
+	public envelopeCache: LRUCache<string, number>;
+	public quorumSetState: QuorumSetState = new QuorumSetState();
 
 	constructor(
+		public network: string,
 		public topTierAddresses: NodeAddress[],
 		public peerNodes: PeerNodeCollection,
-		public crawlState: CrawlState
+		public latestConfirmedClosedLedger: Ledger,
+		public quorumSets: Map<string, QuorumSet>,
+		public slots: Slots
 	) {
 		this.topTierAddressesSet = this.mapTopTierAddresses(topTierAddresses);
+		this.envelopeCache = new LRUCache<string, number>(5000);
 	}
 
 	private mapTopTierAddresses(topTierNodes: NodeAddress[]) {
@@ -50,6 +59,6 @@ export class Observation {
 		if (this.state !== ObservationState.Synced) return;
 		if (this.networkHalted) return;
 
-		this.crawlState.updateLatestConfirmedClosedLedger(ledger);
+		this.latestConfirmedClosedLedger = ledger;
 	}
 }

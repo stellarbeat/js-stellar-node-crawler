@@ -1,4 +1,3 @@
-import { CrawlState } from '../crawl-state';
 import {
 	ClosePayload,
 	ConnectedPayload,
@@ -6,7 +5,6 @@ import {
 	DataPayload
 } from './connection-manager';
 import { QuorumSetManager } from './quorum-set-manager';
-import { NodeAddress } from '../node-address';
 import { EventEmitter } from 'events';
 import { ObservationManager } from './observation-manager';
 import { PeerEventHandler } from './peer-event-handler/peer-event-handler';
@@ -29,11 +27,8 @@ export class NetworkObserver extends EventEmitter {
 		this.setupPeerEventHandlers();
 	}
 
-	public async observe(
-		topTierNodes: NodeAddress[],
-		crawlState: CrawlState
-	): Promise<number> {
-		this._observation = this.createObservation(crawlState, topTierNodes);
+	public async startObservation(observation: Observation): Promise<number> {
+		this._observation = observation;
 		await this.observationManager.startSync(this.observation);
 		return this.connectionManager.getNumberOfActiveConnections();
 	}
@@ -55,17 +50,6 @@ export class NetworkObserver extends EventEmitter {
 		resolve: (observation: Observation) => void
 	): void {
 		resolve(this.observation);
-	}
-
-	private createObservation(
-		crawlState: CrawlState,
-		topTierAddresses: NodeAddress[]
-	): Observation {
-		return this.observationFactory.createObservation(
-			topTierAddresses,
-			crawlState.peerNodes,
-			crawlState
-		);
 	}
 
 	private setupPeerEventHandlers() {

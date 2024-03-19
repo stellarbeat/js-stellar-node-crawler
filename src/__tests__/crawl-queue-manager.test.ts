@@ -2,14 +2,14 @@ import { AsyncCrawlQueue } from '../crawl-queue';
 import { CrawlQueueManager } from '../crawl-queue-manager';
 import { mock } from 'jest-mock-extended';
 import { P } from 'pino';
-import { CrawlState } from '../crawl-state';
+import { Crawl } from '../crawl';
 import { CrawlTask } from '../crawl-task';
 import { nodeAddressToPeerKey } from '../node-address';
 
 describe('CrawlQueueManager', () => {
 	const crawlQueue = mock<AsyncCrawlQueue>();
 	const logger = mock<P.Logger>();
-	const crawlState = mock<CrawlState>();
+	const crawlState = mock<Crawl>();
 
 	beforeEach(() => {
 		crawlState.crawledNodeAddresses = new Set();
@@ -21,7 +21,7 @@ describe('CrawlQueueManager', () => {
 		const crawlQueueManager = new CrawlQueueManager(crawlQueue, logger);
 		crawlQueueManager.addCrawlTask({
 			connectCallback: () => {},
-			crawlState,
+			crawl: crawlState,
 			nodeAddress: ['localhost', 11625]
 		});
 
@@ -48,7 +48,7 @@ describe('CrawlQueueManager', () => {
 	it('should perform a crawl queue task', () => {
 		const task: CrawlTask = {
 			connectCallback: jest.fn(),
-			crawlState,
+			crawl: crawlState,
 			nodeAddress: ['localhost', 11625]
 		};
 
@@ -64,7 +64,7 @@ describe('CrawlQueueManager', () => {
 	it('should complete a crawl task', function () {
 		const task: CrawlTask = {
 			connectCallback: jest.fn(),
-			crawlState,
+			crawl: crawlState,
 			nodeAddress: ['localhost', 11625]
 		};
 

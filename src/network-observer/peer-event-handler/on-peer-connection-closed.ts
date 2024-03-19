@@ -13,10 +13,7 @@ export class OnPeerConnectionClosed {
 	public handle(data: ClosePayload, observation: Observation) {
 		this.logIfTopTierDisconnect(data, observation.topTierAddressesSet);
 		if (data.publicKey) {
-			this.quorumSetManager.onNodeDisconnected(
-				data.publicKey,
-				observation.crawlState
-			);
+			this.quorumSetManager.onNodeDisconnected(data.publicKey, observation);
 		}
 	}
 

@@ -1,29 +1,26 @@
 import { Observation } from '../observation';
 import { PeerNodeCollection } from '../../peer-node-collection';
 import { mock } from 'jest-mock-extended';
-import { CrawlState } from '../../crawl-state';
 import { NodeAddress } from '../../node-address';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { P } from 'pino';
 import { ObservationState } from '../observation-state';
+import { Slots } from '../peer-event-handler/stellar-message-handlers/scp-envelope/scp-statement/externalize/slots';
 
 describe('Observation', () => {
 	const createObservation = (topTierAddresses: NodeAddress[] = []) => {
 		return new Observation(
+			'test',
 			topTierAddresses,
 			mock<PeerNodeCollection>(),
-			new CrawlState(
-				new QuorumSet(2, ['A']),
-				new Map<string, QuorumSet>(),
-				{
-					sequence: BigInt(0),
-					closeTime: new Date(),
-					value: 'value',
-					localCloseTime: new Date()
-				},
-				'test',
-				mock<P.Logger>()
-			)
+			{
+				sequence: BigInt(0),
+				closeTime: new Date(),
+				value: '',
+				localCloseTime: new Date()
+			},
+			new Map<string, QuorumSet>(),
+			new Slots(new QuorumSet(1, ['A'], []), mock<P.Logger>())
 		);
 	};
 	it('should move to syncing state', () => {
@@ -75,9 +72,7 @@ describe('Observation', () => {
 			localCloseTime: new Date()
 		};
 		observation.ledgerCloseConfirmed(ledger);
-		expect(observation.crawlState.latestConfirmedClosedLedger.sequence).toEqual(
-			BigInt(1)
-		);
+		expect(observation.latestConfirmedClosedLedger.sequence).toEqual(BigInt(1));
 	});
 
 	it('should not confirm ledger close if not in synced state', () => {
@@ -89,9 +84,7 @@ describe('Observation', () => {
 			localCloseTime: new Date()
 		};
 		observation.ledgerCloseConfirmed(ledger);
-		expect(observation.crawlState.latestConfirmedClosedLedger.sequence).toBe(
-			BigInt(0)
-		);
+		expect(observation.latestConfirmedClosedLedger.sequence).toBe(BigInt(0));
 	});
 
 	it('should not confirm ledger close if network halted', () => {
@@ -106,8 +99,6 @@ describe('Observation', () => {
 			localCloseTime: new Date()
 		};
 		observation.ledgerCloseConfirmed(ledger);
-		expect(observation.crawlState.latestConfirmedClosedLedger.sequence).toBe(
-			BigInt(0)
-		);
+		expect(observation.latestConfirmedClosedLedger.sequence).toBe(BigInt(0));
 	});
 });

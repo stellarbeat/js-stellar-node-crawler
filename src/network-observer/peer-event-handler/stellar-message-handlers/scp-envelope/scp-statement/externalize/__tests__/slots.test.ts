@@ -36,7 +36,7 @@ describe('slots', () => {
 		const slots = new Slots(trustedQuorumSet, logger);
 		const slot = slots.getSlot(BigInt(1));
 		slot.addExternalizeValue('A', 'test value', new Date());
-		const slot2 = slots.getSlot(BigInt(2));
+		slots.getSlot(BigInt(2));
 
 		expect(slots.getConfirmedClosedSlotIndexes()).toEqual([BigInt(1)]);
 	});

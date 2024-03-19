@@ -30,7 +30,7 @@ export class CrawlQueueManager {
 		crawlQueueTask: CrawlTask,
 		crawlQueueTaskDone: AsyncResultCallback<void>
 	): void {
-		crawlQueueTask.crawlState.crawlQueueTaskDoneCallbacks.set(
+		crawlQueueTask.crawl.crawlQueueTaskDoneCallbacks.set(
 			crawlQueueTask.nodeAddress.join(':'),
 			crawlQueueTaskDone
 		);

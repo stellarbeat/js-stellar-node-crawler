@@ -6,8 +6,11 @@ import { StragglerTimer } from '../straggler-timer';
 import { P } from 'pino';
 import { Observation } from '../observation';
 import { PeerNodeCollection } from '../../peer-node-collection';
-import { CrawlState } from '../../crawl-state';
 import { ObservationState } from '../observation-state';
+import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
+import { Ledger } from '../../crawler';
+import { Slots } from '../peer-event-handler/stellar-message-handlers/scp-envelope/scp-statement/externalize/slots';
+import { NodeAddress } from '../../node-address';
 
 describe('ObservationManager', () => {
 	const connectionManager = mock<ConnectionManager>();
@@ -23,17 +26,23 @@ describe('ObservationManager', () => {
 		logger
 	);
 
+	const createObservation = (topTierAddresses: NodeAddress[] = []) => {
+		return new Observation(
+			'test',
+			topTierAddresses,
+			mock<PeerNodeCollection>(),
+			mock<Ledger>(),
+			new Map<string, QuorumSet>(),
+			new Slots(new QuorumSet(1, ['A'], []), mock<P.Logger>())
+		);
+	};
+
 	beforeEach(() => {
 		jest.clearAllMocks();
 	});
 
 	it('should start syncing', (resolve) => {
-		const peerNodes = new PeerNodeCollection();
-		const observation = new Observation(
-			[['localhost', 11625]],
-			peerNodes,
-			mock<CrawlState>()
-		);
+		const observation = createObservation([['localhost', 11625]]);
 		observationManager.startSync(observation).then(() => {
 			expect(connectionManager.connectToNode).toHaveBeenCalledWith(
 				observation.topTierAddresses[0][0],
@@ -49,12 +58,7 @@ describe('ObservationManager', () => {
 
 	it('should stop observation immediately if no more active nodes', (resolve) => {
 		connectionManager.getNumberOfActiveConnections.mockReturnValue(0);
-		const peerNodes = new PeerNodeCollection();
-		const observation = new Observation(
-			[['localhost', 11625]],
-			peerNodes,
-			mock<CrawlState>()
-		);
+		const observation = createObservation();
 		observation.moveToSyncingState();
 		observation.moveToSyncedState();
 		observationManager.stopObservation(observation, () => {});
@@ -68,12 +72,7 @@ describe('ObservationManager', () => {
 
 	it('should stop observation after all active nodes are disconnected', (resolve) => {
 		connectionManager.getNumberOfActiveConnections.mockReturnValue(1);
-		const peerNodes = new PeerNodeCollection();
-		const observation = new Observation(
-			[['localhost', 11625]],
-			peerNodes,
-			mock<CrawlState>()
-		);
+		const observation = createObservation();
 		observation.moveToSyncingState();
 		observation.moveToSyncedState();
 		const callback = () => {
@@ -100,12 +99,7 @@ describe('ObservationManager', () => {
 	});
 
 	it('should handle ledger close confirmed', () => {
-		const peerNodes = new PeerNodeCollection();
-		const observation = new Observation(
-			[['localhost', 11625]],
-			peerNodes,
-			mock<CrawlState>()
-		);
+		const observation = createObservation();
 		observation.moveToSyncingState();
 		observation.moveToSyncedState();
 		observationManager.ledgerCloseConfirmed(observation, {} as any);
@@ -118,9 +112,12 @@ describe('ObservationManager', () => {
 	it('should handle network halted', async () => {
 		const peerNodes = new PeerNodeCollection();
 		const observation = new Observation(
+			'test',
 			[['localhost', 11625]],
 			peerNodes,
-			mock<CrawlState>()
+			mock<Ledger>(),
+			new Map<string, QuorumSet>(),
+			new Slots(new QuorumSet(1, ['A'], []), mock<P.Logger>())
 		);
 		await observationManager.startSync(observation);
 		expect(observation.networkHalted).toBe(false);

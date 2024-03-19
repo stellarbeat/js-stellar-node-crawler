@@ -2,10 +2,10 @@ import { PublicKey, QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import * as P from 'pino';
 import { xdr } from '@stellar/stellar-base';
 import { PeerNode } from '../peer-node';
-import { CrawlState } from '../crawl-state';
 import { err, ok, Result } from 'neverthrow';
 import { truncate } from '../utilities/truncate';
 import { ConnectionManager } from './connection-manager';
+import { Observation } from './observation';
 
 type QuorumSetHash = string;
 
@@ -22,24 +22,24 @@ export class QuorumSetManager {
 
 	public onNodeDisconnected(
 		publicKey: PublicKey,
-		crawlState: CrawlState
+		observation: Observation
 	): void {
-		if (!crawlState.quorumSetState.quorumSetRequests.has(publicKey)) return;
+		if (!observation.quorumSetState.quorumSetRequests.has(publicKey)) return;
 
-		this.clearQuorumSetRequest(publicKey, crawlState);
+		this.clearQuorumSetRequest(publicKey, observation);
 	}
 
 	public processQuorumSetHashFromStatement(
 		peer: PeerNode,
 		scpStatement: xdr.ScpStatement,
-		crawlState: CrawlState
+		observation: Observation
 	): void {
 		const quorumSetHashResult = this.getQuorumSetHash(scpStatement);
 		if (quorumSetHashResult.isErr()) return;
 
 		peer.quorumSetHash = quorumSetHashResult.value;
 		if (
-			!this.getQuorumSetHashOwners(peer.quorumSetHash, crawlState).has(
+			!this.getQuorumSetHashOwners(peer.quorumSetHash, observation).has(
 				peer.publicKey
 			)
 		) {
@@ -49,18 +49,18 @@ export class QuorumSetManager {
 			);
 		}
 
-		this.getQuorumSetHashOwners(peer.quorumSetHash, crawlState).add(
+		this.getQuorumSetHashOwners(peer.quorumSetHash, observation).add(
 			peer.publicKey
 		);
 
-		if (crawlState.quorumSets.has(peer.quorumSetHash))
-			peer.quorumSet = crawlState.quorumSets.get(peer.quorumSetHash);
+		if (observation.quorumSets.has(peer.quorumSetHash))
+			peer.quorumSet = observation.quorumSets.get(peer.quorumSetHash);
 		else {
 			this.logger.debug(
 				{ pk: peer.publicKey },
 				'Unknown quorumSet for hash: ' + peer.quorumSetHash
 			);
-			this.requestQuorumSet(peer.quorumSetHash, crawlState);
+			this.requestQuorumSet(peer.quorumSetHash, observation);
 		}
 	}
 
@@ -68,41 +68,41 @@ export class QuorumSetManager {
 		quorumSetHash: QuorumSetHash,
 		quorumSet: QuorumSet,
 		sender: PublicKey,
-		crawlState: CrawlState
+		observation: Observation
 	): void {
-		crawlState.quorumSets.set(quorumSetHash, quorumSet);
-		const owners = this.getQuorumSetHashOwners(quorumSetHash, crawlState);
+		observation.quorumSets.set(quorumSetHash, quorumSet);
+		const owners = this.getQuorumSetHashOwners(quorumSetHash, observation);
 
 		owners.forEach((owner) => {
-			const peer = crawlState.peerNodes.get(owner);
+			const peer = observation.peerNodes.get(owner);
 			if (peer) peer.quorumSet = quorumSet;
 		});
 
-		this.clearQuorumSetRequest(sender, crawlState);
+		this.clearQuorumSetRequest(sender, observation);
 	}
 
 	public peerNodeDoesNotHaveQuorumSet(
 		peerPublicKey: PublicKey,
 		quorumSetHash: QuorumSetHash,
-		crawlState: CrawlState
+		observation: Observation
 	): void {
 		const request =
-			crawlState.quorumSetState.quorumSetRequests.get(peerPublicKey);
+			observation.quorumSetState.quorumSetRequests.get(peerPublicKey);
 		if (!request) return;
 		if (request.hash !== quorumSetHash) return;
 
-		this.clearQuorumSetRequest(peerPublicKey, crawlState);
-		this.requestQuorumSet(quorumSetHash, crawlState);
+		this.clearQuorumSetRequest(peerPublicKey, observation);
+		this.requestQuorumSet(quorumSetHash, observation);
 	}
 
 	protected requestQuorumSet(
 		quorumSetHash: QuorumSetHash,
-		crawlState: CrawlState
+		observation: Observation
 	): void {
-		if (crawlState.quorumSets.has(quorumSetHash)) return;
+		if (observation.quorumSets.has(quorumSetHash)) return;
 
 		if (
-			crawlState.quorumSetState.quorumSetHashesInProgress.has(quorumSetHash)
+			observation.quorumSetState.quorumSetHashesInProgress.has(quorumSetHash)
 		) {
 			this.logger.debug({ hash: quorumSetHash }, 'Request already in progress');
 			return;
@@ -110,16 +110,16 @@ export class QuorumSetManager {
 
 		this.logger.debug({ hash: quorumSetHash }, 'Requesting quorumSet');
 		const alreadyRequestedToResult =
-			crawlState.quorumSetState.quorumSetRequestedTo.get(quorumSetHash);
+			observation.quorumSetState.quorumSetRequestedTo.get(quorumSetHash);
 		const alreadyRequestedTo: Set<string> = alreadyRequestedToResult
 			? alreadyRequestedToResult
 			: new Set();
-		crawlState.quorumSetState.quorumSetRequestedTo.set(
+		observation.quorumSetState.quorumSetRequestedTo.set(
 			quorumSetHash,
 			alreadyRequestedTo
 		);
 
-		const owners = this.getQuorumSetHashOwners(quorumSetHash, crawlState);
+		const owners = this.getQuorumSetHashOwners(quorumSetHash, observation);
 		const quorumSetMessage = xdr.StellarMessage.getScpQuorumset(
 			Buffer.from(quorumSetHash, 'base64')
 		);
@@ -140,20 +140,20 @@ export class QuorumSetManager {
 			);
 
 			connection.sendStellarMessage(quorumSetMessage);
-			crawlState.quorumSetState.quorumSetHashesInProgress.add(quorumSetHash);
-			crawlState.quorumSetState.quorumSetRequests.set(to, {
+			observation.quorumSetState.quorumSetHashesInProgress.add(quorumSetHash);
+			observation.quorumSetState.quorumSetRequests.set(to, {
 				hash: quorumSetHash,
 				timeout: setTimeout(() => {
 					this.logger.info(
 						{ pk: truncate(to), hash: quorumSetHash },
 						'Request timeout reached'
 					);
-					crawlState.quorumSetState.quorumSetRequests.delete(to);
-					crawlState.quorumSetState.quorumSetHashesInProgress.delete(
+					observation.quorumSetState.quorumSetRequests.delete(to);
+					observation.quorumSetState.quorumSetHashesInProgress.delete(
 						quorumSetHash
 					);
 
-					this.requestQuorumSet(quorumSetHash, crawlState);
+					this.requestQuorumSet(quorumSetHash, observation);
 				}, this.quorumRequestTimeoutMS)
 			});
 		};
@@ -161,7 +161,7 @@ export class QuorumSetManager {
 		//first try the owners of the hashes
 		const notYetRequestedOwnerWithActiveConnection = (
 			Array.from(owners.keys())
-				.map((owner) => crawlState.peerNodes.get(owner))
+				.map((owner) => observation.peerNodes.get(owner))
 				.filter((owner) => owner !== undefined) as PeerNode[]
 		)
 			.filter((owner) => !alreadyRequestedTo.has(owner.key))
@@ -189,13 +189,13 @@ export class QuorumSetManager {
 
 	protected getQuorumSetHashOwners(
 		quorumSetHash: QuorumSetHash,
-		crawlState: CrawlState
+		observation: Observation
 	): Set<string> {
 		let quorumSetHashOwners =
-			crawlState.quorumSetState.quorumSetOwners.get(quorumSetHash);
+			observation.quorumSetState.quorumSetOwners.get(quorumSetHash);
 		if (!quorumSetHashOwners) {
 			quorumSetHashOwners = new Set();
-			crawlState.quorumSetState.quorumSetOwners.set(
+			observation.quorumSetState.quorumSetOwners.set(
 				quorumSetHash,
 				quorumSetHashOwners
 			);
@@ -250,13 +250,13 @@ export class QuorumSetManager {
 
 	protected clearQuorumSetRequest(
 		peerPublicKey: PublicKey,
-		crawlState: CrawlState
+		observation: Observation
 	): void {
 		const result =
-			crawlState.quorumSetState.quorumSetRequests.get(peerPublicKey);
+			observation.quorumSetState.quorumSetRequests.get(peerPublicKey);
 		if (!result) return;
 		clearTimeout(result.timeout);
-		crawlState.quorumSetState.quorumSetRequests.delete(peerPublicKey);
-		crawlState.quorumSetState.quorumSetHashesInProgress.delete(result.hash);
+		observation.quorumSetState.quorumSetRequests.delete(peerPublicKey);
+		observation.quorumSetState.quorumSetHashesInProgress.delete(result.hash);
 	}
 }

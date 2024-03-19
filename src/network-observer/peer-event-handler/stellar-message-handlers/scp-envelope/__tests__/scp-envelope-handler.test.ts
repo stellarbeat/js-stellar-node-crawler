@@ -2,10 +2,10 @@ import { mock } from 'jest-mock-extended';
 import { ScpStatementHandler } from '../scp-statement/scp-statement-handler';
 import { ScpEnvelopeHandler } from '../scp-envelope-handler';
 import { createDummyExternalizeScpEnvelope } from '../../../../../__fixtures__/createDummyExternalizeMessage';
-import { CrawlState } from '../../../../../crawl-state';
 import LRUCache = require('lru-cache');
 import { Keypair, Networks } from '@stellar/stellar-base';
 import { ok } from 'neverthrow';
+import { Observation } from '../../../../observation';
 
 describe('scp-envelope-handler', () => {
 	it('should process valid scp envelope and return closed ledger', () => {
@@ -19,7 +19,7 @@ describe('scp-envelope-handler', () => {
 		scpStatementHandler.handle.mockReturnValueOnce(ok({ closedLedger }));
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
-		const crawlState = createMockCrawlState();
+		const crawlState = createMockObservation();
 		const result = handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(1);
 		expect(result.isOk()).toBeTruthy();
@@ -31,7 +31,7 @@ describe('scp-envelope-handler', () => {
 		const scpStatementHandler = mock<ScpStatementHandler>();
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
-		const crawlState = createMockCrawlState();
+		const crawlState = createMockObservation();
 		handler.handle(scpEnvelope, crawlState);
 		handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(1);
@@ -41,7 +41,7 @@ describe('scp-envelope-handler', () => {
 		const scpStatementHandler = mock<ScpStatementHandler>();
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
-		const crawlState = createMockCrawlState(BigInt(100));
+		const crawlState = createMockObservation(BigInt(100));
 		handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
 	});
@@ -53,7 +53,7 @@ describe('scp-envelope-handler', () => {
 			Keypair.random(),
 			Buffer.from('wrong network')
 		);
-		const crawlState = createMockCrawlState();
+		const crawlState = createMockObservation();
 		const result = handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
 		expect(result.isErr()).toBeTruthy();
@@ -61,17 +61,17 @@ describe('scp-envelope-handler', () => {
 		expect(result.error.message).toEqual('Invalid SCP Signature');
 	});
 
-	function createMockCrawlState(sequence = BigInt(1)) {
-		const crawlState = mock<CrawlState>();
-		crawlState.latestConfirmedClosedLedger = {
+	function createMockObservation(sequence = BigInt(1)) {
+		const observation = mock<Observation>();
+		observation.latestConfirmedClosedLedger = {
 			sequence: sequence,
 			closeTime: new Date(),
 			value: '',
 			localCloseTime: new Date()
 		};
-		crawlState.network = Networks.PUBLIC;
-		crawlState.envelopeCache = new LRUCache<string, number>({ max: 1000 });
-		return crawlState;
+		observation.network = Networks.PUBLIC;
+		observation.envelopeCache = new LRUCache<string, number>({ max: 1000 });
+		return observation;
 	}
 
 	it('should not process scp envelope when processing SCP signature fails', () => {
@@ -79,7 +79,7 @@ describe('scp-envelope-handler', () => {
 		const handler = new ScpEnvelopeHandler(scpStatementHandler);
 		const scpEnvelope = createDummyExternalizeScpEnvelope();
 		scpEnvelope.signature(Buffer.alloc(20)); // invalid signature
-		const crawlState = createMockCrawlState();
+		const crawlState = createMockObservation();
 		const result = handler.handle(scpEnvelope, crawlState);
 		expect(scpStatementHandler.handle).toHaveBeenCalledTimes(0);
 		expect(result.isErr()).toBeTruthy();

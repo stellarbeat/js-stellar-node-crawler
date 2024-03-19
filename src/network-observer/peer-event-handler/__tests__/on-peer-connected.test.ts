@@ -3,10 +3,12 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { P } from 'pino';
 import { ConnectedPayload, ConnectionManager } from '../../connection-manager';
 import { StragglerTimer } from '../../straggler-timer';
-import { CrawlState } from '../../../crawl-state';
 import { OnPeerConnected } from '../on-peer-connected';
 import { Observation } from '../../observation';
 import { ObservationState } from '../../observation-state';
+import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
+import { Ledger } from '../../../crawler';
+import { Slots } from '../stellar-message-handlers/scp-envelope/scp-statement/externalize/slots';
 
 describe('OnPeerConnectedHandler', () => {
 	const connectionManager = mock<ConnectionManager>();
@@ -24,7 +26,14 @@ describe('OnPeerConnectedHandler', () => {
 		);
 	};
 	const createObservation = (): Observation => {
-		return new Observation([], mock<PeerNodeCollection>(), mock<CrawlState>());
+		return new Observation(
+			'test',
+			[],
+			mock<PeerNodeCollection>(),
+			mock<Ledger>(),
+			new Map<string, QuorumSet>(),
+			new Slots(new QuorumSet(1, ['A'], []), mock<P.Logger>())
+		);
 	};
 
 	const createData = (): ConnectedPayload => {

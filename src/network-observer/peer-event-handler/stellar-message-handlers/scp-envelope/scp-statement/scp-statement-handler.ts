@@ -1,12 +1,12 @@
 import * as P from 'pino';
 import { xdr } from '@stellar/stellar-base';
-import { CrawlState } from '../../../../../crawl-state';
 import { getPublicKeyStringFromBuffer } from '@stellarbeat/js-stellar-node-connector';
 import { QuorumSetManager } from '../../../../quorum-set-manager';
 import { err, ok, Result } from 'neverthrow';
 import { ExternalizeStatementHandler } from './externalize/externalize-statement-handler';
 import { mapExternalizeStatement } from './externalize/map-externalize-statement';
 import { Ledger } from '../../../../../crawler';
+import { Observation } from '../../../../observation';
 
 export class ScpStatementHandler {
 	constructor(
@@ -17,7 +17,7 @@ export class ScpStatementHandler {
 
 	public handle(
 		scpStatement: xdr.ScpStatement,
-		crawlState: CrawlState
+		observation: Observation
 	): Result<
 		{
 			closedLedger: Ledger | null;
@@ -42,14 +42,14 @@ export class ScpStatementHandler {
 			'processing new scp statement: ' + scpStatement.pledges().switch().name
 		);
 
-		const peer = crawlState.peerNodes.getOrAdd(publicKey); //maybe we got a relayed message from a peer that we have not crawled yet
+		const peer = observation.peerNodes.getOrAdd(publicKey); //maybe we got a relayed message from a peer that we have not crawled yet
 		peer.participatingInSCP = true;
 		peer.latestActiveSlotIndex = slotIndex.toString();
 
 		this.quorumSetManager.processQuorumSetHashFromStatement(
 			peer,
 			scpStatement,
-			crawlState
+			observation
 		);
 
 		if (
@@ -68,17 +68,17 @@ export class ScpStatementHandler {
 		}
 
 		const closedLedgerOrNull = this.externalizeStatementHandler.handle(
-			crawlState.peerNodes,
-			crawlState.slots.getSlot(slotIndex),
+			observation.peerNodes,
+			observation.slots.getSlot(slotIndex),
 			externalizeData.value,
 			new Date(), //todo: move up,
-			crawlState.latestConfirmedClosedLedger
+			observation.latestConfirmedClosedLedger
 		);
 
 		if (
 			closedLedgerOrNull !== null &&
 			closedLedgerOrNull.sequence >
-				crawlState.latestConfirmedClosedLedger.sequence
+				observation.latestConfirmedClosedLedger.sequence
 		) {
 			return ok({
 				closedLedger: closedLedgerOrNull

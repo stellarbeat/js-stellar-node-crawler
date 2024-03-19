@@ -1,8 +1,8 @@
 import { NodeAddress } from './node-address';
-import { CrawlState } from './crawl-state';
+import { Crawl } from './crawl';
 
 export interface CrawlTask {
 	nodeAddress: NodeAddress;
-	crawlState: CrawlState;
+	crawl: Crawl;
 	connectCallback: () => void;
 }

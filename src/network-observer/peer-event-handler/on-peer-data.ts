@@ -49,7 +49,7 @@ export class OnPeerData {
 			data.publicKey,
 			data.stellarMessageWork.stellarMessage,
 			attemptLedgerClose,
-			observation.crawlState
+			observation
 		);
 
 		data.stellarMessageWork.done();

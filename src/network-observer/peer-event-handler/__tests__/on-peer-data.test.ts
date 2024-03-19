@@ -4,13 +4,14 @@ import { P } from 'pino';
 import { OnPeerData } from '../on-peer-data';
 import { StellarMessageHandler } from '../stellar-message-handlers/stellar-message-handler';
 import { createDummyExternalizeMessage } from '../../../__fixtures__/createDummyExternalizeMessage';
-import { CrawlState } from '../../../crawl-state';
 import { err, ok } from 'neverthrow';
 import { PeerNodeCollection } from '../../../peer-node-collection';
 import { Ledger } from '../../../crawler';
 import { NodeAddress } from '../../../node-address';
 import { Observation } from '../../observation';
 import { ObservationState } from '../../observation-state';
+import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
+import { Slots } from '../stellar-message-handlers/scp-envelope/scp-statement/externalize/slots';
 
 describe('OnDataHandler', () => {
 	const connectionManager = mock<ConnectionManager>();
@@ -26,7 +27,14 @@ describe('OnDataHandler', () => {
 	}
 
 	function createObservation(): Observation {
-		return new Observation([], mock<PeerNodeCollection>(), mock<CrawlState>());
+		return new Observation(
+			'test',
+			[],
+			mock<PeerNodeCollection>(),
+			mock<Ledger>(),
+			new Map<string, QuorumSet>(),
+			new Slots(new QuorumSet(1, ['A'], []), logger)
+		);
 	}
 
 	function createData() {
@@ -64,15 +72,15 @@ describe('OnDataHandler', () => {
 
 		stellarMessageHandler.handleStellarMessage.mockReturnValue(ok(result));
 
-		const state = createObservation();
-		state.state = ObservationState.Synced;
-		const receivedResult = onDataHandler.handle(data, state);
+		const observation = createObservation();
+		observation.state = ObservationState.Synced;
+		const receivedResult = onDataHandler.handle(data, observation);
 
 		expect(stellarMessageHandler.handleStellarMessage).toHaveBeenCalledWith(
 			data.publicKey,
 			data.stellarMessageWork.stellarMessage,
 			true,
-			state.crawlState
+			observation
 		);
 		expect(data.stellarMessageWork.done).toHaveBeenCalled();
 		expect(receivedResult).toEqual(result);
@@ -81,18 +89,18 @@ describe('OnDataHandler', () => {
 	it('should handle data successfully but not attempt slot close if not in synced mode', () => {
 		const onDataHandler = createDataHandler();
 		const data = createData();
-		const state = createObservation();
-		state.state = ObservationState.Syncing;
+		const observation = createObservation();
+		observation.state = ObservationState.Syncing;
 		const result = createSuccessfulResult();
 		stellarMessageHandler.handleStellarMessage.mockReturnValue(ok(result));
 
-		const receivedResult = onDataHandler.handle(data, state);
+		const receivedResult = onDataHandler.handle(data, observation);
 
 		expect(stellarMessageHandler.handleStellarMessage).toHaveBeenCalledWith(
 			data.publicKey,
 			data.stellarMessageWork.stellarMessage,
 			false,
-			state.crawlState
+			observation
 		);
 		expect(data.stellarMessageWork.done).toHaveBeenCalled();
 		expect(receivedResult).toEqual(result);

@@ -6,15 +6,17 @@ import { P } from 'pino';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { QuorumSet } from '@stellarbeat/js-stellarbeat-shared';
 import { CrawlLogger } from '../crawl-logger';
-import { CrawlProcessState, CrawlState } from '../crawl-state';
+import { CrawlProcessState } from '../crawl';
 import { EventEmitter } from 'events';
 import { AsyncCrawlQueue } from '../crawl-queue';
 import { NetworkObserver } from '../network-observer/network-observer';
 import { ClosePayload } from '../network-observer/connection-manager';
+import { ObservationFactory } from '../network-observer/observation-factory';
+import { CrawlFactory } from '../crawl-factory';
 import { Observation } from '../network-observer/observation';
-import { PeerNodeCollection } from '../peer-node-collection';
 
 describe('Crawler', () => {
+	const crawlFactory = new CrawlFactory(new ObservationFactory());
 	beforeEach(() => {
 		jest.clearAllMocks();
 	});
@@ -44,22 +46,24 @@ describe('Crawler', () => {
 			crawlLogger,
 			logger
 		);
-		const crawlState = new CrawlState(
+		const crawl = crawlFactory.createCrawl(
+			'test',
+			[['peer', 2]],
+			[['top', 1]],
 			new QuorumSet(2, []),
-			new Map(),
 			{
 				closeTime: new Date(0),
 				localCloseTime: new Date(0),
 				sequence: BigInt(0),
 				value: ''
 			},
-			'test',
+			new Map(),
 			logger
 		);
 
 		return {
 			crawler,
-			crawlState,
+			crawl,
 			networkObserver,
 			networkObserverEventEmitter,
 			crawlLogger,
@@ -75,14 +79,16 @@ describe('Crawler', () => {
 	it('should return error if no active top tier connections and no node addresses to crawl', async () => {
 		const {
 			crawler,
-			crawlState,
+			crawl: crawl,
 			networkObserver,
 			crawlLogger,
 			maxCrawlTimeManager
 		} = setupSUT();
-		networkObserver.observe.mockResolvedValue(0);
+		networkObserver.startObservation.mockResolvedValue(0);
+		crawl.observation.topTierAddresses = [];
+		crawl.nodesToCrawl = [];
 		try {
-			await crawler.crawl([], [], crawlState);
+			await crawler.startCrawl(crawl);
 		} catch (e) {
 			expect(e).toBeInstanceOf(Error);
 			expect(crawlLogger.start).not.toHaveBeenCalled();
@@ -107,16 +113,16 @@ describe('Crawler', () => {
 	it('should connect to top tier and not crawl if there are no nodes to be crawled', async () => {
 		const {
 			crawler,
-			crawlState,
+			crawl: crawl,
 			networkObserver,
 			crawlLogger,
 			maxCrawlTimeManager
 		} = setupSUT();
-		networkObserver.observe.mockResolvedValue(1);
-		networkObserver.stop.mockResolvedValue(
-			new Observation([], mock<PeerNodeCollection>(), mock<CrawlState>())
-		);
-		const result = await crawler.crawl([], [], crawlState);
+		networkObserver.startObservation.mockResolvedValue(1);
+		networkObserver.stop.mockResolvedValue(mock<Observation>());
+		crawl.observation.topTierAddresses = [];
+		crawl.nodesToCrawl = [];
+		const result = await crawler.startCrawl(crawl);
 		expect(result).toEqual({
 			closedLedgers: [],
 			latestClosedLedger: {
@@ -135,13 +141,13 @@ describe('Crawler', () => {
 	it('should connect to top tier and crawl peer nodes received from top tier', (resolve) => {
 		const {
 			crawler,
-			crawlState,
+			crawl: crawl,
 			networkObserver,
 			networkObserverEventEmitter,
 			crawlLogger,
 			maxCrawlTimeManager
 		} = setupSUT();
-		networkObserver.observe.mockImplementationOnce(() => {
+		networkObserver.startObservation.mockImplementationOnce(() => {
 			return new Promise((resolve) => {
 				networkObserverEventEmitter.emit('peers', [['127.0.0.1', 11625]]);
 				setTimeout(() => {
@@ -149,6 +155,9 @@ describe('Crawler', () => {
 				}, 1);
 			});
 		});
+
+		networkObserver.stop.mockResolvedValue(mock<Observation>());
+
 		networkObserver.connectToNode.mockImplementation((address, port) => {
 			return new Promise((resolve) => {
 				const disconnectPayload: ClosePayload = {
@@ -162,11 +171,8 @@ describe('Crawler', () => {
 			});
 		});
 
-		networkObserver.stop.mockResolvedValue(
-			new Observation([], mock<PeerNodeCollection>(), mock<CrawlState>())
-		);
 		crawler
-			.crawl([['peer', 2]], [['top', 1]], crawlState)
+			.startCrawl(crawl)
 			.then((result) => {
 				expect(result).toEqual({
 					closedLedgers: [],
@@ -180,13 +186,12 @@ describe('Crawler', () => {
 				});
 				expectCorrectMaxTimer(maxCrawlTimeManager);
 				expectCorrectLogger(crawlLogger);
-				expect(networkObserver.observe).toHaveBeenNthCalledWith(
+				expect(networkObserver.startObservation).toHaveBeenNthCalledWith(
 					1,
-					[['top', 1]],
-					crawlState
+					crawl.observation
 				);
 				expect(networkObserver.connectToNode).toHaveBeenCalledTimes(2);
-				expect(crawlState.state).toBe(CrawlProcessState.IDLE);
+				expect(crawl.state).toBe(CrawlProcessState.IDLE);
 				resolve();
 			})
 			.catch((e) => {
@@ -197,16 +202,14 @@ describe('Crawler', () => {
 	it('should crawl nodes received from peers', (resolve) => {
 		const {
 			crawler,
-			crawlState,
+			crawl,
 			networkObserver,
 			crawlLogger,
 			maxCrawlTimeManager,
 			networkObserverEventEmitter
 		} = setupSUT();
-		networkObserver.observe.mockResolvedValue(1);
-		networkObserver.stop.mockResolvedValue(
-			new Observation([], mock<PeerNodeCollection>(), mock<CrawlState>())
-		);
+		networkObserver.startObservation.mockResolvedValue(1);
+		networkObserver.stop.mockResolvedValue(mock<Observation>());
 		networkObserver.connectToNode.mockImplementation((address, port) => {
 			return new Promise((resolve) => {
 				const disconnectPayload: ClosePayload = {
@@ -221,7 +224,7 @@ describe('Crawler', () => {
 			});
 		});
 		crawler
-			.crawl([['peer', 2]], [['top', 1]], crawlState)
+			.startCrawl(crawl)
 			.then((result) => {
 				expect(result).toEqual({
 					closedLedgers: [],

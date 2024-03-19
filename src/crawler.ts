@@ -1,5 +1,5 @@
 import * as P from 'pino';
-import { CrawlProcessState, CrawlState } from './crawl-state';
+import { CrawlProcessState, Crawl } from './crawl';
 import { CrawlResult } from './crawl-result';
 import { CrawlerConfiguration } from './crawler-configuration';
 import { CrawlLogger } from './crawl-logger';
@@ -23,7 +23,7 @@ export interface Ledger {
  * and manages the crawl state.
  */
 export class Crawler {
-	private _crawlState: CrawlState | null = null;
+	private _crawl: Crawl | null = null;
 
 	constructor(
 		private config: CrawlerConfiguration,
@@ -37,29 +37,19 @@ export class Crawler {
 		this.setupPeerListenerEvents();
 	}
 
-	async crawl(
-		nodeAddresses: NodeAddress[],
-		topTierNodeAddresses: NodeAddress[],
-		crawlState: CrawlState
-	): Promise<CrawlResult> {
+	async startCrawl(crawl: Crawl): Promise<CrawlResult> {
 		return new Promise<CrawlResult>((resolve, reject) => {
-			if (
-				this._crawlState &&
-				this.crawlState.state !== CrawlProcessState.IDLE
-			) {
+			if (this.isCrawlRunning()) {
 				return reject(new Error('Crawl process already running'));
 			}
-			this._crawlState = crawlState;
-			this._crawlState.topTierAddresses = new Set(
-				topTierNodeAddresses.map((address) => `${address[0]}:${address[1]}`)
-			);
-			this.syncTopTierAndCrawl(
-				resolve,
-				reject,
-				topTierNodeAddresses,
-				nodeAddresses
-			);
+			this.crawl = crawl;
+
+			this.syncTopTierAndCrawl(resolve, reject);
 		});
+	}
+
+	private isCrawlRunning() {
+		return this._crawl && this.crawl.state !== CrawlProcessState.IDLE;
 	}
 
 	private setupPeerListenerEvents() {
@@ -68,20 +58,20 @@ export class Crawler {
 		});
 		this.networkObserver.on('disconnect', (data: ClosePayload) => {
 			this.crawlQueueManager.completeCrawlQueueTask(
-				this.crawlState.crawlQueueTaskDoneCallbacks,
+				this.crawl.crawlQueueTaskDoneCallbacks,
 				data.address
 			);
 
 			if (!data.publicKey) {
-				this.crawlState.failedConnections.push(data.address);
+				this.crawl.failedConnections.push(data.address);
 			}
 		});
 	}
 
 	private onPeerAddressesReceived(peerAddresses: NodeAddress[]) {
-		if (this.crawlState.state === CrawlProcessState.TOP_TIER_SYNC) {
-			this.crawlState.peerAddressesReceivedDuringSync =
-				this.crawlState.peerAddressesReceivedDuringSync.concat(peerAddresses);
+		if (this.crawl.state === CrawlProcessState.TOP_TIER_SYNC) {
+			this.crawl.peerAddressesReceivedDuringSync =
+				this.crawl.peerAddressesReceivedDuringSync.concat(peerAddresses);
 		} else {
 			peerAddresses.forEach((peerAddress) => this.crawlPeerNode(peerAddress));
 		}
@@ -89,32 +79,25 @@ export class Crawler {
 
 	private async syncTopTierAndCrawl(
 		resolve: (value: PromiseLike<CrawlResult> | CrawlResult) => void,
-		reject: (reason?: any) => void,
-		topTierAddresses: NodeAddress[],
-		nodeAddresses: NodeAddress[]
+		reject: (reason?: any) => void
 	) {
-		const nrOfActiveTopTierConnections = await this.startTopTierSync(
-			topTierAddresses
-		);
-		this.startCrawlProcess(
-			resolve,
-			reject,
-			nodeAddresses,
-			nrOfActiveTopTierConnections
-		);
+		const nrOfActiveTopTierConnections = await this.startTopTierSync();
+		this.startCrawlProcess(resolve, reject, nrOfActiveTopTierConnections);
 	}
 
 	private startCrawlProcess(
 		resolve: (value: PromiseLike<CrawlResult> | CrawlResult) => void,
 		reject: (reason?: any) => void,
-		nodeAddresses: NodeAddress[],
 		nrOfActiveTopTierConnections: number
 	) {
-		const nodesToCrawl = nodeAddresses.concat(
-			this.crawlState.peerAddressesReceivedDuringSync
+		const nodesToCrawl = this.crawl.nodesToCrawl.concat(
+			this.crawl.peerAddressesReceivedDuringSync
 		);
 
-		if (nodesToCrawl.length === 0 && nrOfActiveTopTierConnections === 0) {
+		if (
+			this.crawl.nodesToCrawl.length === 0 &&
+			nrOfActiveTopTierConnections === 0
+		) {
 			this.logger.warn(
 				'No nodes to crawl and top tier connections closed, crawl failed'
 			);
@@ -123,33 +106,33 @@ export class Crawler {
 		}
 
 		this.logger.info('Starting crawl process');
-		this.crawlLogger.start(this.crawlState, nodeAddresses.length);
-		this.crawlState.state = CrawlProcessState.CRAWLING;
+		this.crawlLogger.start(this.crawl);
+		this.crawl.state = CrawlProcessState.CRAWLING;
 		this.setupCrawlCompletionHandlers(resolve, reject);
 
 		if (nodesToCrawl.length === 0) {
 			this.logger.warn('No nodes to crawl');
 			this.networkObserver.stop().then(() => {
 				this.finish(resolve, reject);
-				this.crawlState.state = CrawlProcessState.STOPPING;
+				this.crawl.state = CrawlProcessState.STOPPING;
 			});
 		} else nodesToCrawl.forEach((address) => this.crawlPeerNode(address));
 	}
 
-	private async startTopTierSync(topTierAddresses: NodeAddress[]) {
+	private async startTopTierSync() {
 		this.logger.info('Starting Top Tier sync');
-		this.crawlState.state = CrawlProcessState.TOP_TIER_SYNC;
-		return this.networkObserver.observe(topTierAddresses, this.crawlState);
+		this.crawl.state = CrawlProcessState.TOP_TIER_SYNC;
+		return this.networkObserver.startObservation(this.crawl.observation);
 	}
 
 	private setupCrawlCompletionHandlers(
 		resolve: (value: PromiseLike<CrawlResult> | CrawlResult) => void,
 		reject: (reason?: any) => void
 	) {
-		this.startMaxCrawlTimeout(resolve, reject, this.crawlState);
+		this.startMaxCrawlTimeout(resolve, reject);
 		this.crawlQueueManager.onDrain(() => {
 			this.logger.info('Stopping crawl process');
-			this.crawlState.state = CrawlProcessState.STOPPING;
+			this.crawl.state = CrawlProcessState.STOPPING;
 			this.networkObserver.stop().then(() => {
 				this.finish(resolve, reject);
 			});
@@ -158,13 +141,12 @@ export class Crawler {
 
 	private startMaxCrawlTimeout(
 		resolve: (value: CrawlResult | PromiseLike<CrawlResult>) => void,
-		reject: (error: Error) => void,
-		crawlState: CrawlState
+		reject: (error: Error) => void
 	) {
 		this.maxCrawlTimeManager.setTimer(this.config.maxCrawlTime, () => {
 			this.logger.fatal('Max crawl time hit, closing all connections');
 			this.networkObserver.stop().then(() => this.finish(resolve, reject));
-			crawlState.maxCrawlTimeHit = true;
+			this.crawl.maxCrawlTimeHit = true;
 		});
 	}
 
@@ -174,7 +156,7 @@ export class Crawler {
 	): void {
 		this.crawlLogger.stop();
 		this.maxCrawlTimeManager.clearTimer();
-		this.crawlState.state = CrawlProcessState.IDLE;
+		this.crawl.state = CrawlProcessState.IDLE;
 
 		if (this.hasCrawlTimedOut()) {
 			//todo clean crawl-queue and connections
@@ -186,14 +168,15 @@ export class Crawler {
 	}
 
 	private hasCrawlTimedOut(): boolean {
-		return this.crawlState.maxCrawlTimeHit;
+		return this.crawl.maxCrawlTimeHit;
 	}
 
 	private constructCrawlResult(): CrawlResult {
 		return {
-			peers: this.crawlState.peerNodes.getAll(),
-			closedLedgers: this.crawlState.slots.getConfirmedClosedSlotIndexes(),
-			latestClosedLedger: this.crawlState.latestConfirmedClosedLedger
+			peers: this.crawl.observation.peerNodes.getAll(),
+			closedLedgers:
+				this.crawl.observation.slots.getConfirmedClosedSlotIndexes(),
+			latestClosedLedger: this.crawl.observation.latestConfirmedClosedLedger
 		};
 	}
 
@@ -203,10 +186,10 @@ export class Crawler {
 		if (!this.canNodeBeCrawled(peerKey)) return;
 
 		this.logNodeAddition(peerKey);
-		this.crawlState.crawledNodeAddresses.add(peerKey);
+		this.crawl.crawledNodeAddresses.add(peerKey);
 		const crawlTask: CrawlTask = {
 			nodeAddress: nodeAddress,
-			crawlState: this.crawlState,
+			crawl: this.crawl,
 			connectCallback: () =>
 				this.networkObserver.connectToNode(nodeAddress[0], nodeAddress[1])
 		};
@@ -220,13 +203,17 @@ export class Crawler {
 
 	private canNodeBeCrawled(peerKey: string): boolean {
 		return (
-			!this.crawlState.crawledNodeAddresses.has(peerKey) &&
-			!this.crawlState.topTierAddresses.has(peerKey)
+			!this.crawl.crawledNodeAddresses.has(peerKey) &&
+			!this.crawl.observation.topTierAddressesSet.has(peerKey)
 		);
 	}
 
-	private get crawlState(): CrawlState {
-		if (!this._crawlState) throw new Error('crawlState not set');
-		return this._crawlState;
+	private get crawl(): Crawl {
+		if (!this._crawl) throw new Error('crawl not set');
+		return this._crawl;
+	}
+
+	private set crawl(crawl: Crawl) {
+		this._crawl = crawl;
 	}
 }

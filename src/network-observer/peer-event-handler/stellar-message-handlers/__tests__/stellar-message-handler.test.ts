@@ -2,7 +2,6 @@ import { StellarMessageHandler } from '../stellar-message-handler';
 import { ScpEnvelopeHandler } from '../scp-envelope/scp-envelope-handler';
 import { QuorumSetManager } from '../../../quorum-set-manager';
 import { P } from 'pino';
-import { CrawlState } from '../../../../crawl-state';
 import { Keypair } from '@stellar/stellar-base';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { createDummyExternalizeMessage } from '../../../../__fixtures__/createDummyExternalizeMessage';
@@ -12,6 +11,7 @@ import { createDummyQuorumSetMessage } from '../../../../__fixtures__/createDumm
 import { createDummyDontHaveMessage } from '../../../../__fixtures__/createDummyDontHaveMessage';
 import { createDummyErrLoadMessage } from '../../../../__fixtures__/createDummyErrLoadMessage';
 import { PeerNodeCollection } from '../../../../peer-node-collection';
+import { Observation } from '../../../observation';
 
 describe('StellarMessageHandler', () => {
 	let scpManager: MockProxy<ScpEnvelopeHandler>;
@@ -32,7 +32,7 @@ describe('StellarMessageHandler', () => {
 		it('should handle SCP message and attempt ledger close', () => {
 			const keyPair = Keypair.random();
 			const stellarMessage = createDummyExternalizeMessage(keyPair);
-			const crawlState = mock<CrawlState>();
+			const observation = mock<Observation>();
 			const closedLedger = {
 				sequence: BigInt(2),
 				closeTime: new Date(),
@@ -48,7 +48,7 @@ describe('StellarMessageHandler', () => {
 				senderPublicKey,
 				stellarMessage,
 				true,
-				crawlState
+				observation
 			);
 			expect(scpManager.handle).toHaveBeenCalledTimes(1);
 			expect(result.isOk()).toBeTruthy();
@@ -61,12 +61,12 @@ describe('StellarMessageHandler', () => {
 
 		it('should not attempt ledger close', () => {
 			const stellarMessage = createDummyExternalizeMessage();
-			const crawlState = mock<CrawlState>();
+			const observation = mock<Observation>();
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
 				false,
-				crawlState
+				observation
 			);
 			expect(scpManager.handle).toHaveBeenCalledTimes(0);
 			expect(result.isOk()).toBeTruthy();
@@ -74,16 +74,16 @@ describe('StellarMessageHandler', () => {
 
 		it('should handle peers message', () => {
 			const stellarMessage = createDummyPeersMessage();
-			const crawlState = mock<CrawlState>();
+			const observation = mock<Observation>();
 			const peerNodes = new PeerNodeCollection();
 			peerNodes.getOrAdd(senderPublicKey);
-			crawlState.peerNodes = peerNodes;
+			observation.peerNodes = peerNodes;
 
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
 				true,
-				crawlState
+				observation
 			);
 			expect(result.isOk()).toBeTruthy();
 			if (!result.isOk()) return;
@@ -96,12 +96,12 @@ describe('StellarMessageHandler', () => {
 
 		it('should handle SCP quorum set message', () => {
 			const stellarMessage = createDummyQuorumSetMessage();
-			const crawlState = mock<CrawlState>();
+			const observation = mock<Observation>();
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
 				true,
-				crawlState
+				observation
 			);
 			expect(quorumSetManager.processQuorumSet).toHaveBeenCalledTimes(1);
 			expect(result.isOk()).toBeTruthy();
@@ -114,12 +114,12 @@ describe('StellarMessageHandler', () => {
 
 		it('should handle dont have message', () => {
 			const stellarMessage = createDummyDontHaveMessage();
-			const crawlState = mock<CrawlState>();
+			const observation = mock<Observation>();
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
 				true,
-				crawlState
+				observation
 			);
 			expect(
 				quorumSetManager.peerNodeDoesNotHaveQuorumSet
@@ -134,19 +134,19 @@ describe('StellarMessageHandler', () => {
 
 		it('should handle errLoad message', () => {
 			const stellarMessage = createDummyErrLoadMessage();
-			const crawlState = mock<CrawlState>();
+			const observation = mock<Observation>();
 			const peerNodes = new PeerNodeCollection();
 			peerNodes.getOrAdd(senderPublicKey);
-			crawlState.peerNodes = peerNodes;
+			observation.peerNodes = peerNodes;
 			const result = handler.handleStellarMessage(
 				senderPublicKey,
 				stellarMessage,
 				true,
-				crawlState
+				observation
 			);
 			expect(result.isOk()).toBeTruthy();
 			expect(
-				crawlState.peerNodes.get(senderPublicKey)?.overLoaded
+				observation.peerNodes.get(senderPublicKey)?.overLoaded
 			).toBeTruthy();
 			if (!result.isOk()) return;
 			expect(result.value).toEqual({
