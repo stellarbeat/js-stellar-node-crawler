@@ -87,7 +87,7 @@ describe('Observation', () => {
 		expect(observation.latestConfirmedClosedLedger.sequence).toBe(BigInt(0));
 	});
 
-	it('should mark network halted if new ledger is found after network was previously halted', () => {
+	it('should mark network not halted if new ledger is found after network was previously halted', () => {
 		const observation = createObservation();
 		observation.moveToSyncingState();
 		observation.moveToSyncedState();
